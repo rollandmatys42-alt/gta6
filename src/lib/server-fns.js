@@ -678,7 +678,7 @@ async function omniRouteChat({messages, model, temperature = 0.4, maxTokens = 18
 }
 
 export const generateStudioDraft = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({platform:z.enum(["TikTok","Instagram","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
+ .validator(z.object({platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
  .handler(async({data,context})=>{
   const prompt="You are a professional GTA VI creator marketing assistant. Generate "+data.contentType+" for "+data.platform+". Topic: "+data.topic+". Tone: "+data.tone+". Language: "+data.language+". Keep claims factual, never present leaks or rumours as confirmed, and do not imply affiliation with Rockstar Games. Return only usable content.";
   const generated=await omniRouteChat({messages:[{role:"user",content:prompt}],temperature:0.7,maxTokens:1400,title:"VICEHUB Creator Studio"});
