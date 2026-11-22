@@ -14,7 +14,7 @@ const unb64 = (value: string) => {
 const hex = (bytes: Uint8Array) => Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
 const sha = async (value: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(value)));
 const hmac = async (keyBytes: Uint8Array, value: string) => {
-  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("raw", new Uint8Array(keyBytes).buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(value)));
 };
 const awsEncode = (value: string) => encodeURIComponent(value).replace(/[!'()*]/g, c => "%" + c.charCodeAt(0).toString(16).toUpperCase());
@@ -186,12 +186,12 @@ Deno.serve(async (req) => {
         await db.SocialAccount.update(account.id, { last_used_at: new Date().toISOString(), last_error: "" });
         results.push({ postId: post.id, status: result.status });
       } catch (error) {
-        await db.SocialPost.update(post.id, { status: "failed", error_message: String(error?.message || error).slice(0, 500) }).catch(() => null);
-        results.push({ postId: post.id, status: "failed", error: String(error?.message || error) });
+        await db.SocialPost.update(post.id, { status: "failed", error_message: (error instanceof Error ? error.message : String(error)).slice(0, 500) }).catch(() => null);
+        results.push({ postId: post.id, status: "failed", error: (error instanceof Error ? error.message : String(error)) });
       }
     }
     return Response.json({ success: true, processed: results.length, results, ranAt: now });
   } catch (error) {
-    return Response.json({ success: false, error: String(error?.message || error) }, { status: 500 });
+    return Response.json({ success: false, error: (error instanceof Error ? error.message : String(error)) }, { status: 500 });
   }
 });
