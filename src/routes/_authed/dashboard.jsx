@@ -4,7 +4,7 @@ import SiteFrame from "@/components/SiteFrame";
 import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile, refreshMySubscription, createStripePortalSession } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 import {useLocale,translate} from "@/lib/i18n";
-import { getMyPlanQuote } from "@/lib/server-fns";
+import { getMyLadderQuote as getMyPlanQuote } from "@/lib/loyalty-fns";
 import { formatMoney } from "@/lib/loyalty";
 import "@/styles/fan-theme.css";
 
