@@ -642,7 +642,8 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
  const instagramConfigured=Boolean(secrets.get("META_APP_ID")&&secrets.get("META_APP_SECRET"));
  const youtubeConfigured=Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET"));
  return {
-  aiProviderConfigured:Boolean(secrets.get("AI_ROUTER_API_KEY")),
+  aiProviderConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL")),
+  omniRouteConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL")),
   xApiConfigured:Boolean(secrets.get("X_BEARER_TOKEN")),
   enabledNewsSources:sources.length,
   agentTemplates:agents.length,
@@ -661,18 +662,24 @@ export const updateReportStatus = createServerFn({method:"POST"}).middleware([re
  .validator(z.object({id:z.string(),status:z.enum(["reviewing","resolved","dismissed"])}))
  .handler(async({data,context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.update(data.id,{status:data.status});});
 
+async function omniRouteChat({messages, model, temperature = 0.4, maxTokens = 1800, title = "VICEHUB"}) {
+ const key=secrets.get("OMNIROUTE_API_KEY"),base=secrets.get("OMNIROUTE_BASE_URL");
+ if(!key||!base)throw Object.assign(new Error("OmniRoute is not configured. Add OMNIROUTE_API_KEY and OMNIROUTE_BASE_URL (OpenAI-compatible /v1 base URL) to Base44 secrets."),{status:503,code:"OMNIROUTE_NOT_CONFIGURED"});
+ const selectedModel=model||secrets.get("OMNIROUTE_MODEL")||"auto";
+ const response=await fetch(base.replace(/\\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","X-Title":title},body:JSON.stringify({model:selectedModel,messages,temperature,max_tokens:maxTokens})});
+ const payload=await response.json().catch(()=>({}));
+ if(!response.ok)throw Object.assign(new Error(payload.error?.message||"OmniRoute returned HTTP "+response.status),{status:502,code:"OMNIROUTE_REQUEST_FAILED"});
+ const output=payload.choices?.[0]?.message?.content;
+ if(!output)throw Object.assign(new Error("OmniRoute returned an empty response."),{status:502,code:"OMNIROUTE_EMPTY_RESPONSE"});
+ return {output,model:payload.model||selectedModel,usage:payload.usage||null};
+}
+
 export const generateStudioDraft = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({platform:z.enum(["TikTok","Instagram","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
  .handler(async({data,context})=>{
-  const key=secrets.get("AI_ROUTER_API_KEY");
-  if(!key) throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets to activate generation."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
-  const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1";
-  const model=secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
   const prompt="You are a professional GTA VI creator marketing assistant. Generate "+data.contentType+" for "+data.platform+". Topic: "+data.topic+". Tone: "+data.tone+". Language: "+data.language+". Keep claims factual, never present leaks or rumours as confirmed, and do not imply affiliation with Rockstar Games. Return only usable content.";
-  const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://gta6-creator-hub-c26cc578.base44.app","X-Title":"VICEHUB Creator Studio"},body:JSON.stringify({model,messages:[{role:"user",content:prompt}],temperature:0.7,max_tokens:1400})});
-  if(!response.ok) throw Object.assign(new Error("AI provider error: HTTP "+response.status),{status:502,code:"AI_PROVIDER_ERROR"});
-  const payload=await response.json();const output=payload.choices?.[0]?.message?.content;
-  if(!output) throw new Error("AI provider returned an empty response.");
+  const generated=await omniRouteChat({messages:[{role:"user",content:prompt}],temperature:0.7,maxTokens:1400,title:"VICEHUB Creator Studio"});
+  const output=generated.output,model=generated.model;
   const saved=await context.getBase44().asServiceRole.entities.AIContentDraft.create({user_id:context.user.id,platform:data.platform,content_type:data.contentType,topic:data.topic,output,status:"draft",provider:model});
   return {output,id:saved.id,model};
  });
@@ -740,12 +747,9 @@ export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([re
   requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
   const agent=await db.AIAgentConfig.get(data.agentId).catch(()=>null);
   if(!agent||!agent.enabled)throw Object.assign(new Error("This agent is not enabled."),{status:403});
-  const key=secrets.get("AI_ROUTER_API_KEY");if(!key)throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
-  const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1",model=agent.provider_model||secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
-  const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://gta6-creator-hub-c26cc578.base44.app","X-Title":"VICEHUB Agent"},body:JSON.stringify({model,messages:[{role:"system",content:agent.instructions},{role:"user",content:data.taskInput}],temperature:0.4,max_tokens:1800})});
-  if(!response.ok)throw Object.assign(new Error("AI provider error: HTTP "+response.status),{status:502});
-  const result=await response.json(),output=result.choices?.[0]?.message?.content;if(!output)throw new Error("AI provider returned an empty result.");
-  const saved=await db.AIContentDraft.create({user_id:context.user.id,platform:"General",content_type:agent.agent_key==="seo_agent"?"SEO":agent.agent_key==="geo_agent"?"GEO":agent.agent_key==="social_agent"?"Caption":"Description",topic:data.taskInput,output,status:"draft",provider:model});
+  const generated=await omniRouteChat({model:agent.provider_model||undefined,messages:[{role:"system",content:agent.instructions},{role:"user",content:data.taskInput}],temperature:0.4,maxTokens:1800,title:"VICEHUB Agent"});
+   const output=generated.output,model=generated.model;
+   const saved=await db.AIContentDraft.create({user_id:context.user.id,platform:"General",content_type:agent.agent_key==="seo_agent"?"SEO":agent.agent_key==="geo_agent"?"GEO":agent.agent_key==="social_agent"?"Caption":"Description",topic:data.taskInput,output,status:"draft",provider:model});
   await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Completed successfully"});
   return {output,draftId:saved.id,model};
  });
@@ -1026,14 +1030,9 @@ export const grantComplimentaryPremium = createServerFn({method:"POST"}).middlew
  });
 
 async function translateWithConfiguredAI(sourceText,targetLanguage,contextLabel){
- const key=secrets.get("AI_ROUTER_API_KEY");
- if(!key)throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
- const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1";
- const model=secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
- const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({model,messages:[{role:"system",content:"Translate the provided "+contextLabel+" faithfully into "+targetLanguage+". Preserve meaning, factual distinctions, proper names, URLs, HTML/Markdown structure and all GTA VI trademark disclaimers. Return only a valid JSON object with translated fields."},{role:"user",content:sourceText}],temperature:0.2,max_tokens:4000})});
- if(!response.ok)throw Object.assign(new Error("Translation provider error: HTTP "+response.status),{status:502});
- const raw=(await response.json()).choices?.[0]?.message?.content||"";
- const cleaned=raw.replace(/^\s*\x60\x60\x60(?:json)?/i,"").replace(/\x60\x60\x60\s*$/,"").trim();
+ const generated=await omniRouteChat({messages:[{role:"system",content:"Translate the provided "+contextLabel+" faithfully into "+targetLanguage+". Preserve meaning, factual distinctions, proper names, URLs, HTML/Markdown structure and all GTA VI trademark disclaimers. Return only a valid JSON object with translated fields."},{role:"user",content:sourceText}],temperature:0.2,maxTokens:4000,title:"VICEHUB Translation"});
+  const raw=generated.output;
+  const cleaned=raw.replace(/^\s*\x60\x60\x60(?:json)?/i,"").replace(/\x60\x60\x60\s*$/,"").trim();
  try{return JSON.parse(cleaned);}catch{throw new Error("AI translation did not return valid structured JSON.");}
 }
 export const translateCmsPage = createServerFn({method:"POST"}).middleware([requireUser])
