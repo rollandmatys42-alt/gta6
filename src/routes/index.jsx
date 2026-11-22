@@ -37,7 +37,11 @@ const sections = [
 
 function HomePage() {
   const { isAuthenticated, navigateToLogin, logout } = useAuth();
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(() => {
+    if (typeof window === "undefined") return "en";
+    const saved = window.localStorage.getItem("vicehub-language");
+    return saved && ["en","fr","es","pt","it","de"].includes(saved) ? saved : "en";
+  });
   const [videoLanguage, setVideoLanguage] = useState("All");
   const [installPrompt, setInstallPrompt] = useState(null);
   const [installHelp, setInstallHelp] = useState(false);
@@ -59,9 +63,7 @@ function HomePage() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-    const saved = window.localStorage.getItem("vicehub-language");
-    if (saved && ["en","fr","es","pt","it","de"].includes(saved)) setLanguage(saved);
-    setIsInstalled(window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true);
+     setIsInstalled(window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true);
     const handler = event => { event.preventDefault(); setInstallPrompt(event); };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
