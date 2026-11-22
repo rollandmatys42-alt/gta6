@@ -6,7 +6,7 @@
     "provider": { "type": "string", "enum": ["TikTok", "Instagram", "YouTube"] },
     "provider_user_id": { "type": "string", "maxLength": 200 },
     "account_name": { "type": "string", "maxLength": 160 },
-    "access_token_ciphertext": { "type": "string", "rls": { "read": { "user_condition": { "role": "admin" } }, "update": { "user_condition": { "role": "admin" } } } },
+    "access_token_ciphertext": { "type": "string" },
     "refresh_token_ciphertext": { "type": "string", "rls": { "read": { "user_condition": { "role": "admin" } }, "update": { "user_condition": { "role": "admin" } } } },
     "expires_at": { "type": "string", "format": "date-time" },
     "refresh_expires_at": { "type": "string", "format": "date-time" },
