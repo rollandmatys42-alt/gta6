@@ -3,6 +3,7 @@
 - Video records are private metadata; only verified, published catalogue fields are exposed by the public server function.
 - Original and watermarked renditions are stored in a private S3-compatible bucket (Cloudflare R2 supported). The app issues short-lived signed URLs only after authorization.
 - Free accounts receive five downloads per UTC calendar month. Paid tier limits and clean-download entitlement come from active SubscriptionPlan records; no paid prices or limits are invented.
+- The active tier is stored in the admin-managed UserSubscription entity, separate from Base44's built-in User record.
 - Free accounts are served only the separately prepared watermarked rendition. Publishing requires both private renditions and verified content rights.
 - Admin-only upload URL, draft creation and publish functions are server-side and check the Base44 admin role.
 - Required Base44 secrets: VIDEO_STORAGE_ENDPOINT, VIDEO_STORAGE_BUCKET, VIDEO_STORAGE_ACCESS_KEY_ID, VIDEO_STORAGE_SECRET_ACCESS_KEY, VIDEO_STORAGE_REGION (usually auto).
