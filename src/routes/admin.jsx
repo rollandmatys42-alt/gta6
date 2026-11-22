@@ -13,8 +13,22 @@ function AdminPage(){
  const [page,setPage]=useState({slug:"",title:"",content:"",locale:"en",status:"draft",metaTitle:"",metaDescription:""});
  const [plan,setPlan]=useState({tierCode:"starter",displayName:"Starter",monthlyPriceCents:0,currency:"USD",monthlyDownloadLimit:0,cleanDownloads:false,marketplaceEnabled:false,status:"draft",loyaltyMonthlyDiscountPercent:0,loyaltyMaxDiscountPercent:0,loyaltyFloorPriceCents:0,sortOrder:1});
  const [agent,setAgent]=useState({agentKey:"news_editor",displayName:"News Editor",instructions:"Review GTA VI news sources. Separate official facts from reports, rumours and theories. Never copy third-party articles.",providerModel:"",enabled:false,schedule:"manual",monthlyRunLimit:0});
- const refresh=async()=>{setError("");try{const [s,n,so,p,pg,r,a,pl,cp,rd,subs,fin,promo,inv,vi,invoiceCfg]=await Promise.all([getAdminOverview(),getAdminNews(),getNewsSources(),getAdminShopProducts(),getAdminSitePages(),getAdminReports(),getAdminAgents(),getAdminPlans(),getAdminCreatorProfiles(),getPlatformReadiness(),getAdminSubscribers(),getAdminFinanceSnapshot(),getAdminPromotions(),getAdminInvoices(),getAdminVideoIntelligence(),getAdminInvoiceSettings()]);setStats(s);setNews(n);setSources(so);setProducts(p);setPages(pg);setReports(r);setAgents(a);setPlans(pl);setCreatorProfiles(cp);setReadiness(rd);setSubscribers(subs);setFinance(fin);setPromotions(promo);setInvoices(inv);setVideoIntel(vi);setInvoiceSettings(invoiceCfg);}catch(e){setError(e.message||"Admin data could not be loaded.");}};
- useEffect(()=>{if(user?.role==="admin")refresh();},[user?.id]);
+ const refresh=async(target=tab)=>{setError("");try{switch(target){
+ case "Overview":{const [s,subs,fin,vi]=await Promise.all([getAdminOverview(),getAdminSubscribers(),getAdminFinanceSnapshot(),getAdminVideoIntelligence()]);setStats(s);setSubscribers(subs);setFinance(fin);setVideoIntel(vi);break;}
+ case "Subscribers":{const [subs,fin]=await Promise.all([getAdminSubscribers(),getAdminFinanceSnapshot()]);setSubscribers(subs);setFinance(fin);break;}
+ case "Finance":{const [fin,promo,inv,pl,cfg]=await Promise.all([getAdminFinanceSnapshot(),getAdminPromotions(),getAdminInvoices(),getAdminPlans(),getAdminInvoiceSettings()]);setFinance(fin);setPromotions(promo);setInvoices(inv);setPlans(pl);setInvoiceSettings(cfg);break;}
+ case "Video Intelligence":{const [vi,rd]=await Promise.all([getAdminVideoIntelligence(),getPlatformReadiness()]);setVideoIntel(vi);setReadiness(rd);break;}
+ case "CMS":setPages(await getAdminSitePages());break;
+ case "News":setNews(await getAdminNews());break;
+ case "Sources":setSources(await getNewsSources());break;
+ case "Creators":setCreatorProfiles(await getAdminCreatorProfiles());break;
+ case "Plans":setPlans(await getAdminPlans());break;
+ case "Reports":setReports(await getAdminReports());break;
+ case "AI agents":setAgents(await getAdminAgents());break;
+ case "Shop":setProducts(await getAdminShopProducts());break;
+ default:break;
+ }}catch(e){setError(e.message||"Admin data could not be loaded.");}};
+ useEffect(()=>{if(user?.role==="admin")refresh(tab);},[user?.id,tab]);
  if(user?.role!=="admin")return <SiteFrame eyebrow="VICEHUB / RESTRICTED"><h1>ACCESS DENIED.</h1><p>Administrator permissions are required.</p></SiteFrame>;
  const run=async action=>{setBusy(true);setError("");setNotice("");try{const result=await action();setNotice(typeof result==="string"?result:"Changes saved successfully.");await refresh();}catch(e){setError(e.message||"Operation failed.");}finally{setBusy(false);}};
  const saveArticle=e=>{e.preventDefault();return run(async()=>{await saveNewsArticle({data:article});setArticle({title:"",slug:"",summary:"",body:"",sourceName:"",sourceUrl:"",sourceType:"media",confidence:"reported",locale:"en",status:"draft"});return "News article saved.";});};
