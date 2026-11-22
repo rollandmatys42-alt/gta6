@@ -25,7 +25,7 @@ const sections = [
   { id: "news", icon: "◉", title: "GTA VI news desk", desc: "Official updates, press coverage and clearly labelled community reports." },
   { id: "marketplace", icon: "◇", title: "Creator marketplace", desc: "Sell original edits, packs and licensed creator content." },
 ];
-const videos = [];\nconst stories = [
+const stories = [
   { type: "OFFICIAL SOURCE", title: "Rockstar Games newsroom", desc: "Official announcements and trailers will be indexed here with direct source links.", source: "rockstargames.com" },
   { type: "PRESS COVERAGE", title: "Industry coverage and analysis", desc: "Editorial summaries will link to the original publisher and preserve attribution.", source: "Verified media" },
   { type: "COMMUNITY REPORT", title: "Community discoveries", desc: "Fan theories and unconfirmed reports will always be labelled as unverified.", source: "Community desk" },
