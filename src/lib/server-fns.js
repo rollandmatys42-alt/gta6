@@ -679,3 +679,37 @@ export const grantComplimentaryPremium = createServerFn({method:"POST"}).middlew
   const payload={user_id:data.userId,tier_code:"premium",status:"active",currency:data.currency,started_at:new Date().toISOString(),streak_months:0,loyalty_discount_percent:0,current_monthly_price_cents:0,voluntary_cancelled:false};
   return rows[0]?db.UserSubscription.update(rows[0].id,payload):db.UserSubscription.create(payload);
  });
+
+async function translateWithConfiguredAI(sourceText,targetLanguage,contextLabel){
+ const key=secrets.get("AI_ROUTER_API_KEY");
+ if(!key)throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
+ const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1";
+ const model=secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
+ const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({model,messages:[{role:"system",content:"Translate the provided "+contextLabel+" faithfully into "+targetLanguage+". Preserve meaning, factual distinctions, proper names, URLs, HTML/Markdown structure and all GTA VI trademark disclaimers. Return only a valid JSON object with translated fields."},{role:"user",content:sourceText}],temperature:0.2,max_tokens:4000})});
+ if(!response.ok)throw Object.assign(new Error("Translation provider error: HTTP "+response.status),{status:502});
+ const raw=(await response.json()).choices?.[0]?.message?.content||"";
+ const cleaned=raw.replace(/^\s*\x60\x60\x60(?:json)?/i,"").replace(/\x60\x60\x60\s*$/,"").trim();
+ try{return JSON.parse(cleaned);}catch{throw new Error("AI translation did not return valid structured JSON.");}
+}
+export const translateCmsPage = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({pageId:z.string().min(1),targetLocale:z.enum(["fr","es","de","it","pt"])}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
+  const page=await db.SitePage.get(data.pageId);
+  const exists=await db.SitePage.filter({slug:page.slug,locale:data.targetLocale},"-created_date",1,0);
+  if(exists.length)throw Object.assign(new Error("A page translation already exists for this language. Edit that version instead."),{status:409});
+  const translated=await translateWithConfiguredAI(JSON.stringify({title:page.title,content:page.content,metaTitle:page.meta_title||"",metaDescription:page.meta_description||""}),({fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese"})[data.targetLocale],"CMS page");
+  if(!translated.title||!translated.content)throw new Error("Translation output is missing required page fields.");
+  return db.SitePage.create({slug:page.slug,title:translated.title,content:translated.content,locale:data.targetLocale,status:"draft",meta_title:translated.metaTitle||translated.title,meta_description:translated.metaDescription||"",updated_by:context.user.id});
+ });
+export const translateNewsArticle = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({articleId:z.string().min(1),targetLocale:z.enum(["fr","es","de","it","pt"])}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
+  const article=await db.NewsArticle.get(data.articleId);
+  const exists=await db.NewsArticle.filter({slug:article.slug,locale:data.targetLocale},"-created_date",1,0);
+  if(exists.length)throw Object.assign(new Error("A translation already exists for this language."),{status:409});
+  const translated=await translateWithConfiguredAI(JSON.stringify({title:article.title,summary:article.summary,body:article.body,tags:article.tags||[]}),({fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese"})[data.targetLocale],"GTA VI news article");
+  if(!translated.title||!translated.summary||!translated.body)throw new Error("Translation output is missing required article fields.");
+  return db.NewsArticle.create({title:translated.title,slug:article.slug,summary:translated.summary,body:translated.body,source_name:article.source_name,source_url:article.source_url,source_type:article.source_type,confidence:article.confidence,locale:data.targetLocale,status:"draft",tags:translated.tags||article.tags||[],created_by:context.user.id});
+ });
