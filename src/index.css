@@ -561,3 +561,122 @@
 @media(max-width:1000px){.reference-benefits{grid-template-columns:repeat(2,1fr);row-gap:12px}.reference-benefits>div:nth-child(2){border-right:0}.reaction-gallery{grid-template-columns:repeat(2,1fr)}.shorts-rail{grid-template-columns:repeat(3,1fr)}.short-poster{height:290px}}
 @media(max-width:700px){.reference-benefits{padding:18px 5%;grid-template-columns:1fr 1fr}.reference-benefits>div{padding:7px 8px;grid-template-columns:27px 1fr;gap:7px}.reference-benefits b{font-size:22px}.reference-benefits span{font-size:8px}.reference-benefits small{font-size:8px}.reference-section{padding:55px 5%}.reference-section-head{align-items:flex-start;flex-direction:column;gap:15px}.reference-section-head h2{font-size:52px}.reaction-gallery{grid-template-columns:1fr 1fr;gap:8px}.reference-card-image{height:190px}.reference-card-copy{padding:12px}.reference-card-copy b{font-size:20px}.shorts-rail{grid-template-columns:repeat(2,1fr);gap:10px}.short-poster{height:260px}.feed-row{grid-template-columns:25px 62px 1fr;gap:9px;padding:11px 3px}.feed-thumb{height:48px}.feed-title b{font-size:18px}.feed-action{grid-column:3;font-size:7px}.how-grid,.leaderboard-grid{grid-template-columns:1fr}.how-grid article{min-height:280px}.leaderboard-panel{min-height:unset}.reference-feature-cta{align-items:flex-start;flex-direction:column;padding:55px 5%}.faq-item>button{grid-template-columns:28px 1fr 20px;gap:8px}.faq-item>button b{font-size:19px}.faq-item>p{margin-left:36px}.reference-link{white-space:normal;text-align:left}}
 @media(max-width:420px){.reference-benefits{grid-template-columns:1fr}.reference-benefits>div{border-right:0;border-bottom:1px solid #cbb9a8;padding:9px 0}.reference-benefits>div:last-child{border-bottom:0}.reaction-gallery{grid-template-columns:1fr}.reference-card-image{height:220px}.shorts-rail{grid-template-columns:1fr 1fr}.short-poster{height:220px}.leaderboard-row{grid-template-columns:22px 34px 1fr auto;gap:7px;padding:12px 10px}.leader-score{font-size:7px}}
+
+
+/* VICEHUB GTA VI identity system — Vice City neon, Leonida dusk, deep Atlantic night */
+.hub-shell{
+  --vh-night:#071421;--vh-deep:#091b2b;--vh-panel:#10283a;--vh-panel-2:#132f43;
+  --vh-pink:#ff4f9a;--vh-cyan:#35d9d2;--vh-orange:#ff8a4c;--vh-violet:#9c78ff;
+  --vh-white:#f7f5f2;--vh-muted:#a8b8c4;--vh-line:#29485a;
+  background:var(--vh-night);color:var(--vh-white);
+}
+.hub-shell .topbar{background:rgba(5,16,28,.96);border-bottom:1px solid #24475b;box-shadow:0 8px 30px #02091280}
+.hub-shell .brand-mark{background:linear-gradient(145deg,var(--vh-pink),var(--vh-orange));color:#071421}
+.hub-shell .brand-accent,.hub-shell .nav-link.active,.hub-shell .nav-link:hover{color:var(--vh-cyan)}
+.hub-shell .nav-link{color:#c2d0d8}
+.hub-shell .sign-in{color:#d5e1e8}
+.hub-shell .join-btn,.hub-shell .primary-btn{background:linear-gradient(110deg,var(--vh-pink),var(--vh-orange));border:1px solid var(--vh-pink);color:#101522;box-shadow:0 7px 24px #ff4f9a30}
+.hub-shell .join-btn:hover,.hub-shell .primary-btn:hover{filter:brightness(1.12);box-shadow:0 9px 30px #ff4f9a55}
+.hub-shell .vice-landing-hero{background:#071421}
+.hub-shell .vice-hero-photo{filter:saturate(1.2) contrast(1.12);object-position:center 48%}
+.hub-shell .vice-hero-shade{background:linear-gradient(90deg,rgba(4,14,26,.94) 0%,rgba(5,19,33,.72) 46%,rgba(5,19,33,.12) 100%),linear-gradient(0deg,#071421 0%,transparent 38%),linear-gradient(135deg,#ff4f9a24,transparent 45%,#35d9d224)}
+.hub-shell .vice-landing-hero .eyebrow,.hub-shell .vice-hero-overline{color:var(--vh-cyan)}
+.hub-shell .vice-landing-hero h1{color:#fff8f5;text-shadow:0 5px 35px #000b}
+.hub-shell .vice-landing-hero h1 em{color:var(--vh-pink);text-shadow:0 0 28px #ff4f9a55}
+.hub-shell .vice-landing-hero p{color:#d4e0e7}
+.hub-shell .vice-hero-stamp{border-color:var(--vh-pink);color:#fff0f6;background:#07142188}
+.hub-shell .vice-hero-stamp b{color:var(--vh-cyan)}
+.hub-shell .vice-hero-caption span{color:var(--vh-orange)}
+.hub-shell .hero-proof b,.hub-shell .hero-bottom b{color:var(--vh-cyan)}
+.hub-shell .city-discovery,.hub-shell .library-section,.hub-shell .features-section,.hub-shell .pricing-section,.hub-shell .reference-section,.hub-shell .shorts-section,.hub-shell .how-section,.hub-shell .faq-section{background:var(--vh-night);color:var(--vh-white)}
+.hub-shell .city-discovery-head h2,.hub-shell .section-head h2,.hub-shell .reference-section-head h2,.hub-shell .pricing-intro h2{color:#fff7f4}
+.hub-shell .city-discovery-head p,.hub-shell .section-head p,.hub-shell .reference-section-head p,.hub-shell .pricing-intro>p{color:var(--vh-muted)}
+.hub-shell .city-tile{border:1px solid #31556a;background:var(--vh-panel);color:#fff}
+.hub-shell .city-tile:before{background:linear-gradient(145deg,#ff4f9a,#8b4f9b 48%,#087e91)}
+.hub-shell .city-tile:after{background:linear-gradient(0deg,rgba(4,13,24,.94),rgba(4,13,24,.08) 78%),linear-gradient(90deg,#07142155,transparent)}
+.hub-shell .city-tile-number,.hub-shell .city-tile i{color:var(--vh-cyan)}
+.hub-shell .section-head .eyebrow,.hub-shell .library-section .eyebrow,.hub-shell .news-section .eyebrow,.hub-shell .features-section .eyebrow,.hub-shell .pricing-section .eyebrow,.hub-shell .reference-section .eyebrow{color:var(--vh-pink)}
+.hub-shell .outline-btn,.hub-shell .reference-link{border:1px solid #3e7184!important;color:var(--vh-cyan)!important;background:#0b2030!important}
+.hub-shell .outline-btn:hover,.hub-shell .reference-link:hover{border-color:var(--vh-pink)!important;color:#fff!important;background:#ff4f9a18!important}
+.hub-shell .video-moment-card,.hub-shell .drop-card,.hub-shell .empty-library{background:var(--vh-panel);border-color:#31556a;color:#eaf3f7}
+.hub-shell .video-moment-media{background:linear-gradient(135deg,#ff4f9a,#6c4b92 48%,#087e91)}
+.hub-shell .video-moment-info{background:linear-gradient(145deg,#15344a,#0a1c2c)}
+.hub-shell .video-moment-info small,.hub-shell .drop-view-label,.hub-shell .drops-count{color:var(--vh-cyan)}
+.hub-shell .video-moment-info h3,.hub-shell .drop-card .video-meta h3,.hub-shell .drops-feed-head h3{color:#fff7f4}
+.hub-shell .search-box{border-color:#3c687b;color:var(--vh-cyan)}
+.hub-shell .search-box input,.hub-shell .video-language-filter{background:#0b2030;color:#edf6f8;border-color:#31556a}
+.hub-shell .search-box input::placeholder{color:#91a8b5}
+.hub-shell .filter{background:#10283a;border-color:#31556a;color:#c8d8e0}
+.hub-shell .filter.active{background:var(--vh-pink);border-color:var(--vh-pink);color:#071421}
+.hub-shell .drop-card{box-shadow:0 12px 30px #020a1270}
+.hub-shell .drop-card:hover{border-color:var(--vh-pink)}
+.hub-shell .drop-card-bottom>button{background:#0b2030;border-color:#3c687b;color:var(--vh-cyan)}
+.hub-shell .drop-tags span{background:#0b2030;border-color:#31556a;color:#c8d8e0}
+.hub-shell .news-section,.hub-shell .reaction-section,.hub-shell .reaction-feed-section,.hub-shell .leaderboard-section{background:#0c2030;color:var(--vh-white)}
+.hub-shell .news-section .section-head h2,.hub-shell .reaction-section .reference-section-head h2,.hub-shell .reaction-feed-section .reference-section-head h2,.hub-shell .leaderboard-section .reference-section-head h2{color:#fff7f4}
+.hub-shell .news-section .section-head p,.hub-shell .reaction-section .reference-section-head p,.hub-shell .reaction-feed-section .reference-section-head p,.hub-shell .leaderboard-section .reference-section-head p{color:var(--vh-muted)}
+.hub-shell .news-section .news-card,.hub-shell .reaction-card,.hub-shell .leaderboard-panel{background:linear-gradient(155deg,#15344a,#0d2233);border-color:#31556a;color:#f5f8fa}
+.hub-shell .news-section .news-card:hover,.hub-shell .reaction-card:hover{border-color:var(--vh-pink)}
+.hub-shell .news-index,.hub-shell .story-type,.hub-shell .story-source span,.hub-shell .reference-index,.hub-shell .reference-card-copy small{color:var(--vh-pink)}
+.hub-shell .news-card h3,.hub-shell .reference-card-copy b,.hub-shell .leaderboard-panel-head b,.hub-shell .leader-name b,.hub-shell .fanpage-feature h3{color:#fff7f4}
+.hub-shell .news-card p,.hub-shell .story-source,.hub-shell .reference-card-copy>span{color:#b4c7d1}
+.hub-shell .story-source{border-color:#31556a}
+.hub-shell .reference-card-image,.hub-shell .short-poster,.hub-shell .feed-thumb{background:#071421}
+.hub-shell .reference-image-fallback{background:linear-gradient(145deg,#ff4f9a,#714d9d 52%,#087f91);color:#fff}
+.hub-shell .reference-play,.hub-shell .short-play{border-color:#35d9d2;background:#071421b8;color:#fff}
+.hub-shell .reference-card-tag{background:#071421e8;color:var(--vh-cyan)}
+.hub-shell .reference-empty{border-color:#31556a;color:#f3f7f9}
+.hub-shell .reference-empty span,.hub-shell .shorts-empty p,.hub-shell .leaderboard-empty,.hub-shell .fanpage-feature p{color:#a8bdc8}
+.hub-shell .shorts-empty{border-color:#31556a;background:linear-gradient(145deg,#15344a,#0a1b2b)}
+.hub-shell .shorts-empty-mark,.hub-shell .how-symbol{border-color:var(--vh-cyan);color:var(--vh-cyan)}
+.hub-shell .shorts-empty>b,.hub-shell .short-card>b,.hub-shell .how-grid h3{color:#fff7f4}
+.hub-shell .short-card>span,.hub-shell .how-grid p{color:#afc1ca}
+.hub-shell .reference-live,.hub-shell .feed-action,.hub-shell .how-grid article>button{color:var(--vh-cyan)}
+.hub-shell .reaction-feed{border-color:#31556a}
+.hub-shell .feed-row{border-color:#31556a;color:#edf5f8}
+.hub-shell .feed-row:hover{background:#15344a}
+.hub-shell .feed-number,.hub-shell .leader-rank{color:var(--vh-pink)}
+.hub-shell .feed-title small,.hub-shell .leader-name small{color:#9db2bf}
+.hub-shell .how-grid article{border-color:#31556a;background:linear-gradient(145deg,#15344a,#0b1e2d)}
+.hub-shell .how-number{color:#35d9d230}
+.hub-shell .leaderboard-panel{min-height:330px}
+.hub-shell .leaderboard-panel-head{border-color:#31556a}
+.hub-shell .leaderboard-panel-head span{color:var(--vh-cyan)}
+.hub-shell .leaderboard-row{border-color:#31556a}
+.hub-shell .leader-avatar{background:linear-gradient(145deg,var(--vh-pink),var(--vh-cyan));color:#071421}
+.hub-shell .leader-score{color:var(--vh-orange)}
+.hub-shell .fanpage-orbit{border-color:var(--vh-pink);color:var(--vh-pink)}
+.hub-shell .fanpage-feature button{background:var(--vh-pink);color:#071421}
+.hub-shell .reference-feature-cta{background:linear-gradient(110deg,#ff4f9a 0%,#9c78ff 48%,#35d9d2 100%);color:#071421}
+.hub-shell .reference-feature-cta .eyebrow{color:#102033}
+.hub-shell .reference-feature-cta h2,.hub-shell .reference-feature-cta h2 em{color:#071421}
+.hub-shell .reference-feature-cta p{color:#132c3a}
+.hub-shell .reference-feature-cta .primary-btn{background:#071421;color:#35d9d2;border-color:#071421}
+.hub-shell .feature-card,.hub-shell .plan-card{background:linear-gradient(145deg,#15344a,#0b1e2d);border-color:#31556a;color:#f5f8fa}
+.hub-shell .feature-card:hover,.hub-shell .plan-card.highlighted{border-color:var(--vh-pink)}
+.hub-shell .feature-icon,.hub-shell .feature-link,.hub-shell .plan-name span,.hub-shell .currency-note b,.hub-shell .loyalty-note span{color:var(--vh-cyan)}
+.hub-shell .feature-card h3,.hub-shell .plan-name,.hub-shell .plan-price{color:#fff7f4}
+.hub-shell .feature-card p,.hub-shell .plan-card>p,.hub-shell .plan-card li,.hub-shell .loyalty-note{color:#b2c4ce}
+.hub-shell .plan-card ul,.hub-shell .currency-note{border-color:#31556a}
+.hub-shell .plan-card.highlighted{background:linear-gradient(145deg,#38264a,#10283a)}
+.hub-shell .reference-benefits{background:#0c2030;color:#f5f8fa;border-color:#31556a}
+.hub-shell .reference-benefits>div{border-color:#31556a}
+.hub-shell .reference-benefits b{color:var(--vh-pink)}
+.hub-shell .reference-benefits small{color:#a8bdc8}
+.hub-shell .footer{background:#050f1b;border-color:#24475b}
+.hub-shell .footer-brand{color:#fff}
+.hub-shell .footer>p,.hub-shell .footer>small,.hub-shell .gta-disclaimer{color:#9bb0bd}
+.hub-shell .footer-links button{color:#c8d8e0}
+.hub-shell .gta-disclaimer{border-color:#24475b}
+.hub-shell .faq-item,.hub-shell .faq-list{border-color:#31556a}
+.hub-shell .faq-item>button{color:#f5f8fa}
+.hub-shell .faq-item>button span{color:var(--vh-pink)}
+.hub-shell .faq-item>button i{color:var(--vh-cyan)}
+.hub-shell .faq-item>p{color:#afc1ca}
+.hub-shell .reference-section .eyebrow{color:var(--vh-pink)}
+.hub-shell .reference-section .reference-section-head h2{letter-spacing:.2px}
+.hub-shell .reference-feature-cta .primary-btn:hover{background:#10283a;color:#fff}
+@media(max-width:760px){
+ .hub-shell .vice-hero-shade{background:linear-gradient(90deg,rgba(4,14,26,.92),rgba(5,19,33,.5)),linear-gradient(0deg,#071421 0%,transparent 65%),linear-gradient(135deg,#ff4f9a22,transparent 45%,#35d9d222)}
+ .hub-shell .reference-benefits{background:#0c2030}
+}
