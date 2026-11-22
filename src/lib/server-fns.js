@@ -324,12 +324,16 @@ export const createVideoRecord = createServerFn({ method: "POST" })
     thumbnailUrl: z.string().url().max(1000).optional(),
     creatorName: z.string().max(80).optional(),
     sourceReference: z.string().url().max(1000).optional(),
+    rightsEvidenceReference: z.string().max(500).optional(),
+    fileSizeBytes: z.number().int().min(1).max(4000000000),
+    mimeType: z.enum(["video/mp4", "video/quicktime"]),
     licenseVerified: z.boolean(),
     originalStorageKey: z.string().min(1).max(300),
     watermarkedStorageKey: z.string().min(1).max(300),
   }))
   .handler(async ({ data, context }) => {
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
+    if (data.licenseVerified && (!data.sourceReference || !data.rightsEvidenceReference)) throw Object.assign(new Error("Both the original source and commercial-rights evidence reference are required before marking the licence as verified."), { status: 400, code: "RIGHTS_EVIDENCE_REQUIRED" });
     if (!data.originalStorageKey.startsWith("videos/original/") || !data.watermarkedStorageKey.startsWith("videos/watermarked/")) {
       throw Object.assign(new Error("Video assets must use the private original and watermarked storage paths."), { status: 400, code: "INVALID_ASSET_PATH" });
     }
@@ -341,6 +345,8 @@ export const createVideoRecord = createServerFn({ method: "POST" })
       ...(data.thumbnailUrl ? { thumbnail_url: data.thumbnailUrl } : {}),
       creator_name: data.creatorName || "",
       ...(data.sourceReference ? { source_reference: data.sourceReference } : {}),
+      ...(data.rightsEvidenceReference ? { rights_evidence_reference: data.rightsEvidenceReference } : {}),
+      file_size_bytes: data.fileSizeBytes, mime_type: data.mimeType,
       license_status: data.licenseVerified ? "verified" : "pending",
       storage_key: data.originalStorageKey, watermarked_storage_key: data.watermarkedStorageKey,
       uploaded_by: context.user.id, status: "draft",
@@ -354,7 +360,7 @@ export const publishVideo = createServerFn({ method: "POST" })
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
     const base44 = context.getBase44();
     const video = await base44.asServiceRole.entities.Video.get(data.videoId);
-    if (video.license_status !== "verified" || !video.storage_key || !video.watermarked_storage_key) {
+    if (video.license_status !== "verified" || !video.source_reference || !video.rights_evidence_reference || !video.storage_key || !video.watermarked_storage_key) {
       throw Object.assign(new Error("Verify the content licence and upload both private renditions before publishing."), { status: 409, code: "PUBLISH_REQUIREMENTS_NOT_MET" });
     }
     return base44.asServiceRole.entities.Video.update(video.id, {
