@@ -74,7 +74,7 @@ Supported initial publishing paths:
 - YouTube: video upload to the selected channel (initial upload size limit 250 MB).
 - X: text posts only; X video upload is not enabled.
 
-The social publishing worker processes due scheduled posts every five minutes. A scheduled post is only a queue instruction; it is not considered published until the provider confirms the publication request. TikTok requests remain in a processing state after the API accepts them.
+A five-minute Base44 Workflow is defined for processing due scheduled posts, but it is currently **inactive**: the first test run was rejected by Base44 with `insufficient_credits`. Background scheduling is therefore not operational until the workspace can execute workflows or an external scheduler is deliberately configured. Until then, users can publish immediately or manually process due posts from the Social Planner. A scheduled post is only considered published after the provider confirms publication. TikTok requests remain in a processing state after the API accepts them.
 
 Adding credentials alone does not activate a platform: configure the exact callback URL in each developer console, complete app review, enable the requested scopes and confirm the connected account is eligible. TikTok's unaudited applications may be restricted to private-only posts and must not be represented as publicly publish-ready.
 
