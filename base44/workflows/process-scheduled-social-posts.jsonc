@@ -1,0 +1,36 @@
+{
+  "name": "Process Scheduled Social Posts",
+  "description": "Checks the queue every five minutes and publishes due posts through each user's own connected social account.",
+  "trigger": {
+    "config": {
+      "trigger_type": "scheduled",
+      "cron_expression": "*/5 * * * *",
+      "timezone": "Europe/London"
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "process_scheduled_social_posts",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "publish_due_posts": {
+          "call": "invoke_server_route",
+          "with": {
+            "path": "/api/social/publisher",
+            "method": "POST",
+            "body": {}
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Publish due posts",
+            "description": "Process the scheduled social queue"
+          }
+        }
+      }
+    ]
+  }
+}
