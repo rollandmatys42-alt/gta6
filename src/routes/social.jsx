@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
+import "@/styles/social-publishing.css";
 import {
   beginSocialOAuth, completeSocialOAuth, getMySocialAccounts, getMySocialPosts,
   saveSocialPost, deleteSocialPost, disconnectSocialAccount, publishSocialPost,
