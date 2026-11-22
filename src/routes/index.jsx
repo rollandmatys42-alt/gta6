@@ -102,11 +102,11 @@ function HomePage() {
   };
   
   const planCards = [
-    {tier:"free",name:t.free,priceText:"FREE",desc:t.freeDesc,features:[t.monthly,"Curated library access","Community browsing"],cta:t.startFree},
-    {tier:"starter",name:t.starter,desc:t.starterDesc,features:["Expanded monthly downloads","Clean downloads where licensed","Creator tools"],cta:t.choose},
-    {tier:"pro",name:t.pro,desc:t.proDesc,features:["Higher download allowance","AI content workspace","Priority library access"],cta:t.choose},
-    {tier:"premium",name:t.premium,desc:t.premiumDesc,features:["Direct social publishing when approved","Creator analytics","Advanced download allowance"],cta:t.choose}
-  ].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat("en-US",{style:"currency",currency}).format(configured.monthly_price_cents/100):"Pricing pending"};});
+    {tier:"free",name:t.free,priceText:"FREE",desc:t.freeDesc,features:[t.monthly,t.communityBrowsing],cta:t.startFree},
+    {tier:"starter",name:t.starter,desc:t.starterDesc,features:[t.expandedDownloads,t.cleanDownloads,t.creatorTools],cta:t.choose},
+    {tier:"pro",name:t.pro,desc:t.proDesc,features:[t.higherAllowance,t.aiWorkspace,t.priorityAccess],cta:t.choose},
+    {tier:"premium",name:t.premium,desc:t.premiumDesc,features:[t.directSocial,t.analytics,t.advancedAllowance],cta:t.choose}
+  ].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat(language,{style:"currency",currency}).format(configured.monthly_price_cents/100):t.pricePending};});
   return (
     <div className="hub-shell">
       <header className="topbar">
