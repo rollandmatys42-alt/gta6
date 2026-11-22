@@ -529,3 +529,7 @@ export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([re
   await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Completed successfully"});
   return {output,draftId:saved.id,model};
  });
+
+export const createContentReport = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({targetType:z.enum(["news","thread","post","listing","product"]),targetId:z.string().min(1),reason:z.enum(["copyright","spam","abuse","misinformation","other"]),details:z.string().max(2000).optional()}))
+ .handler(async({data,context})=>context.getBase44().asServiceRole.entities.ContentReport.create({reporter_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reason:data.reason,details:data.details||"",status:"open"}));
