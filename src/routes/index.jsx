@@ -142,21 +142,32 @@ function HomePage() {
       {notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss">×</button></div>}
 
       <main>
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow"><span className="live-dot" /> {t.eyebrow}</div>
+        <section className="hero vice-landing-hero">
+          <img className="vice-hero-photo" src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=2200&q=85" alt="Neon-lit coastal city at night" fetchPriority="high" />
+          <div className="vice-hero-shade" />
+          <div className="hero-copy vice-hero-copy">
+            <div className="eyebrow"><span className="live-dot" /> {t.eyebrow} · LEONIDA NETWORK</div>
+            <div className="vice-hero-overline">WELCOME TO VICE CITY</div>
             <h1>{t.hero}<br /><em>{t.hero2}</em></h1>
             <p>{t.intro}</p>
-            <div className="hero-actions"><button className="primary-btn" onClick={() => navigate("library")}>{t.browse}<span>↗</span></button><button className="text-btn" onClick={() => navigate("studio")}>{t.learn} <span>→</span></button></div>
+            <div className="hero-actions"><button className="primary-btn" onClick={() => navigate("library")}>{t.browse}<span>↗</span></button><button className="text-btn" onClick={() => navigate("news")}>{t.latest} <span>→</span></button></div>
             <div className="hero-proof"><span><b>01</b> {t.discover}</span><i /> <span><b>02</b> {t.create}</span><i /> <span><b>03</b> {t.grow}</span></div>
           </div>
-          <div className="hero-art hero-art-rebuilt" aria-label="Vice City inspired cinematic creator artwork">
-            <div className="hero-image-wash" /><div className="hero-sun" />
-            <div className="hero-cityline"><i/><i/><i/><i/><i/><i/><i/><i/></div>
-            <div className="hero-character-silhouette"><span>VICE</span><b>HUB</b></div>
-            <div className="hero-art-label"><span>VICEHUB / 06</span><b>YOUR CITY. YOUR CUT.</b><small>THE CREATOR NETWORK</small></div>
+          <div className="vice-hero-side">
+            <div className="vice-hero-stamp">VICE<br/><b>HUB</b><small>EST. 2026</small></div>
+            <div className="vice-hero-caption"><span>THE CITY IS YOURS</span><b>DISCOVER · CREATE · DROP</b></div>
           </div>
-          <div className="hero-bottom"><span>{t.intro}</span><span>01 / 04 <b>—</b> VICE CITY</span></div>
+          <div className="hero-bottom"><span>VICEHUB / THE GTA VI CREATOR NETWORK</span><span>26°07' N · 80°08' W <b>—</b> LEONIDA</span></div>
+        </section>
+
+        <section className="city-discovery">
+          <div className="city-discovery-head"><div><div className="eyebrow">EXPLORE THE UNIVERSE</div><h2>FIND YOUR NEXT DROP.</h2><p>Choose a lane. Find footage. Build something worth watching.</p></div><span className="city-discovery-index">VICEHUB / 01—04</span></div>
+          <div className="city-discovery-grid">
+            <button className="city-tile city-tile-cinema" onClick={() => {setCategory("Cinematics");navigate("library");}}><img src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/><span className="city-tile-number">01 / CINEMATICS</span><b>MAKE IT<br/>CINEMATIC</b><i>EXPLORE FOOTAGE ↗</i></button>
+            <button className="city-tile city-tile-night" onClick={() => {setCategory("Gameplay");navigate("library");}}><img src="https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/><span className="city-tile-number">02 / GAMEPLAY</span><b>PLAY IT<br/>YOUR WAY</b><i>EXPLORE GAMEPLAY ↗</i></button>
+            <button className="city-tile city-tile-coast" onClick={() => {setCategory("Locations");navigate("library");}}><img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/><span className="city-tile-number">03 / LOCATIONS</span><b>CHASE THE<br/>HORIZON</b><i>EXPLORE LOCATIONS ↗</i></button>
+            <button className="city-tile city-tile-edit" onClick={() => {setCategory("Shorts");navigate("library");}}><img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/><span className="city-tile-number">04 / SHORTS & REELS</span><b>MAKE THE<br/>FEED YOURS</b><i>EXPLORE SHORTS ↗</i></button>
+          </div>
         </section>
 
         <section className="section library-section" id="library">
