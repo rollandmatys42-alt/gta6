@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listPublishedVideos, requestVideoDownload, getNewsFeed, getPublicPlans } from "@/lib/server-fns";
+import { listPublishedVideos, requestVideoDownload, getNewsFeed, getPublicPlans, createStripeCheckoutSession } from "@/lib/server-fns";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -47,6 +47,7 @@ function HomePage() {
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
+  const [checkoutBusy, setCheckoutBusy] = useState("");
   const [liveVideos, setLiveVideos] = useState([]);
   const [liveNews, setLiveNews] = useState([]);
   const [livePlans, setLivePlans] = useState([]);
@@ -85,6 +86,18 @@ function HomePage() {
     ((v.title || "").toLowerCase().includes(search.toLowerCase()) || (v.category || "").toLowerCase().includes(search.toLowerCase()))
   ), [liveVideos, category, videoLanguage, search]);
   const featuredVideo = liveVideos.find(v => v.is_featured) || liveVideos[0] || null;
+  const startCheckout = async (plan) => {
+    if (!isAuthenticated) { navigateToLogin(); return; }
+    if (!plan.checkoutReady) { setNotice("This membership is not open for sale yet. The administrator must configure its price and activate it first."); return; }
+    setCheckoutBusy(plan.tier); setNotice("");
+    try {
+      const result = await createStripeCheckoutSession({ data: { tierCode: plan.tier, currency } });
+      window.location.assign(result.url);
+    } catch (error) {
+      setNotice(error?.message || "Secure checkout could not be opened.");
+      setCheckoutBusy("");
+    }
+  };
   const downloadVideo = async (video) => {
     try {
       setDownloadMessage("Checking your account and monthly download allowance…");
@@ -107,7 +120,7 @@ function HomePage() {
     {tier:"starter",name:t.starter,desc:t.starterDesc,features:["Expanded monthly downloads","Clean downloads where licensed","Creator tools"],cta:t.choose},
     {tier:"pro",name:t.pro,desc:t.proDesc,features:["Higher download allowance","AI content workspace","Priority library access"],cta:t.choose},
     {tier:"premium",name:t.premium,desc:t.premiumDesc,features:["Direct social publishing when approved","Creator analytics","Advanced download allowance"],cta:t.choose}
-  ].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat("en-US",{style:"currency",currency}).format(configured.monthly_price_cents/100):"Pricing pending"};});
+  ].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat("en-US",{style:"currency",currency}).format(configured.monthly_price_cents/100):"Pricing pending",checkoutReady:!!configured&&Number(configured.monthly_price_cents)>0};});
   return (
     <div className="hub-shell">
       <header className="topbar">
@@ -158,9 +171,9 @@ function HomePage() {
 
         <section className="features-section"><div className="section-head"><div><div className="eyebrow">03 / CREATOR WORKSPACE</div><h2>{t.tools}</h2><p>{t.toolsSub}</p></div></div><div className="feature-grid">{sections.map((item, i) => <button className="feature-card" key={item.id} onClick={() => navigate(item.id)}><div className="feature-top"><span className="feature-icon">{item.icon}</span><span>0{i + 1} / 04</span></div><h3>{item.title}</h3><p>{item.desc}</p><span className="feature-link">{t.open} ↗</span></button>)}</div></section>
 
-        <section id="plans" className="pricing-section"><div className="pricing-intro"><div className="eyebrow">04 / MEMBERSHIP</div><h2>{t.plans}</h2><p>{t.plansSub}</p><div className="currency-note">DISPLAY CURRENCY <b>{currency}</b><small>Prices appear in the selected currency when configured by the administrator. Checkout is not active yet.</small></div></div><div className="plans-grid">
-          {planCards.map((plan,i)=><article className={i===2?"plan-card highlighted":"plan-card"} key={plan.name}><div className="plan-name">{plan.name}{i===2&&<span>POPULAR</span>}</div><div className="plan-price">{plan.priceText}<small>{plan.tier==="free"?"":t.month}</small></div><p>{plan.desc}</p><ul>{plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}</ul><button className={i===2?"primary-btn full":"outline-btn full"} onClick={() => setNotice("Subscription checkout is not connected yet. Prices and loyalty discounts will be configured before sales open.")}>{plan.cta} <span>↗</span></button></article>)}
-        </div><p className="loyalty-note"><span>✳</span> Loyalty reductions and minimum prices are configurable by the administrator. Uninterrupted paid months increase the discount; voluntary cancellation resets the introductory price. Billing remains disabled until Stripe is connected.</p></section>
+        <section id="plans" className="pricing-section"><div className="pricing-intro"><div className="eyebrow">04 / MEMBERSHIP</div><h2>{t.plans}</h2><p>{t.plansSub}</p><div className="currency-note">DISPLAY CURRENCY <b>{currency}</b><small>Prices appear in the selected currency. Paid checkout opens only after the administrator activates a priced membership and connects Stripe.</small></div></div><div className="plans-grid">
+          {planCards.map((plan,i)=><article className={i===2?"plan-card highlighted":"plan-card"} key={plan.name}><div className="plan-name">{plan.name}{i===2&&<span>POPULAR</span>}</div><div className="plan-price">{plan.priceText}<small>{plan.tier==="free"?"":t.month}</small></div><p>{plan.desc}</p><ul>{plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}</ul><button className={i===2?"primary-btn full":"outline-btn full"} disabled={plan.tier!=="free"&&(!plan.checkoutReady||!!checkoutBusy)} onClick={() => plan.tier==="free" ? (isAuthenticated?window.location.assign("/dashboard"):navigateToLogin()) : startCheckout(plan)}>{checkoutBusy===plan.tier?"OPENING SECURE CHECKOUT…":plan.tier==="free"?plan.cta:plan.checkoutReady?plan.cta:"PRICE NOT CONFIGURED"} <span>↗</span></button></article>)}
+        </div><p className="loyalty-note"><span>✳</span> Loyalty reductions and minimum prices are configurable by the administrator. Uninterrupted paid months increase the discount; voluntary cancellation resets the introductory price. Paid memberships use Stripe Billing. A subscription is activated only after Stripe confirms successful checkout; account management is handled through the secure Stripe customer portal.</p></section>
       </main>
 
       <footer className="footer"><div className="footer-brand"><span className="brand-mark">V</span><span>VICE<span className="brand-accent">HUB</span></span></div><p>{t.note}</p><div className="footer-links"><button onClick={() => window.location.assign("/terms")}>Terms</button><button onClick={() => window.location.assign("/privacy")}>Privacy</button><button onClick={() => window.location.assign("/copyright")}>Copyright</button></div><div className="gta-disclaimer">VICEHUB IS AN INDEPENDENT, UNOFFICIAL CREATOR PLATFORM. IT IS NOT AFFILIATED WITH, ENDORSED BY OR SPONSORED BY ROCKSTAR GAMES OR TAKE-TWO INTERACTIVE. GRAND THEFT AUTO, GTA VI, VICE CITY, LEONIDA, CHARACTERS, LOGOS AND GAME ASSETS ARE THE PROPERTY OF THEIR RESPECTIVE RIGHTS HOLDERS. CONTENT IS PUBLISHED ONLY WHERE DISTRIBUTION RIGHTS HAVE BEEN VERIFIED.</div><small>© 2026 VICEHUB. INDEPENDENT CREATOR PLATFORM.</small></footer>
