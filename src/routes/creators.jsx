@@ -3,7 +3,7 @@ import {createFileRoute} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import {getCreatorDirectory,getMyCreatorProfile,saveMyCreatorProfile,sendDirectMessage} from "@/lib/server-fns";
 import {useAuth} from "@/lib/AuthContext";
-export const Route=createFileRoute("/creators")({head:()=>({meta:[{title:"Creator Directory — VICEHUB"}]}),component:CreatorsPage});
+export const Route=createFileRoute("/creators")({head:()=>({meta:[{title:"Creator Directory — VICEHUB"},{name:"description",content:"Discover GTA VI video editors, creators and community builders in the VICEHUB creator directory."},{property:"og:title",content:"Creator Directory — VICEHUB"},{property:"og:description",content:"Discover GTA VI video editors, creators and community builders in the VICEHUB creator directory."}]}),component:CreatorsPage});
 function CreatorsPage(){
  const {isAuthenticated,navigateToLogin}=useAuth();const [creators,setCreators]=useState([]),[profile,setProfile]=useState({displayName:"",bio:"",avatarUrl:"",websiteUrl:"",locationLabel:"",skills:[]}),[query,setQuery]=useState(""),[selected,setSelected]=useState(null),[message,setMessage]=useState(""),[notice,setNotice]=useState(""),[error,setError]=useState("");
  const load=()=>getCreatorDirectory({data:{query}}).then(setCreators).catch(e=>setError(e.message));
