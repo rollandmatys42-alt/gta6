@@ -9,8 +9,12 @@ export const Route = createFileRoute("/")({
       { title: "GTA6 Creator Hub — The creator network" },
       { name: "description", content: "A creator-first hub for GTA VI video inspiration, community, news and creator tools." },
       { name: "theme-color", content: "#09090d" },
+      { property: "og:title", content: "GTA6 Creator Hub — The creator network" },
+      { property: "og:description", content: "A creator-first hub for GTA VI video inspiration, community, news and creator tools." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "manifest", href: "/manifest.webmanifest" }, { rel: "icon", href: "/icons/vicehub.svg", type: "image/svg+xml" }],
+    links: [{ rel: "manifest", href: "/manifest.webmanifest" }, { rel: "icon", href: "/icons/vicehub.svg", type: "image/svg+xml" }, { rel: "canonical", href: "https://gta6-creator-hub-c26cc578.base44.app/" }],
   }),
   component: HomePage,
 });
