@@ -2,7 +2,7 @@
   "id": "/",
   "name": "VICEHUB — GTA VI Creator Network",
   "short_name": "VICEHUB",
-  "description": "Independent GTA VI creator community, news and content studio.",
+  "description": "Independent creator video library, downloads and social publishing workspace.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -12,5 +12,6 @@
   "icons": [
     { "src": "/icons/vicehub.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ],
-  "categories": ["entertainment", "social", "video"]
+  "categories": ["entertainment", "social", "video"],
+  "prefer_related_applications": false
 }
