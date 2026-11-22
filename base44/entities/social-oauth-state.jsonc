@@ -1,0 +1,14 @@
+{
+  "name": "SocialOAuthState",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string" },
+    "provider": { "type": "string", "enum": ["TikTok", "Instagram", "YouTube", "X"] },
+    "state_hash": { "type": "string", "maxLength": 128 },
+    "code_verifier": { "type": "string", "maxLength": 256 },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "used_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["user_id", "provider", "state_hash", "expires_at"],
+  "rls": { "read": { "user_condition": { "role": "admin" } }, "create": false, "update": false, "delete": false }
+}
