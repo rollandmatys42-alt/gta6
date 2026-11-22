@@ -435,7 +435,11 @@ export const createMarketplaceInquiry = createServerFn({method:"POST"}).middlewa
   const db=context.getBase44().asServiceRole.entities,listing=await db.MarketplaceListing.get(data.listingId).catch(()=>null);
   if(!listing||listing.status!=="published") throw Object.assign(new Error("Listing not found."),{status:404});
   if(listing.seller_id===context.user.id) throw Object.assign(new Error("You cannot contact yourself."),{status:400});
-  return db.MarketplaceInquiry.create({listing_id:listing.id,buyer_id:context.user.id,seller_id:listing.seller_id,message:data.message,status:"open"});
+  const [buyerBlock,sellerBlock]=await Promise.all([db.UserBlock.filter({blocker_id:context.user.id,blocked_id:listing.seller_id},"-created_date",1,0),db.UserBlock.filter({blocker_id:listing.seller_id,blocked_id:context.user.id},"-created_date",1,0)]);
+  if(buyerBlock.length||sellerBlock.length)throw Object.assign(new Error("This enquiry cannot be sent because one user has blocked the other."),{status:403});
+  const inquiry=await db.MarketplaceInquiry.create({listing_id:listing.id,buyer_id:context.user.id,seller_id:listing.seller_id,message:data.message,status:"open"});
+  await db.UserNotification.create({user_id:listing.seller_id,type:"marketplace",title:"New marketplace enquiry",body:"A buyer has contacted you about "+listing.title.slice(0,100),target_url:"/marketplace"});
+  return inquiry;
  });
 
 export const getShopProducts = createServerFn({method:"GET"}).handler(async({context})=>{
@@ -597,7 +601,9 @@ export const replyMarketplaceInquiry = createServerFn({method:"POST"}).middlewar
   const db=context.getBase44().asServiceRole.entities;
   const inquiry=await db.MarketplaceInquiry.get(data.inquiryId).catch(()=>null);
   if(!inquiry||inquiry.seller_id!==context.user.id)throw Object.assign(new Error("Only the listing creator can reply to this enquiry."),{status:403});
-  return db.MarketplaceInquiry.update(inquiry.id,{seller_reply:data.reply,status:"replied",replied_at:new Date().toISOString()});
+  const updated=await db.MarketplaceInquiry.update(inquiry.id,{seller_reply:data.reply,status:"replied",replied_at:new Date().toISOString()});
+  await db.UserNotification.create({user_id:inquiry.buyer_id,type:"marketplace",title:"Creator replied to your enquiry",body:"The seller replied to your marketplace enquiry.",target_url:"/marketplace"});
+  return updated;
  });
 
 export const getCreatorDirectory = createServerFn({method:"GET"}).validator(z.object({query:z.string().max(100).optional()})).handler(async({data,context})=>{
@@ -629,6 +635,8 @@ export const sendDirectMessage = createServerFn({method:"POST"}).middleware([req
  .handler(async({data,context})=>{
   if(data.recipientId===context.user.id)throw Object.assign(new Error("You cannot message yourself."),{status:400});
   const db=context.getBase44().asServiceRole.entities;
+  const recipientProfile=await db.CreatorProfile.filter({user_id:data.recipientId,status:"published"},"-created_date",1,0);
+  if(!recipientProfile.length)throw Object.assign(new Error("You can only message creators with a published VICEHUB profile."),{status:404});
   const [blockedBySender,blockedByRecipient]=await Promise.all([db.UserBlock.filter({blocker_id:context.user.id,blocked_id:data.recipientId},"-created_date",1,0),db.UserBlock.filter({blocker_id:data.recipientId,blocked_id:context.user.id},"-created_date",1,0)]);
   if(blockedBySender.length||blockedByRecipient.length)throw Object.assign(new Error("This message cannot be sent because one user has blocked the other."),{status:403,code:"MESSAGING_BLOCKED"});
   const message=await db.DirectMessage.create({sender_id:context.user.id,recipient_id:data.recipientId,body:data.body,status:"sent"});
