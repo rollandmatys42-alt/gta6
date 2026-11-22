@@ -138,3 +138,47 @@
 
 .admin-readiness-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
 .admin-readiness-actions .outline-btn{min-height:42px}
+
+/* VICEHUB Creator HQ — immersive member dashboard */
+.vice-dashboard-hero{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(220px,.65fr);gap:26px;min-height:390px;padding:clamp(28px,5vw,58px);margin:12px 0 25px;overflow:hidden;border:1px solid rgba(255,255,255,.14);background:linear-gradient(112deg,#100e18 0%,#211426 52%,#10232a 100%);box-shadow:0 24px 80px #0007}
+.vice-dashboard-sky{position:absolute;inset:0;z-index:-1;overflow:hidden;opacity:.72;background:radial-gradient(ellipse at 76% 24%,rgba(255,142,153,.26),transparent 24%),linear-gradient(180deg,transparent 35%,rgba(9,9,15,.82) 100%)}
+.vice-dashboard-sun{position:absolute;width:230px;height:230px;border-radius:50%;right:18%;top:-82px;background:linear-gradient(180deg,#ffd3a2,#f2769d);box-shadow:0 0 80px #f17da044}
+.vice-dashboard-tower{position:absolute;bottom:0;width:12%;background:linear-gradient(90deg,#111322,#263044);border-top:2px solid #6de2d7;box-shadow:inset 0 0 35px #ed70a51a}
+.vice-dashboard-tower:after{content:"";position:absolute;inset:15px 10px;background:repeating-linear-gradient(90deg,transparent 0 12px,#f5a2c533 13px 15px),repeating-linear-gradient(0deg,transparent 0 18px,#f5a2c522 19px 21px)}
+.vice-dashboard-tower.tower-a{height:48%;right:8%}.vice-dashboard-tower.tower-b{height:68%;right:22%;width:15%}.vice-dashboard-tower.tower-c{height:38%;right:39%;width:10%}
+.vice-dashboard-palm{position:absolute;right:5%;top:23%;font-size:95px;color:#0d1520;transform:rotate(18deg);text-shadow:0 0 8px #ff9db0}
+.vice-dashboard-road{position:absolute;bottom:-100px;right:0;width:65%;height:170px;transform:perspective(190px) rotateX(30deg);background:linear-gradient(#191726,#08090f);border-top:2px solid #f28aa9}
+.vice-dashboard-road:after{content:"";position:absolute;left:50%;height:100%;width:2px;background:#f7b5a2;box-shadow:0 0 18px #f7b5a2}
+.vice-dashboard-copy{position:relative;z-index:1;max-width:700px;align-self:center}
+.vice-dashboard-copy .eyebrow{font-size:9px;letter-spacing:2px;color:#82e9df}
+.vice-dashboard-copy .live-dot{width:6px;height:6px;border-radius:50%;display:inline-block;background:#ff6ca8;margin-right:8px}
+.vice-dashboard-kicker{font-size:9px;letter-spacing:3px;color:#ff9abd;margin:25px 0 10px;font-weight:800}
+.vice-dashboard-copy h1{font-family:'Barlow Condensed',sans-serif;font-size:clamp(46px,7vw,82px);line-height:.83;letter-spacing:-1px;margin:0 0 18px}
+.vice-dashboard-copy h1 em{font-style:normal;background:linear-gradient(90deg,#ff77b2,#ffc28e 65%,#73e5da);background-clip:text;-webkit-background-clip:text;color:transparent}
+.vice-dashboard-copy p{max-width:440px;color:#c4b9c8;font-size:12px;line-height:1.8}
+.vice-dashboard-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.vice-dashboard-actions a{text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.vice-dashboard-side{position:relative;z-index:1;align-self:center;display:flex;flex-direction:column;gap:13px;padding:22px;background:rgba(8,9,15,.68);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(10px)}
+.vice-dashboard-membership{display:flex;flex-direction:column;gap:7px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.13)}
+.vice-dashboard-membership span,.vice-dashboard-membership small{font-size:8px;letter-spacing:1.8px;color:#aaa0b0}.vice-dashboard-membership b{font-family:'Barlow Condensed';font-size:25px;color:#fff}
+.vice-dashboard-membership small{color:#7fe6dc}
+.vice-dashboard-download-count{display:flex;align-items:center;gap:12px;padding:4px 0}
+.vice-dashboard-download-count strong{font-family:'Barlow Condensed';font-size:58px;line-height:1;color:#ff82b7}
+.vice-dashboard-download-count span{font-size:8px;letter-spacing:1.4px;line-height:1.6;color:#c6b9c9}
+.vice-dashboard-refresh,.vice-dashboard-signout{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.04);padding:11px;color:#f7edf5;text-align:left;font-size:8px;font-weight:800;letter-spacing:1.4px}
+.vice-dashboard-refresh{border-color:#65dcd2;color:#8cebe0}.vice-dashboard-signout{border:0;padding:7px 0;color:#a79aaa}
+.vice-dashboard-coordinate{position:absolute;bottom:13px;left:clamp(28px,5vw,58px);right:clamp(28px,5vw,58px);display:flex;justify-content:space-between;gap:15px;font-size:7px;letter-spacing:1.5px;color:#8e8392}
+.vice-dashboard-coordinate span{color:#e5a0b7}
+.vice-dashboard-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 25px}
+.vice-stat-card{position:relative;display:flex;flex-direction:column;gap:10px;min-height:145px;padding:17px;background:linear-gradient(145deg,#17131e,#10151b);border:1px solid rgba(255,255,255,.12);text-decoration:none;color:#fff;transition:transform .2s,border-color .2s}
+.vice-stat-card:hover{transform:translateY(-3px);border-color:#e56ca7}
+.vice-stat-card>span{font-size:8px;letter-spacing:1.4px;color:#9b91a1}
+.vice-stat-card>strong{font-family:'Barlow Condensed';font-size:42px;line-height:1;color:#fff}
+.vice-stat-card>strong i{font-size:18px;font-style:normal;color:#8a7f90}
+.vice-stat-card>small{font-size:9px;color:#aaa0af;line-height:1.5}
+.vice-stat-arrow{position:absolute;right:16px;top:15px;color:#70e2d7;font-size:15px}
+.vice-stat-track{height:3px;background:#37303c;margin-top:auto}.vice-stat-track i{height:100%;display:block;background:linear-gradient(90deg,#f35e9f,#6ee3d8)}
+.account-module-card{position:relative;min-height:175px;background:linear-gradient(145deg,#1a1420,#11171e);border:1px solid rgba(255,255,255,.12);padding:20px;transition:transform .2s,border-color .2s}.account-module-card:hover{transform:translateY(-3px);border-color:#f06da9}
+.account-module-card>span{color:#72e5dc}.account-module-card>b{font-family:'Barlow Condensed';font-size:23px;letter-spacing:.6px}
+.account-module-card>small{color:#b2a8b7;line-height:1.6}.account-module-card>i{color:#ff8fba}
+@media(max-width:900px){.vice-dashboard-hero{grid-template-columns:1fr}.vice-dashboard-side{max-width:360px;width:100%;margin-bottom:26px}.vice-dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.vice-dashboard-hero{padding:24px 18px 45px;min-height:0}.vice-dashboard-copy h1{font-size:clamp(43px,13vw,62px)}.vice-dashboard-side{max-width:none}.vice-dashboard-coordinate{left:18px;right:18px;font-size:6px}.vice-dashboard-stats{gap:7px}.vice-stat-card{padding:13px;min-height:130px}.vice-stat-card>strong{font-size:34px}.vice-stat-card>span{font-size:7px;letter-spacing:.8px}.vice-dashboard-actions a{width:100%;justify-content:center}}

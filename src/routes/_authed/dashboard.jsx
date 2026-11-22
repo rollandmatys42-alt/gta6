@@ -61,26 +61,32 @@ function DashboardPage() {
   };
 
   return <SiteFrame eyebrow="VICEHUB / CREATOR CONTROL ROOM">
-    <section className="account-dashboard-hero">
-      <div><div className="eyebrow">YOUR CREATOR OPERATING SYSTEM</div>
+    <section className="vice-dashboard-hero">
+      <div className="vice-dashboard-sky"><span className="vice-dashboard-sun" /><span className="vice-dashboard-tower tower-a" /><span className="vice-dashboard-tower tower-b" /><span className="vice-dashboard-tower tower-c" /><span className="vice-dashboard-palm">✦</span><span className="vice-dashboard-road" /></div>
+      <div className="vice-dashboard-copy">
+        <div className="eyebrow"><i className="live-dot" /> VICE CITY / LEONIDA · CREATOR HQ</div>
+        <div className="vice-dashboard-kicker">YOUR NEXT SCENE STARTS HERE</div>
         <h1>WELCOME BACK,<br/><em>{(user?.full_name || user?.email || "CREATOR").split(" ")[0].toUpperCase()}.</em></h1>
-        <p>Your footage, download allowance, creator tools and social publishing workspace — in one control room.</p>
+        <p>Your personal base for discovering footage, building content and growing your creator presence.</p>
+        <div className="vice-dashboard-actions"><a className="primary-btn" href="/">EXPLORE THE VIDEO LIBRARY <span>↗</span></a><a className="outline-btn" href="/social">OPEN SOCIAL DESK</a></div>
       </div>
-      <div className="account-dashboard-hero-actions">
-        <span className="account-status-pill">{account?.tier === "free" ? "FREE MEMBERSHIP" : (account?.planName || "MEMBERSHIP").toUpperCase()}</span>
-        <button className="outline-btn" onClick={load} disabled={loading}>{loading ? "REFRESHING…" : "REFRESH DATA ↻"}</button>
-        <button className="text-btn" onClick={logout}>SIGN OUT ↗</button>
+      <div className="vice-dashboard-side">
+        <div className="vice-dashboard-membership"><span>YOUR ACCESS PASS</span><b>{account?.tier === "free" ? "FREE MEMBER" : (account?.planName || "MEMBERSHIP").toUpperCase()}</b><small>{account?.subscriptionStatus || "ACCOUNT ACTIVE"}</small></div>
+        <div className="vice-dashboard-download-count"><strong>{account?.downloadsRemaining ?? 0}</strong><span>DOWNLOADS LEFT<br/>THIS MONTH</span></div>
+        <button className="vice-dashboard-refresh" onClick={load} disabled={loading}>{loading ? "SYNCING YOUR HQ…" : "↻ SYNC YOUR HQ"}</button>
+        <button className="vice-dashboard-signout" onClick={logout}>SIGN OUT ↗</button>
       </div>
+      <div className="vice-dashboard-coordinate">VICEHUB // PERSONAL CREATOR NETWORK <span>26°07' N · 80°08' W</span></div>
     </section>
     {error && <div className="platform-alert" role="alert">{error}</div>}
     {loading && !data && <div className="platform-empty">Loading your creator workspace…</div>}
     {data && <>
       {data.secondaryErrors > 0 && <div className="platform-note">{data.secondaryErrors} secondary section(s) could not be refreshed. Your account and download data remain available.</div>}
-      <section className="account-metrics-grid">
-        <Metric label="DOWNLOADS THIS MONTH" value={`${used} / ${limit}`} note={`${account?.downloadsRemaining ?? 0} remaining · UTC month`} href="/" />
-        <Metric label="UNREAD MESSAGES" value={unreadMessages} note="Private creator inbox" href="/messages" />
-        <Metric label="UNREAD ALERTS" value={unreadAlerts} note="Account and content updates" href="/notifications" />
-        <Metric label="SAVED SOCIAL POSTS" value={data.posts.length} note="Drafts and publishing queue" href="/social" />
+      <section className="vice-dashboard-stats">
+        <a className="vice-stat-card stat-downloads" href="/"><span>01 / DOWNLOAD ALLOWANCE</span><strong>{used}<i> / {limit}</i></strong><small>{account?.downloadsRemaining ?? 0} downloads remaining · resets monthly</small><div className="vice-stat-track"><i style={{width:percent+"%"}} /></div></a>
+        <a className="vice-stat-card" href="/social"><span>02 / SOCIAL DRAFTS</span><strong>{data.posts.length.toString().padStart(2,"0")}</strong><small>Saved posts and planning reminders</small><b className="vice-stat-arrow">↗</b></a>
+        <a className="vice-stat-card" href="/studio"><span>03 / CREATOR STUDIO</span><strong>{data.drafts.length.toString().padStart(2,"0")}</strong><small>Hooks, captions and scripts saved</small><b className="vice-stat-arrow">↗</b></a>
+        <a className="vice-stat-card" href="/messages"><span>04 / INBOX & ALERTS</span><strong>{(unreadMessages+unreadAlerts).toString().padStart(2,"0")}</strong><small>{unreadMessages} unread messages · {unreadAlerts} alerts</small><b className="vice-stat-arrow">↗</b></a>
       </section>
       <div className="account-dashboard-columns">
         <section className="account-panel account-plan-panel">
@@ -100,7 +106,7 @@ function DashboardPage() {
         </section>
       </div>
       <section className="account-panel account-modules-panel">
-        <div className="section-head"><div><div className="eyebrow">YOUR VICEHUB</div><h2>CREATOR WORKSPACES</h2></div><span className="source-pill">7 MODULES</span></div>
+        <div className="section-head"><div><div className="eyebrow">YOUR VICEHUB / SELECT A DESTINATION</div><h2>YOUR CREATOR WORLD</h2></div><span className="source-pill">CONTROL ROOM</span></div>
         <div className="account-module-grid">{modules.map(([href,code,title,description]) => <a className="account-module-card" href={href} key={href}>
           <span>{code}</span><b>{title}</b><small>{description}</small><i>OPEN MODULE ↗</i>
         </a>)}</div>
