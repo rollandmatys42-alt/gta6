@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import "@/styles/video-library.css";
@@ -36,6 +36,8 @@ function VideoLibraryPage() {
   const [category, setCategory] = useState("All");
   const [language, setLanguage] = useState("All");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const requestSequence = useRef(0);
   const [videos, setVideos] = useState([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -47,7 +49,13 @@ function VideoLibraryPage() {
   const [previewMessage, setPreviewMessage] = useState("");
   const [downloadMessage, setDownloadMessage] = useState("");
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   const fetchPage = useCallback(async ({ reset = false } = {}) => {
+    const requestId = ++requestSequence.current;
     const nextOffset = reset ? 0 : offset;
     if (reset) setLoading(true); else setLoadingMore(true);
     setError("");
@@ -56,36 +64,33 @@ function VideoLibraryPage() {
         data: {
           category: category === "All" ? undefined : category,
           language: language === "All" ? undefined : language,
+          search: debouncedQuery || undefined,
           offset: nextOffset,
           limit: 24,
         },
       });
+      if (requestId !== requestSequence.current) return;
       setVideos(current => reset ? result.videos : [...current, ...result.videos]);
       setOffset(result.nextOffset);
       setHasMore(result.hasMore);
     } catch (err) {
-      setError(err?.message || "The video catalogue could not be loaded.");
+      if (requestId === requestSequence.current) setError(err?.message || "The video catalogue could not be loaded.");
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (requestId === requestSequence.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
-  }, [category, language, offset]);
+  }, [category, language, debouncedQuery, offset]);
 
   useEffect(() => {
     setVideos([]);
     setOffset(0);
     setHasMore(false);
     fetchPage({ reset: true });
-  }, [category, language]);
+  }, [category, language, debouncedQuery]);
 
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return videos;
-    return videos.filter(video => [
-      video.title, video.description, video.creator_name, video.category,
-      ...(Array.isArray(video.tags) ? video.tags : []),
-    ].filter(Boolean).join(" ").toLowerCase().includes(term));
-  }, [videos, query]);
+  const filtered = videos;
 
   const featured = videos.find(video => video.is_featured) || videos[0] || null;
   const gridVideos = filtered.filter(video => video.id !== featured?.id);
