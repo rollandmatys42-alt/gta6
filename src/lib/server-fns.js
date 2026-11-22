@@ -90,7 +90,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
     );
     const subscription = subscriptions[0];
     let tier = subscription?.tier_code || "free";
-    if (tier !== "free" && subscription?.status !== "active") tier = "free";
+    if (tier !== "free" && subscription?.status !== "active" && !(subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date())) tier = "free";
     let limit = MONTHLY_FREE_LIMIT;
     let cleanDownloads = false;
     if (tier !== "free") {
@@ -229,7 +229,7 @@ export const getMyAccount = createServerFn({ method: "GET" })
       { user_id: user.id }, "-created_date", 1, 0,
     );
     const subscription = subscriptions[0];
-    const tier = subscription?.status === "active" ? (subscription.tier_code || "free") : "free";
+    const tier = subscription?.status === "active" || (subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date()) ? (subscription.tier_code || "free") : "free";
     let limit = MONTHLY_FREE_LIMIT;
     let planName = "Free";
     if (tier !== "free") {
@@ -533,3 +533,26 @@ export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([re
 export const createContentReport = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({targetType:z.enum(["news","thread","post","listing","product"]),targetId:z.string().min(1),reason:z.enum(["copyright","spam","abuse","misinformation","other"]),details:z.string().max(2000).optional()}))
  .handler(async({data,context})=>context.getBase44().asServiceRole.entities.ContentReport.create({reporter_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reason:data.reason,details:data.details||"",status:"open"}));
+
+export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object({currency:z.enum(["USD","EUR","GBP"]).default("USD")})).handler(async({data,context})=>{
+ const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({status:"active",currency:data.currency},"sort_order",20,0);
+ return rows;
+});
+export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
+export const saveAdminPlan = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),tierCode:z.enum(["starter","pro","premium"]),displayName:z.string().min(2).max(50),monthlyPriceCents:z.number().int().min(0),currency:z.enum(["USD","EUR","GBP"]),monthlyDownloadLimit:z.number().int().min(0),cleanDownloads:z.boolean(),marketplaceEnabled:z.boolean(),status:z.enum(["draft","active","archived"]),loyaltyMonthlyDiscountPercent:z.number().min(0).max(100),loyaltyMaxDiscountPercent:z.number().min(0).max(100),loyaltyFloorPriceCents:z.number().int().min(0),sortOrder:z.number().int()}))
+ .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.SubscriptionPlan;const p={tier_code:data.tierCode,display_name:data.displayName,monthly_price_cents:data.monthlyPriceCents,currency:data.currency,monthly_download_limit:data.monthlyDownloadLimit,clean_downloads:data.cleanDownloads,marketplace_enabled:data.marketplaceEnabled,status:data.status,loyalty_monthly_discount_percent:data.loyaltyMonthlyDiscountPercent,loyalty_max_discount_percent:data.loyaltyMaxDiscountPercent,loyalty_floor_price_cents:data.loyaltyFloorPriceCents,sort_order:data.sortOrder};return data.id?db.update(data.id,p):db.create(p);});
+export const getMyPlanQuote = createServerFn({method:"GET"}).middleware([requireUser])
+ .validator(z.object({tierCode:z.enum(["starter","pro","premium"]),currency:z.enum(["USD","EUR","GBP"])}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const plans=await db.SubscriptionPlan.filter({tier_code:data.tierCode,currency:data.currency,status:"active"},"-created_date",1,0);const plan=plans[0];
+  if(!plan)throw Object.assign(new Error("This plan is not configured in the selected currency."),{status:404});
+  const subs=await db.UserSubscription.filter({user_id:context.user.id},"-created_date",1,0);const sub=subs[0];
+  const active=(sub?.status==="active"||sub?.status==="past_due"&&sub?.grace_period_ends_at&&new Date(sub.grace_period_ends_at)>new Date())&&!sub?.voluntary_cancelled;
+  const streak=active?Number(sub?.streak_months||0):0;
+  const discount=Math.min(Number(plan.loyalty_max_discount_percent||0),streak*Number(plan.loyalty_monthly_discount_percent||0));
+  const raw=Math.round(Number(plan.monthly_price_cents||0)*(1-discount/100));
+  const price=Math.max(Number(plan.loyalty_floor_price_cents||0),raw);
+  return {tierCode:data.tierCode,currency:data.currency,basePriceCents:plan.monthly_price_cents,currentPriceCents:price,streakMonths:streak,discountPercent:discount,floorPriceCents:plan.loyalty_floor_price_cents||0,resetOnVoluntaryCancellation:true};
+ });
