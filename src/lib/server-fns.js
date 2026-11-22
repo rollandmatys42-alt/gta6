@@ -481,3 +481,15 @@ export const generateStudioDraft = createServerFn({method:"POST"}).middleware([r
 export const getMyStudioDrafts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  return context.getBase44().asServiceRole.entities.AIContentDraft.filter({user_id:context.user.id},"-created_date",30,0);
 });
+
+export const getAdminAgents = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.AIAgentConfig.list("-created_date",50,0);});
+export const saveAdminAgent = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),agentKey:z.enum(["news_editor","seo_agent","geo_agent","social_agent","platform_analyst"]),displayName:z.string().min(2).max(100),instructions:z.string().max(10000),providerModel:z.string().max(120),enabled:z.boolean(),schedule:z.enum(["manual","hourly","daily","weekly"]),monthlyRunLimit:z.number().int().min(0)}))
+ .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.AIAgentConfig;const p={agent_key:data.agentKey,display_name:data.displayName,instructions:data.instructions,provider_model:data.providerModel,enabled:data.enabled,schedule:data.schedule,monthly_run_limit:data.monthlyRunLimit};return data.id?db.update(data.id,p):db.create(p);});
+export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",50,0));
+export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","YouTube","X"]),caption:z.string().min(1).max(5000),scheduledAt:z.string().datetime().optional()}))
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:data.scheduledAt?"scheduled":"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};return data.id?db.update(data.id,p):db.create(p);});
+export const getMyMarketplaceInquiries = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ const db=context.getBase44().asServiceRole.entities;const [buyer,seller]=await Promise.all([db.MarketplaceInquiry.filter({buyer_id:context.user.id},"-created_date",50,0),db.MarketplaceInquiry.filter({seller_id:context.user.id},"-created_date",50,0)]);return {buyer,seller};
+});
