@@ -641,6 +641,8 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
  const tiktokConfigured=Boolean(secrets.get("TIKTOK_CLIENT_KEY")&&secrets.get("TIKTOK_CLIENT_SECRET"));
  const instagramConfigured=Boolean(secrets.get("META_APP_ID")&&secrets.get("META_APP_SECRET"));
  const youtubeConfigured=Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET"));
+ const xOauthConfigured=Boolean(secrets.get("X_CLIENT_ID")&&secrets.get("X_CLIENT_SECRET"));
+ const socialEncryptionConfigured=Boolean(secrets.get("SOCIAL_TOKEN_ENCRYPTION_KEY")&&secrets.get("SOCIAL_OAUTH_STATE_SECRET"));
  return {
   aiProviderConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL")),
   omniRouteConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL")),
@@ -654,7 +656,8 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
   stripeSecretConfigured:stripeSecret,
   stripeWebhookConfigured:stripeWebhook,
   payments:stripeSecret&&stripeWebhook?"configured":stripeSecret?"webhook_secret_missing":"missing_credentials",
-  socialPublishing:{tiktokConfigured,instagramConfigured,youtubeConfigured},
+  socialEncryptionConfigured,
+  socialPublishing:{tiktokConfigured,instagramConfigured,facebookConfigured:instagramConfigured,youtubeConfigured,xOauthConfigured},
   recurringAgentScheduler:"manual_only"
  };
 });
@@ -1249,7 +1252,7 @@ export const completeSocialOAuth = createServerFn({ method: "POST" }).middleware
       saved.push(await saveSocialAccount(db, context.user.id, { provider: "YouTube", accountId: item.id, accountName: item.snippet?.title || "YouTube channel", accountType: "channel", accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: new Date(Date.now() + Number(token.expires_in || 3600) * 1000).toISOString(), scopes: ["youtube.upload", "youtube.readonly"], metadata: { channelId: item.id } }));
     } else if (provider === "X") {
       const body = new URLSearchParams({ client_id: secrets.get("X_CLIENT_ID"), code: data.code, grant_type: "authorization_code", redirect_uri: SOCIAL_CALLBACK_URL, code_verifier: verifier });
-      const token = await socialTokenRequest("https://api.x.com/2/oauth2/token", body);
+      const token = await socialTokenRequest("https://api.x.com/2/oauth2/token", body, secrets.get("X_CLIENT_ID"), secrets.get("X_CLIENT_SECRET"));
       const profile = await providerJson("https://api.x.com/2/users/me?user.fields=name,username", token.access_token);
       const userInfo = profile.data || {};
       if (!userInfo.id) throw new Error("X did not return the authorised profile.");
@@ -1292,7 +1295,7 @@ async function getUsableSocialToken(db, account) {
       token = await socialTokenRequest("https://oauth2.googleapis.com/token", body);
     } else {
       const body = new URLSearchParams({ client_id: secrets.get("X_CLIENT_ID"), grant_type: "refresh_token", refresh_token: refreshToken });
-      token = await socialTokenRequest("https://api.x.com/2/oauth2/token", body);
+      token = await socialTokenRequest("https://api.x.com/2/oauth2/token", body, secrets.get("X_CLIENT_ID"), secrets.get("X_CLIENT_SECRET"));
     }
     account = await db.SocialAccount.update(account.id, {
       encrypted_access_token: await encryptSocialToken(token.access_token),
@@ -1368,7 +1371,7 @@ async function publishSocialPostForUser(context, postId) {
       externalId = published.data?.id || "";
     }
     const finalStatus = post.platform === "TikTok" ? "publishing" : "published";
-    const updated = await db.SocialPost.update(post.id, { status: finalStatus, external_post_id: externalId, published_at: finalStatus === "published" ? new Date().toISOString() : undefined, error_message: "" });
+    const postPatch = { status: finalStatus, external_post_id: externalId, error_message: "" };\n    if (finalStatus === "published") postPatch.published_at = new Date().toISOString();\n    const updated = await db.SocialPost.update(post.id, postPatch);
     await db.SocialAccount.update(account.id, { last_used_at: new Date().toISOString(), last_error: "" });
     return { success: true, status: updated.status, externalPostId: externalId, message: finalStatus === "publishing" ? "TikTok accepted the video. Processing and moderation continue on TikTok." : "Published successfully." };
   } catch (error) {
