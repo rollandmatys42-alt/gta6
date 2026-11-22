@@ -1,0 +1,31 @@
+{
+  "name": "PaymentLedgerEntry",
+  "type": "object",
+  "properties": {
+    "stripe_invoice_id": { "type": "string", "maxLength": 200 },
+    "stripe_customer_id": { "type": "string", "maxLength": 200 },
+    "stripe_subscription_id": { "type": "string", "maxLength": 200 },
+    "user_id": { "type": "string", "maxLength": 200 },
+    "customer_email": { "type": "string", "maxLength": 254 },
+    "currency": { "type": "string", "enum": ["GBP", "EUR", "USD"] },
+    "amount_paid_cents": { "type": "integer", "minimum": 0, "default": 0 },
+    "amount_due_cents": { "type": "integer", "minimum": 0, "default": 0 },
+    "tax_cents": { "type": "integer", "minimum": 0, "default": 0 },
+    "refund_amount_cents": { "type": "integer", "minimum": 0, "default": 0 },
+    "status": { "type": "string", "enum": ["paid", "failed", "refunded", "disputed"], "default": "paid" },
+    "billing_reason": { "type": "string", "maxLength": 100 },
+    "period_start": { "type": "string", "format": "date-time" },
+    "period_end": { "type": "string", "format": "date-time" },
+    "paid_at": { "type": "string", "format": "date-time" },
+    "invoice_pdf_url": { "type": "string", "format": "uri" },
+    "hosted_invoice_url": { "type": "string", "format": "uri" },
+    "source_event_id": { "type": "string", "maxLength": 200 }
+  },
+  "required": ["currency", "amount_paid_cents", "amount_due_cents", "tax_cents", "refund_amount_cents", "status", "source_event_id"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
