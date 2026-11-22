@@ -128,7 +128,7 @@ function HomePage() {
     const routes = { news: "/news", creators: "/creators", studio: "/studio", shop: "/shop", social: "/social", pricing: "/#plans" };
     if (routes[id]) { window.location.assign(routes[id]); return; }
     setActive(id); setNotice("");
-    if (id === "library") document.getElementById("library")?.scrollIntoView({ behavior: "smooth" });
+    if (id === "library") { window.location.assign("/library"); return; }
   };
   
   const planCards = [
