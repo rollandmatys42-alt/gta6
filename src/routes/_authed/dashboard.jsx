@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile, refreshMySubscription, createStripePortalSession } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
+import {useLocale,translate} from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authed/dashboard")({
   ssr: false,
@@ -27,6 +28,7 @@ function Metric({ label, value, note, href }) {
 function DashboardPage() {
   const { user } = Route.useRouteContext();
   const { logout } = useAuth();
+  const locale=useLocale(),tx=key=>translate(locale,key);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,14 +64,14 @@ function DashboardPage() {
 
   return <SiteFrame eyebrow="VICEHUB / CREATOR CONTROL ROOM">
     <section className="account-dashboard-hero">
-      <div><div className="eyebrow">YOUR CREATOR OPERATING SYSTEM</div>
-        <h1>WELCOME BACK,<br/><em>{(user?.full_name || user?.email || "CREATOR").split(" ")[0].toUpperCase()}.</em></h1>
-        <p>Your footage, download allowance, creator tools and social publishing workspace — in one control room.</p>
+      <div><div className="eyebrow">{tx("dashboard.kicker")}</div>
+        <h1>{tx("dashboard.title")}<br/><em>{(user?.full_name || user?.email || "CREATOR").split(" ")[0].toUpperCase()}.</em></h1>
+        <p>{tx("dashboard.desc")}</p>
       </div>
       <div className="account-dashboard-hero-actions">
         <span className="account-status-pill">{account?.tier === "free" ? "FREE MEMBERSHIP" : (account?.planName || "MEMBERSHIP").toUpperCase()}</span>
         <button className="outline-btn" onClick={load} disabled={loading}>{loading ? "REFRESHING…" : "REFRESH DATA ↻"}</button>
-        <button className="text-btn" onClick={logout}>SIGN OUT ↗</button>
+        <button className="text-btn" onClick={logout}>{tx("dashboard.signout")} ↗</button>
       </div>
     </section>
     {error && <div className="platform-alert" role="alert">{error}</div>}
@@ -77,51 +79,51 @@ function DashboardPage() {
     {data && <>
       {data.secondaryErrors > 0 && <div className="platform-note">{data.secondaryErrors} secondary section(s) could not be refreshed. Your account and download data remain available.</div>}
       <section className="account-metrics-grid">
-        <Metric label="DOWNLOADS THIS MONTH" value={`${used} / ${limit}`} note={`${account?.downloadsRemaining ?? 0} remaining · UTC month`} href="/" />
-        <Metric label="UNREAD MESSAGES" value={unreadMessages} note="Private creator inbox" href="/messages" />
-        <Metric label="UNREAD ALERTS" value={unreadAlerts} note="Account and content updates" href="/notifications" />
-        <Metric label="SAVED SOCIAL POSTS" value={data.posts.length} note="Drafts and publishing queue" href="/social" />
+        <Metric label=tx("dashboard.downloads") value={`${used} / ${limit}`} note={`${account?.downloadsRemaining ?? 0} remaining · UTC month`} href="/" />
+        <Metric label=tx("dashboard.messages") value={unreadMessages} note="Private creator inbox" href="/messages" />
+        <Metric label=tx("dashboard.alerts") value={unreadAlerts} note="Account and content updates" href="/notifications" />
+        <Metric label=tx("dashboard.posts") value={data.posts.length} note="Drafts and publishing queue" href="/social" />
       </section>
       <div className="account-dashboard-columns">
         <section className="account-panel account-plan-panel">
-          <div className="section-head"><div><div className="eyebrow">MEMBERSHIP & DOWNLOADS</div><h2>{account?.planName || "FREE PLAN"}</h2></div><span className="source-pill">{account?.subscriptionStatus || "inactive"}</span></div>
+          <div className="section-head"><div><div className="eyebrow">{tx("dashboard.membership")}</div><h2>{account?.planName || "FREE PLAN"}</h2></div><span className="source-pill">{account?.subscriptionStatus || "inactive"}</span></div>
           <div className="quota-track"><i style={{ width: percent + "%" }} /></div>
-          <div className="account-plan-foot"><span>{used} downloads used</span><b>{account?.downloadsRemaining ?? 0} left</b></div>
+          <div className="account-plan-foot"><span>{used} {tx("dashboard.used")}</span><b>{account?.downloadsRemaining ?? 0} {tx("dashboard.left")}</b></div>
           <p className="account-muted">{account?.tier === "free" ? "Your free membership currently includes five downloads per UTC calendar month. Paid memberships will appear here once billing is activated." : "Your allowance is controlled by your active membership."}</p>
-          <a className="outline-btn account-wide-link" href="/">OPEN VIDEO LIBRARY ↗</a>
+          <a className="outline-btn account-wide-link" href="/">{tx("dashboard.library")} ↗</a>
           {account?.hasBillingCustomer && <button className="primary-btn account-wide-link" type="button" disabled={billingBusy} onClick={manageBilling}>{billingBusy?"OPENING BILLING…":"MANAGE MEMBERSHIP / CANCEL ↗"}</button>}
           {!account?.hasBillingCustomer && <p className="account-muted">Billing is not yet linked to this account. Paid memberships will become available when the platform opens subscriptions.</p>}
         </section>
         <section className="account-panel account-profile-panel">
-          <div className="eyebrow">CREATOR IDENTITY</div><h2>{data.profile?.display_name || "YOUR CREATOR PROFILE"}</h2>
+          <div className="eyebrow">{tx("dashboard.profile")}</div><h2>{data.profile?.display_name || "YOUR CREATOR PROFILE"}</h2>
           <p className="account-muted">{data.profile?.bio || "Add a bio, skills and social links so your creator identity is ready to share."}</p>
           <div className="account-profile-meta"><span>{data.profile ? "Profile saved" : "Profile not created"}</span><span>{data.profile?.skills?.length || 0} skills</span></div>
-          <a className="outline-btn account-wide-link" href="/creators">MANAGE CREATOR PROFILE ↗</a>
+          <a className="outline-btn account-wide-link" href="/creators">{tx("dashboard.manageProfile")} ↗</a>
         </section>
       </div>
       <section className="account-panel account-modules-panel">
-        <div className="section-head"><div><div className="eyebrow">YOUR VICEHUB</div><h2>CREATOR WORKSPACES</h2></div><span className="source-pill">7 MODULES</span></div>
+        <div className="section-head"><div><div className="eyebrow">YOUR VICEHUB</div><h2>{tx("dashboard.workspaces")}</h2></div><span className="source-pill">7 MODULES</span></div>
         <div className="account-module-grid">{modules.map(([href,code,title,description]) => <a className="account-module-card" href={href} key={href}>
           <span>{code}</span><b>{title}</b><small>{description}</small><i>OPEN MODULE ↗</i>
         </a>)}</div>
       </section>
       <div className="account-dashboard-columns">
         <section className="account-panel">
-          <div className="section-head"><div><div className="eyebrow">SOCIAL PUBLISHING</div><h2>YOUR NEXT POSTS</h2></div><a className="text-btn" href="/social">OPEN SOCIAL DESK ↗</a></div>
+          <div className="section-head"><div><div className="eyebrow">SOCIAL PUBLISHING</div><h2>{tx("dashboard.nextPosts")}</h2></div><a className="text-btn" href="/social">{tx("dashboard.socialDesk")} ↗</a></div>
           {upcoming.length ? upcoming.map(p => <div className="account-feed-row" key={p.id}><div><b>{p.platform}</b><small>{p.caption?.slice(0,100)}</small></div><time>{new Date(p.scheduled_at).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}</time></div>) : <div className="account-empty">No posts planned. Prepare your next publication in Social Desk.</div>}
           <p className="account-muted">Direct publishing will become available after each social platform approves VICEHUB and you connect your account.</p>
         </section>
         <section className="account-panel">
-          <div className="section-head"><div><div className="eyebrow">CREATOR STUDIO</div><h2>YOUR SAVED DRAFTS</h2></div><a className="text-btn" href="/studio">OPEN STUDIO ↗</a></div>
+          <div className="section-head"><div><div className="eyebrow">CREATOR STUDIO</div><h2>{tx("dashboard.studio")}</h2></div><a className="text-btn" href="/studio">{tx("dashboard.openStudio")} ↗</a></div>
           <div className="account-feed-row"><div><b>{data.drafts.length} saved drafts</b><small>Hooks, captions, scripts and content ideas</small></div><span>DRAFTS</span></div>
           <div className="account-feed-row"><div><b>{data.profile?.social_links ? Object.keys(data.profile.social_links).length : 0} social links</b><small>Shown on your public creator profile</small></div><span>PROFILE</span></div>
         </section>
       </div>
       <section className="account-panel history-panel">
-        <div className="section-head"><div><div className="eyebrow">YOUR DOWNLOADS</div><h2>DOWNLOAD HISTORY</h2></div><a className="text-btn" href="/">BROWSE VIDEOS ↗</a></div>
-        {account?.history?.length ? <div className="history-list">{account.history.map(item => <div className="history-row" key={item.id}><div><b>{item.video_title || "Video download"}</b><small>Reference: {item.video_id}</small></div><span>{item.watermark_applied ? "Watermarked copy" : "Clean copy"} · {item.status}</span><time>{new Date(item.created_date).toLocaleDateString("en-GB")}</time></div>)}</div> : <div className="account-empty">Your downloaded videos will appear here, with the watermark and date recorded.</div>}
+        <div className="section-head"><div><div className="eyebrow">YOUR DOWNLOADS</div><h2>{tx("dashboard.history")}</h2></div><a className="text-btn" href="/">{tx("dashboard.browse")} ↗</a></div>
+        {account?.history?.length ? <div className="history-list">{account.history.map(item => <div className="history-row" key={item.id}><div><b>{item.video_title || "Video download"}</b><small>Reference: {item.video_id}</small></div><span>{item.watermark_applied ? "Watermarked copy" : "Clean copy"} · {item.status}</span><time>{new Date(item.created_date).toLocaleDateString("en-GB")}</time></div>)}</div> : <div className="account-empty">{tx("dashboard.emptyHistory")}</div>}
       </section>
-      {user?.role === "admin" && <div className="admin-shortcut"><div><b>ADMIN CONTROL ROOM</b><small>Manage video ingestion, rights review, subscriptions, users and platform settings.</small></div><div className="admin-shortcut-actions"><button className="primary-btn" onClick={() => window.location.assign("/admin")}>OPEN ADMIN ↗</button><button className="outline-btn" onClick={() => window.location.assign("/admin/videos")}>MANAGE VIDEOS</button></div></div>}
+      {user?.role === "admin" && <div className="admin-shortcut"><div><b>{tx("dashboard.admin")}</b><small>Manage video ingestion, rights review, subscriptions, users and platform settings.</small></div><div className="admin-shortcut-actions"><button className="primary-btn" onClick={() => window.location.assign("/admin")}>{tx("dashboard.openAdmin")} ↗</button><button className="outline-btn" onClick={() => window.location.assign("/admin/videos")}>MANAGE VIDEOS</button></div></div>}
     </>}
   </SiteFrame>;
 }
