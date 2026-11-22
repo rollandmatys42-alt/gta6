@@ -7,11 +7,11 @@ import { setSiteLocale } from "@/lib/i18n";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "GTA6 Creator Hub — The creator network" },
-      { name: "description", content: "A creator-first hub for GTA VI video inspiration, community, news and creator tools." },
+      { title: "VICEHUB — The GTA VI Creator Universe" },
+      { name: "description", content: "The GTA VI creator universe: discover cinematic footage, short-form drops, creator profiles and tools for your next edit." },
       { name: "theme-color", content: "#09090d" },
-      { property: "og:title", content: "GTA6 Creator Hub — The creator network" },
-      { property: "og:description", content: "A creator-first hub for GTA VI video inspiration, community, news and creator tools." },
+      { property: "og:title", content: "VICEHUB — The GTA VI Creator Universe" },
+      { property: "og:description", content: "The GTA VI creator universe: discover cinematic footage, short-form drops, creator profiles and tools for your next edit." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
