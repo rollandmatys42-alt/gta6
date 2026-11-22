@@ -649,3 +649,12 @@ export const toggleForumReaction = createServerFn({method:"POST"}).middleware([r
   if(existing.length){await db.ForumReaction.delete(existing[0].id);return {active:false};}
   await db.ForumReaction.create({user_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reaction:data.reaction});return {active:true};
  });
+
+export const grantComplimentaryPremium = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({userId:z.string().min(1),currency:z.enum(["USD","EUR","GBP"]).default("USD")}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
+  const rows=await db.UserSubscription.filter({user_id:data.userId},"-created_date",1,0);
+  const payload={user_id:data.userId,tier_code:"premium",status:"active",currency:data.currency,started_at:new Date().toISOString(),streak_months:0,loyalty_discount_percent:0,current_monthly_price_cents:0,voluntary_cancelled:false};
+  return rows[0]?db.UserSubscription.update(rows[0].id,payload):db.UserSubscription.create(payload);
+ });
