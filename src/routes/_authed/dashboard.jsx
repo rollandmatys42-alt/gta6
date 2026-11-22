@@ -101,8 +101,8 @@ function DashboardPage() {
           {!account?.hasBillingCustomer && <p className="account-muted">Billing is not yet linked to this account. Paid memberships will become available when the platform opens subscriptions.</p>}
         </section>
         <section className="account-panel account-profile-panel">
-          <div className="eyebrow">{tx("dashboard.profile")}</div><h2>{data.profile?.display_name || "{tx("dashboard.profile")}"}</h2>
-          <p className="account-muted">{data.profile?.bio || "{tx("dashboard.profileEmpty")}"}</p>
+          <div className="eyebrow">{tx("dashboard.profile")}</div><h2>{data.profile?.display_name || tx("dashboard.profile")}</h2>
+          <p className="account-muted">{data.profile?.bio || tx("dashboard.profileEmpty")}</p>
           <div className="account-profile-meta"><span>{data.profile ? "Profile saved" : "Profile not created"}</span><span>{data.profile?.skills?.length || 0} skills</span></div>
           <a className="outline-btn account-wide-link" href="/creators">{tx("dashboard.manageProfile")} ↗</a>
         </section>
