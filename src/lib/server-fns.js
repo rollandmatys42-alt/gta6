@@ -404,8 +404,8 @@ export const saveMarketplaceListing = createServerFn({method:"POST"}).middleware
  .handler(async({data,context})=>{
   const db=context.getBase44().asServiceRole.entities;
   const subs=await db.UserSubscription.filter({user_id:context.user.id},"-created_date",1,0);
-  if(subs[0]?.tier_code!=="premium" || subs[0]?.status!=="active") throw Object.assign(new Error("A Premium membership is required to publish creator listings. You can prepare a draft after Premium billing is enabled."),{status:403,code:"PREMIUM_REQUIRED"});
-  const payload={seller_id:context.user.id,seller_name:context.user.full_name||context.user.email||"Creator",title:data.title,description:data.description,category:data.category,price_cents:data.priceCents,currency:data.currency,license_terms:data.licenseTerms,status:"pending_review",created_by:context.user.id,...(data.previewUrl?{preview_url:data.previewUrl}:{})};
+  const premiumActive=subs[0]?.tier_code==="premium" && subs[0]?.status==="active" && !subs[0]?.voluntary_cancelled;
+  const payload={seller_id:context.user.id,seller_name:context.user.full_name||context.user.email||"Creator",title:data.title,description:data.description,category:data.category,price_cents:data.priceCents,currency:data.currency,license_terms:data.licenseTerms,status:premiumActive?"pending_review":"draft",created_by:context.user.id,...(data.previewUrl?{preview_url:data.previewUrl}:{})};
   return data.id?db.MarketplaceListing.update(data.id,payload):db.MarketplaceListing.create(payload);
  });
 export const createMarketplaceInquiry = createServerFn({method:"POST"}).middleware([requireUser])
@@ -555,4 +555,17 @@ export const getMyPlanQuote = createServerFn({method:"GET"}).middleware([require
   const raw=Math.round(Number(plan.monthly_price_cents||0)*(1-discount/100));
   const price=Math.max(Number(plan.loyalty_floor_price_cents||0),raw);
   return {tierCode:data.tierCode,currency:data.currency,basePriceCents:plan.monthly_price_cents,currentPriceCents:price,streakMonths:streak,discountPercent:discount,floorPriceCents:plan.loyalty_floor_price_cents||0,resetOnVoluntaryCancellation:true};
+ });
+
+export const getAdminMarketplaceListings = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.MarketplaceListing.list("-created_date",200,0);});
+export const setMarketplaceListingStatus = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({listingId:z.string().min(1),status:z.enum(["published","rejected","archived"])}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
+  const listing=await db.MarketplaceListing.get(data.listingId);
+  if(data.status==="published"){
+   const subs=await db.UserSubscription.filter({user_id:listing.seller_id},"-created_date",1,0);
+   if(subs[0]?.tier_code!=="premium"||subs[0]?.status!=="active"||subs[0]?.voluntary_cancelled)throw Object.assign(new Error("Only active Premium creators can have published marketplace listings."),{status:403,code:"PREMIUM_REQUIRED"});
+  }
+  return db.MarketplaceListing.update(listing.id,{status:data.status});
  });
