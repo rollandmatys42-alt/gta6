@@ -241,3 +241,8 @@
 .vice-dashboard-side{backdrop-filter:blur(16px);border:1px solid #ffffff32;border-radius:2px}
 .vice-stat-card,.account-panel,.account-module-card{border-radius:2px}
 @media(max-width:760px){.vice-dashboard-hero{background-position:58% center}.vice-dashboard-side{padding:15px}}
+
+/* Use real atmospheric photography in the member hero, not placeholder skyline geometry */
+.vice-dashboard-sun,.vice-dashboard-tower,.vice-dashboard-palm,.vice-dashboard-road{display:none!important}
+.vice-dashboard-sky{opacity:1!important}
+.vice-dashboard-coordinate{color:#f3dce8}
