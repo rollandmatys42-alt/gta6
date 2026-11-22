@@ -704,7 +704,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     const user=context.user;
     const plans=await db.SubscriptionPlan.filter({tier_code:data.tierCode,currency:data.currency,status:"active"},"-created_date",1,0);
     const plan=plans[0];
-    if(!plan||Number(plan.monthly_price_cents||0)<=0)throw Object.assign(new Error("This membership is not yet open for sale. Its price must be configured by the administrator first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
+    if(!plan||Number(plan.monthly_price_cents||0)<=0||Number(plan.monthly_download_limit||0)<1)throw Object.assign(new Error("This membership is not yet open for sale. The administrator must configure a positive monthly price and download allowance first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
     if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
