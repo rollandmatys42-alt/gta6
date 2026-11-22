@@ -39,17 +39,44 @@ Subscribe to:
 
 Before checkout can open, activate a SubscriptionPlan record for each tier/currency and set a positive monthly price and monthly download limit. Draft plans are deliberately not purchasable. The checkout creates a monthly recurring Stripe price from the active plan configuration. Customers manage or cancel through the Stripe Billing Portal. Enable the Customer Portal in Stripe settings and allow subscription cancellation. Keep plan switching disabled until VICEHUB supports and verifies tier-change handling.
 
+## OmniRoute AI gateway
+
+All VICEHUB AI features (creator captions, agent tasks and translations) call the OpenAI-compatible OmniRoute Chat Completions endpoint. Do not add direct provider API calls to feature code.
+
+Required Base44 secrets:
+
+- OMNIROUTE_BASE_URL — the OmniRoute API root ending in /v1 (not the /chat/completions path)
+- OMNIROUTE_API_KEY — a server-side OmniRoute key
+- OMNIROUTE_MODEL — optional default model identifier; defaults to auto
+
+The app calls POST <OMNIROUTE_BASE_URL>/chat/completions with Authorization: Bearer. Provider-specific account OAuth and publishing are deliberately kept outside OmniRoute.
+
 ## Social platform APIs
 
-The app must be registered with each platform, the relevant products/scopes approved, and each creator must authorize their own account. Do not collect platform passwords.
+The app must be registered with each platform, the relevant products/scopes approved, and each creator must authorize their own account. Do not collect platform passwords. The OAuth callback URL for every provider is:
 
-Initial server configuration names:
+https://gta6-creator-hub-c26cc578.base44.app/social
+
+Required Base44 secrets:
 
 - TikTok: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET
-- Instagram / Meta: META_APP_ID, META_APP_SECRET
+- Instagram and Facebook Pages (Meta): META_APP_ID, META_APP_SECRET
 - YouTube: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+- X: X_CLIENT_ID, X_CLIENT_SECRET
+- Token security: SOCIAL_TOKEN_ENCRYPTION_KEY, SOCIAL_OAUTH_STATE_SECRET (each at least 32 characters)
 
-Direct publishing is not enabled merely by adding credentials: OAuth redirect URLs, app review, account eligibility and each provider's publishing requirements must also be completed.
+The app stores encrypted access/refresh tokens in the SocialAccount entity. Client-side entity reads are denied; server functions return only account names, scopes and connection status. OAuth state is short-lived, single-use and tied to the signed-in user. Disconnecting an account erases its stored credentials.
+
+Supported initial publishing paths:
+- Instagram: Reels video publishing to a linked Instagram professional account.
+- Facebook: video publishing to a Facebook Page, not a personal profile.
+- TikTok: video publishing through Content Posting API; TikTok must approve the app and verify the source domain for PULL_FROM_URL.
+- YouTube: video upload to the selected channel (initial upload size limit 250 MB).
+- X: text posts only; X video upload is not enabled.
+
+The social publishing worker processes due scheduled posts every five minutes. A scheduled post is only a queue instruction; it is not considered published until the provider confirms the publication request. TikTok requests remain in a processing state after the API accepts them.
+
+Adding credentials alone does not activate a platform: configure the exact callback URL in each developer console, complete app review, enable the requested scopes and confirm the connected account is eligible. TikTok's unaudited applications may be restricted to private-only posts and must not be represented as publicly publish-ready.
 
 ## Rights and media policy
 
