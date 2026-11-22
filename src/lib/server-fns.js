@@ -63,7 +63,10 @@ async function presignR2({ method, objectKey, contentType, expiresIn = DOWNLOAD_
 }
 
 
-const SOCIAL_CALLBACK_URL = "https://gta6-creator-hub-c26cc578.base44.app/social/callback";
+const SOCIAL_CALLBACK_URLS = {
+  TikTok: "https://gta6-creator-hub-c26cc578.base44.app/social/callback/tiktok",
+  Instagram: "https://gta6-creator-hub-c26cc578.base44.app/social/callback/instagram",
+};
 function fromHex(value) {
   if (!/^(?:[a-f0-9]{2})+$/i.test(value || "")) throw new Error("Invalid encrypted social credential.");
   return new Uint8Array(value.match(/.{2}/g).map(byte => parseInt(byte, 16)));
@@ -738,13 +741,13 @@ export const startSocialOAuth = createServerFn({ method: "POST" }).middleware([r
       url.searchParams.set("client_key", clientKey);
       url.searchParams.set("scope", "user.info.basic,video.publish");
       url.searchParams.set("response_type", "code");
-      url.searchParams.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      url.searchParams.set("redirect_uri", SOCIAL_CALLBACK_URLS[data.provider]);
       url.searchParams.set("state", state);
     } else {
       const clientId = secrets.get("META_APP_ID");
       if (!clientId || !secrets.get("META_APP_SECRET")) throw Object.assign(new Error("Instagram app credentials are not configured."), { status: 503, code: "INSTAGRAM_APP_NOT_CONFIGURED" });
       url.searchParams.set("client_id", clientId);
-      url.searchParams.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      url.searchParams.set("redirect_uri", SOCIAL_CALLBACK_URLS[data.provider]);
       url.searchParams.set("response_type", "code");
       url.searchParams.set("scope", "instagram_business_basic,instagram_business_content_publish");
       url.searchParams.set("state", state);
@@ -764,7 +767,7 @@ export const completeSocialOAuth = createServerFn({ method: "POST" }).middleware
       form.set("client_secret", secrets.get("TIKTOK_CLIENT_SECRET") || "");
       form.set("code", data.code);
       form.set("grant_type", "authorization_code");
-      form.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      form.set("redirect_uri", SOCIAL_CALLBACK_URLS[data.provider]);
       const tokenPayload = await socialFetchJson("https://open.tiktokapis.com/v2/oauth/token/", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
       const token = tokenPayload.data || tokenPayload;
       const info = await socialFetchJson("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url", { headers: { Authorization: "Bearer " + token.access_token } });
@@ -781,7 +784,7 @@ export const completeSocialOAuth = createServerFn({ method: "POST" }).middleware
       form.set("client_id", secrets.get("META_APP_ID") || "");
       form.set("client_secret", secrets.get("META_APP_SECRET") || "");
       form.set("grant_type", "authorization_code");
-      form.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      form.set("redirect_uri", SOCIAL_CALLBACK_URLS[data.provider]);
       form.set("code", data.code);
       const shortToken = await socialFetchJson("https://api.instagram.com/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
       const longToken = await socialFetchJson("https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=" + encodeURIComponent(secrets.get("META_APP_SECRET") || "") + "&access_token=" + encodeURIComponent(shortToken.access_token));
