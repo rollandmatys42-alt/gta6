@@ -550,13 +550,32 @@ export const adminSetSubscriberAccess = createServerFn({method:"POST"}).middlewa
  requireAdmin(context);if(data.userId===context.user.id&&data.disabled)throw Object.assign(new Error("You cannot suspend your own administrator account."),{status:400});return context.getBase44().asServiceRole.entities.User.update(data.userId,{disabled:data.disabled});
 });
 export const adminDeleteSubscriber = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({userId:z.string().min(1),confirmEmail:z.string().email()})).handler(async({data,context})=>{
- requireAdmin(context);if(data.userId===context.user.id)throw Object.assign(new Error("You cannot delete your own administrator account."),{status:400});const db=context.getBase44().asServiceRole.entities;const user=await db.User.get(data.userId);if(!user||String(user.email||"").toLowerCase()!==data.confirmEmail.toLowerCase())throw Object.assign(new Error("The account confirmation does not match."),{status:409});if(user.role==="admin")throw Object.assign(new Error("Administrator accounts cannot be deleted from the subscriber CRM."),{status:403});
- const subscriptions=await db.UserSubscription.filter({user_id:data.userId},"-created_date",100,0);if(subscriptions.some(x=>["active","trialing","past_due"].includes(x.status)))throw Object.assign(new Error("Cancel or resolve the active billing subscription before deleting this account."),{status:409});
- await Promise.all([db.DownloadQuota.deleteMany({user_id:data.userId}),db.DownloadEvent.deleteMany({user_id:data.userId}),db.SocialPost.deleteMany({user_id:data.userId}),db.AIContentDraft.deleteMany({user_id:data.userId}),db.CreatorProfile.deleteMany({user_id:data.userId}),db.UserNotification.deleteMany({user_id:data.userId}),db.DirectMessage.deleteMany({sender_id:data.userId}),db.DirectMessage.deleteMany({recipient_id:data.userId}),db.UserBlock.deleteMany({blocker_id:data.userId}),db.UserBlock.deleteMany({blocked_id:data.userId}),db.ForumPost.deleteMany({author_id:data.userId}),db.ForumThread.deleteMany({author_id:data.userId}),db.ForumReaction.deleteMany({user_id:data.userId}),db.MarketplaceInquiry.deleteMany({buyer_id:data.userId}),db.MarketplaceInquiry.deleteMany({seller_id:data.userId}),db.MarketplaceListing.deleteMany({seller_id:data.userId}),db.ContentReport.deleteMany({reporter_id:data.userId}),db.Video.updateMany({uploaded_by:data.userId},{$set:{uploaded_by:"deleted-account"}})]);
- if(subscriptions.length)await db.UserSubscription.updateMany({user_id:data.userId},{$set:{user_id:"deleted:"+data.userId,stripe_customer_id:"",stripe_subscription_id:""}});
- await db.PlatformInvoice.deleteMany({user_id:data.userId,status:"draft"});
+ requireAdmin(context);
+ if(data.userId===context.user.id)throw Object.assign(new Error("You cannot delete your own administrator account."),{status:400});
+ const db=context.getBase44().asServiceRole.entities;
+ const user=await db.User.get(data.userId);
+ if(!user||String(user.email||"").toLowerCase()!==data.confirmEmail.toLowerCase())throw Object.assign(new Error("The account confirmation does not match."),{status:409});
+ if(user.role==="admin")throw Object.assign(new Error("Administrator accounts cannot be deleted from the subscriber CRM."),{status:403});
+ const subscriptions=await db.UserSubscription.filter({user_id:data.userId},"-created_date",100,0);
+ if(subscriptions.some(x=>["active","trialing","past_due"].includes(x.status)))throw Object.assign(new Error("Cancel or resolve the active billing subscription before deleting this account."),{status:409});
+ const removeRecords=async(entity,filter)=>{const collection=db[entity];if(!collection?.filter||!collection?.delete)return;const rows=await collection.filter(filter,"-created_date",5000,0);for(const row of rows)await collection.delete(row.id);};
+ const jobs=[
+  ["DownloadQuota",{user_id:data.userId}],["DownloadEvent",{user_id:data.userId}],
+  ["SocialPost",{user_id:data.userId}],["AIContentDraft",{user_id:data.userId}],
+  ["CreatorProfile",{user_id:data.userId}],["UserNotification",{user_id:data.userId}],
+  ["DirectMessage",{sender_id:data.userId}],["DirectMessage",{recipient_id:data.userId}],
+  ["UserBlock",{blocker_id:data.userId}],["UserBlock",{blocked_id:data.userId}],
+  ["ForumPost",{author_id:data.userId}],["ForumThread",{author_id:data.userId}],
+  ["ForumReaction",{user_id:data.userId}],["MarketplaceInquiry",{buyer_id:data.userId}],
+  ["MarketplaceInquiry",{seller_id:data.userId}],["MarketplaceListing",{seller_id:data.userId}],
+  ["ContentReport",{reporter_id:data.userId}],["PlatformInvoice",{user_id:data.userId,status:"draft"}]
+ ];
+ for(const [entity,filter] of jobs)await removeRecords(entity,filter);
+ const ownedVideos=await db.Video.filter({uploaded_by:data.userId},"-created_date",5000,0);
+ for(const video of ownedVideos)await db.Video.update(video.id,{uploaded_by:"deleted-account"});
+ for(const subscription of subscriptions)await db.UserSubscription.update(subscription.id,{user_id:"deleted:"+data.userId,stripe_customer_id:"",stripe_subscription_id:""});
  await db.User.delete(data.userId);
- return {success:true,message:"Account deleted. Historical payment ledger and non-draft invoice records were retained for accounting audit."};
+ return {success:true,message:"App user deleted. Associated personal profile and operational records removed; non-draft invoices, payment ledger and anonymised subscription history retained for accounting."};
 });
 export const getAdminPromotions = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriberPromotion.list("-created_date",500,0);});
 export const saveAdminPromotion = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({id:z.string().optional(),name:z.string().min(2).max(120),code:z.string().min(3).max(40).transform(v=>v.toUpperCase()),discountPercent:z.number().min(1).max(100),targetTiers:z.array(z.enum(["free","starter","pro","premium"])),targetCountries:z.array(z.string().length(2)),startsAt:z.string().optional(),endsAt:z.string().optional(),maxRedemptions:z.number().int().min(0),status:z.enum(["draft","active","paused","expired"]),internalNote:z.string().max(1000).optional()})).handler(async({data,context})=>{
