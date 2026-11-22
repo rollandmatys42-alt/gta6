@@ -172,7 +172,7 @@ function SocialPublishingPage() {
   };
   const edit = post => {
     setEditingId(post.id); setPlatform(post.platform); setAccountId(post.account_id || "");
-    setCaption(post.caption || ""); setMediaUrl(post.media_reference || "");
+    setCaption(post.caption || ""); setMediaUrl(post.media_reference?.startsWith("https://") ? post.media_reference : ""); setMediaFile(null); setExistingMediaObjectKey(post.media_reference?.startsWith("social/") ? post.media_reference : "");
     setScheduledAt(localDate(post.scheduled_at)); setError(""); setNotice("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -237,7 +237,7 @@ function SocialPublishingPage() {
         <div className="social-section-head"><div><span className="social-kicker">02 / CONTENT DISTRIBUTION</span><h2>CREATE A PUBLICATION</h2></div><span className="social-count">PRIVATE PLANNER</span></div>
         <form className="social-composer" onSubmit={save}>
           <div className="social-form-grid">
-            <label>NETWORK<select value={platform} onChange={event => { setPlatform(event.target.value); setAccountId(""); }}><option value="TikTok">TikTok</option><option value="Instagram">Instagram</option><option value="Facebook">Facebook Page</option><option value="YouTube">YouTube</option><option value="X">X</option></select></label>
+            <label>NETWORK<select value={platform} onChange={event => { setPlatform(event.target.value); setAccountId(""); setMediaUrl(""); setMediaFile(null); setExistingMediaObjectKey(""); }}><option value="TikTok">TikTok</option><option value="Instagram">Instagram</option><option value="Facebook">Facebook Page</option><option value="YouTube">YouTube</option><option value="X">X</option></select></label>
             <label>DESTINATION ACCOUNT<select required value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">Select your connected account…</option>{accountOptions.map(account => <option value={account.id} key={account.id}>{account.accountName}</option>)}</select></label>
           </div>
           <div className="social-platform-hint">{platformNotes[platform]}</div>
