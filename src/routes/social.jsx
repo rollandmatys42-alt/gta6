@@ -84,6 +84,7 @@ function SocialPublishingPage() {
       return;
     }
     if (!code || !state) return;
+    window.history.replaceState({}, "", "/social");
     let active = true;
     setBusy(true);
     setError("");
@@ -152,7 +153,7 @@ function SocialPublishingPage() {
       let uploadedObjectKey = existingMediaObjectKey;
       if (mediaFile) {
         setNotice("Uploading your video to private storage…");
-        const signed = await createSocialMediaUploadUrl({ data: { fileName: mediaFile.name, contentType: mediaFile.type, sizeBytes: mediaFile.size } });
+        const signed = await createSocialMediaUploadUrl({ data: { fileName: mediaFile.type === "video/quicktime" ? "upload.mov" : "upload.mp4", contentType: mediaFile.type, sizeBytes: mediaFile.size } });
         const uploaded = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": mediaFile.type }, body: mediaFile });
         if (!uploaded.ok) throw new Error("Private video storage rejected the upload (HTTP " + uploaded.status + ").");
         uploadedObjectKey = signed.objectKey;
