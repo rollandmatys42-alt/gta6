@@ -133,6 +133,7 @@ function AdminVideosPage() {
   const [isFeatured, setIsFeatured] = useState(false);
   const [creatorName, setCreatorName] = useState("");
   const [sourceReference, setSourceReference] = useState("");
+  const [rightsEvidenceReference, setRightsEvidenceReference] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [durationSeconds, setDurationSeconds] = useState("");
   const [licenseVerified, setLicenseVerified] = useState(false);
@@ -151,8 +152,8 @@ function AdminVideosPage() {
       setError("Choose the original video. VICEHUB will generate the watermarked MP4 automatically in your browser.");
       return;
     }
-    if (licenseVerified && !sourceReference.trim()) {
-      setError("Add a source or rights reference before marking the licence as verified.");
+    if (licenseVerified && (!sourceReference.trim() || !rightsEvidenceReference.trim())) {
+      setError("Add both the original source and a commercial-rights evidence reference before marking the licence as verified.");
       return;
     }
     setBusy(true);
@@ -169,6 +170,8 @@ function AdminVideosPage() {
         title, description, category, language, isFeatured, creatorName,
         ...(thumbnailUrl.trim() ? { thumbnailUrl: thumbnailUrl.trim() } : {}),
         ...(sourceReference.trim() ? { sourceReference: sourceReference.trim() } : {}),
+        ...(rightsEvidenceReference.trim() ? { rightsEvidenceReference: rightsEvidenceReference.trim() } : {}),
+        fileSizeBytes: originalFile.size, mimeType: originalFile.type,
         ...(durationSeconds ? { durationSeconds: Number(durationSeconds) } : {}),
         licenseVerified, originalStorageKey, watermarkedStorageKey,
       }});
@@ -178,7 +181,7 @@ function AdminVideosPage() {
       } else {
         setMessage("Video uploaded as a draft. Verify its rights before publishing.");
       }
-      setTitle(""); setDescription(""); setCreatorName(""); setSourceReference(""); setThumbnailUrl(""); setLanguage("en"); setIsFeatured(false);
+      setTitle(""); setDescription(""); setCreatorName(""); setSourceReference(""); setRightsEvidenceReference(""); setThumbnailUrl(""); setLanguage("en"); setIsFeatured(false);
       setDurationSeconds(""); setLicenseVerified(false); setOriginalFile(null); setWatermarkProgress(0);
       event.target.reset();
     } catch (err) {
@@ -212,7 +215,8 @@ function AdminVideosPage() {
             <label>Thumbnail URL<input type="url" value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} placeholder="https://…" /></label>
           </div>
           <label>Creator / source name<input maxLength={80} value={creatorName} onChange={(e) => setCreatorName(e.target.value)} placeholder="Creator name" /></label>
-          <label>Rights / source reference<input type="url" value={sourceReference} onChange={(e) => setSourceReference(e.target.value)} placeholder="https://…" /></label>
+          <label>Original source URL<input type="url" value={sourceReference} onChange={(e) => setSourceReference(e.target.value)} placeholder="https://…" /></label>
+          <label>Commercial rights evidence (licence / written permission reference)<input required={licenseVerified} maxLength={500} value={rightsEvidenceReference} onChange={(e) => setRightsEvidenceReference(e.target.value)} placeholder="Agreement ID, permission URL or legal document reference" /></label>
           <label className="license-check"><input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} /> Feature as “Video of the Moment”</label>
           <div className="admin-form-row upload-pair">
             <label>Original video (.mp4 / .mov)<input required type="file" accept="video/mp4,video/quicktime" onChange={(e) => { setOriginalFile(e.target.files?.[0] || null); setWatermarkProgress(0); }} /><small>{originalFile?.name || "Choose the clean master video"}</small></label>
