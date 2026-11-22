@@ -653,7 +653,7 @@ export const createContentReport = createServerFn({method:"POST"}).middleware([r
  .handler(async({data,context})=>context.getBase44().asServiceRole.entities.ContentReport.create({reporter_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reason:data.reason,details:data.details||"",status:"open"}));
 
 export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object({currency:z.enum(["USD","EUR","GBP"]).default("USD")})).handler(async({data,context})=>{
- const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({status:"active",currency:data.currency},"sort_order",20,0);
+ const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",20,0);
  return rows;
 });
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
