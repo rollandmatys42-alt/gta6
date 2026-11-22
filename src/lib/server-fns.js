@@ -256,7 +256,7 @@ export const createVideoRecord = createServerFn({ method: "POST" })
 
 function parseAdminCsv(text) {
  const rows=[];let row=[],field="",quoted=false;
- for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;}else if(ch==='"'&&field==="")quoted=true;else if(ch===","){row.push(field);field="";}else if(ch==="\\n"||ch==="\\r"){if(ch==="\\r"&&text[i+1]==="\\n")i++;row.push(field);field="";if(row.some(x=>String(x).trim()))rows.push(row);row=[];}else field+=ch;}
+ for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;}else if(ch==='"'&&field==="")quoted=true;else if(ch===","){row.push(field);field="";}else if(ch===String.fromCharCode(10)||ch===String.fromCharCode(13)){if(ch===String.fromCharCode(13)&&text[i+1]===String.fromCharCode(10))i++;row.push(field);field="";if(row.some(x=>String(x).trim()))rows.push(row);row=[];}else field+=ch;}
  row.push(field);if(row.some(x=>String(x).trim()))rows.push(row);return rows;
 }
 export const importAdminVideoMetadataCsv = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({csvText:z.string().min(10).max(5000000)})).handler(async({data,context})=>{
