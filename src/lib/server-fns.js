@@ -1070,6 +1070,7 @@ export const listPublishedVideosPage = createServerFn({ method: "GET" })
   .validator(z.object({
     category: z.enum(["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]).optional(),
     language: z.enum(["en", "fr", "es", "pt", "it", "de"]).optional(),
+    search: z.string().trim().max(100).optional(),
     offset: z.number().int().min(0).max(100000).default(0),
     limit: z.number().int().min(1).max(48).default(24),
   }))
@@ -1078,6 +1079,18 @@ export const listPublishedVideosPage = createServerFn({ method: "GET" })
     const filter = { status: "published", license_status: "verified" };
     if (data.category) filter.category = data.category;
     if (data.language) filter.language = data.language;
+    if (data.search) {
+      // Escape user input before passing it to the database's case-insensitive regex filter.
+      const term = data.search.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\    if (data.category) filter.category = data.category;
+    if (data.language) filter.language = data.language;
+    const rows = await base44.asServiceRole.entities.Video.filter(");
+      filter.$or = [
+        { title: { $regex: term, $options: "i" } },
+        { description: { $regex: term, $options: "i" } },
+        { creator_name: { $regex: term, $options: "i" } },
+        { tags: { $regex: term, $options: "i" } },
+      ];
+    }
     const rows = await base44.asServiceRole.entities.Video.filter(
       filter,
       "-published_at",
