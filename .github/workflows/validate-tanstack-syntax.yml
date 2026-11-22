@@ -1,4 +1,4 @@
-name: Validate TanStack source syntax
+name: Validate TanStack source syntax — current admin fix
 on:
   pull_request:
     branches:
