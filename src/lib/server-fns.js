@@ -329,6 +329,26 @@ export const syncNewsSources = createServerFn({method:"POST"}).middleware([requi
     try{
       const url=new URL(source.feed_url);
       if(url.protocol!=="https:" || /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(url.hostname)) throw new Error("Only public HTTPS feed URLs are allowed.");
+      if(url.hostname==="api.x.com" || url.hostname==="api.twitter.com"){
+        const token=secrets.get("X_BEARER_TOKEN");
+        if(!token)throw new Error("X API source configured but X_BEARER_TOKEN is not set in Base44 secrets.");
+        const response=await fetch(url.toString(),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+        if(!response.ok)throw new Error("X API returned HTTP "+response.status);
+        const payload=await response.json();
+        const users=new Map((payload.includes?.users||[]).map(u=>[u.id,u]));
+        let created=0;
+        for(const tweet of (payload.data||[]).slice(0,20)){
+          const author=users.get(tweet.author_id),username=author?.username||"X user";
+          const articleUrl="https://x.com/"+username+"/status/"+tweet.id;
+          const exists=await db.entities.NewsArticle.filter({source_url:articleUrl},"-created_date",1,0);
+          if(exists.length)continue;
+          const title=(tweet.text||"GTA VI social update").replace(/\s+/g," ").slice(0,170);
+          await db.entities.NewsArticle.create({title,slug:title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,150)+"-"+crypto.randomUUID().slice(0,6),summary:(tweet.text||"").slice(0,500),body:tweet.text||"",source_name:"@"+username,source_url:articleUrl,source_type:"social",confidence:"reported",locale:"en",status:"draft",tags:["X import"],created_by:context.user.id});
+          created++;
+        }
+        await db.entities.NewsSource.update(source.id,{last_checked_at:new Date().toISOString(),last_status:"X API OK — "+created+" new drafts"});
+        report.push({source:source.name,created,status:"ok"});continue;
+      }
       const response=await fetch(url.toString(),{headers:{"Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml"}});
       if(!response.ok) throw new Error("Feed returned HTTP "+response.status);
       const xml=(await response.text()).slice(0,1500000);
