@@ -1328,7 +1328,8 @@ async function publishSocialPostForUser(context, postId) {
   if (post.media_type === "video" && mediaUrl.startsWith("social/" + context.user.id + "/")) mediaUrl = await presignR2({ method: "GET", objectKey: mediaUrl, expiresIn: 3600 });
   if (post.media_type === "video" && !mediaUrl.startsWith("https://")) throw Object.assign(new Error("Video publishing requires your uploaded private video or a publicly reachable HTTPS URL."), { status: 400 });
   const token = await getUsableSocialToken(db, account);
-  await db.SocialPost.update(post.id, { status: "publishing", last_attempt_at: new Date().toISOString(), error_message: "" });
+  const claim = await db.SocialPost.updateMany({ id: post.id, status: { $in: ["draft", "failed", "scheduled"] } }, { $set: { status: "publishing", last_attempt_at: new Date().toISOString(), error_message: "" } });
+  if (!claim?.updated) throw Object.assign(new Error("Another publication process has already claimed this post."), { status: 409, code: "SOCIAL_POST_ALREADY_CLAIMED" });
   try {
     let externalId = "";
     if (post.platform === "Instagram") {
