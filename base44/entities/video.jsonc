@@ -58,6 +58,9 @@
       "type": "string",
       "format": "uri"
     },
+    "rights_evidence_reference": { "type": "string", "maxLength": 500 },
+    "file_size_bytes": { "type": "integer", "minimum": 1, "maximum": 4000000000 },
+    "mime_type": { "type": "string", "enum": ["video/mp4", "video/quicktime"] },
     "storage_key": {
       "type": "string",
       "description": "Private R2 object key for clean master",
