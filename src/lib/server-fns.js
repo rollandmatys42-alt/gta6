@@ -361,7 +361,8 @@ export const syncNewsSources = createServerFn({method:"POST"}).middleware([requi
         const linkMatch=block.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?\s*>/i);
         const articleUrl=read("link") || linkMatch?.[1] || "";
         const summary=(read("description")||read("summary")||read("content")).slice(0,500);
-        if(!title || !articleUrl.startsWith("https://")) continue;
+        const gta6Match=/\bgta\s*(?:vi|6)\b|\bgta6\b|grand theft auto\s*vi/i.test(title+" "+summary);
+        if(!title || !articleUrl.startsWith("https://") || !gta6Match) continue;
         const exists=await db.entities.NewsArticle.filter({source_url:articleUrl}, "-created_date",1,0);
         if(exists.length) continue;
         const slug=title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,170)+"-"+crypto.randomUUID().slice(0,6);
@@ -540,7 +541,17 @@ export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([
  ];
  let pageCount=0;
  for(const [slug,title,content] of templates){const exists=await db.SitePage.filter({slug,locale:"en"},"created_date",1,0);if(!exists.length){await db.SitePage.create({slug,title,content,locale:"en",status:["about","contact"].includes(slug)?"published":"draft",meta_title:title+" — VICEHUB",meta_description:"VICEHUB platform information",updated_by:context.user.id});pageCount++;}}
- return {categoriesCreated:categoryCount,pagesCreated:pageCount,legalPagesRequireReview:true};
+ const defaultSources=[
+  ["Rockstar Games — Official YouTube","https://www.youtube.com/feeds/videos.xml?channel_id=UC6VcWc1rAoWdBCM0JxrRQ3A","official"],
+  ["Rockstar Intel","https://rockstarintel.com/feed","media"],
+  ["GTABase News","https://www.gtabase.com/news/?format=feed&type=rss","community"],
+  ["GTA BOOM","https://www.gtaboom.com/feed","community"],
+  ["IGN Gaming News","https://www.ign.com/rss/v2/articles/feed","media"],
+  ["GameSpot News","https://www.gamespot.com/feeds/news/","media"]
+ ];
+ let sourcesCreated=0;
+ for(const [name,feed_url,source_type] of defaultSources){const exists=await db.NewsSource.filter({feed_url},"created_date",1,0);if(!exists.length){await db.NewsSource.create({name,feed_url,source_type,enabled:true,created_by:context.user.id});sourcesCreated++;}}
+ return {categoriesCreated:categoryCount,pagesCreated:pageCount,sourcesCreated,legalPagesRequireReview:true};
 });
 
 export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([requireUser])
