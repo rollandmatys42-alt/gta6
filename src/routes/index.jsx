@@ -66,7 +66,12 @@ function HomePage() {
       setDownloadMessage(error?.message || "Download could not be authorised.");
     }
   };
-  const navigate = (id) => { setActive(id); setNotice(id === "explore" ? "" : `${id.toUpperCase()} — ${t.soon}. This section is being built and will be connected to live data before launch.`); };
+  const navigate = (id) => {
+    const routes = { news: "/news", creators: "/community", studio: "/studio", marketplace: "/marketplace", pricing: "/#plans" };
+    if (routes[id]) { window.location.assign(routes[id]); return; }
+    setActive(id); setNotice("");
+    if (id === "library") document.getElementById("library")?.scrollIntoView({ behavior: "smooth" });
+  };
   
   return (
     <div className="hub-shell">
@@ -119,7 +124,7 @@ function HomePage() {
         </div><p className="loyalty-note"><span>✳</span> Loyalty pricing is planned: the monthly price decreases for each uninterrupted paid month. A voluntary cancellation resets the introductory price on a later return. Exact reductions and minimum price will be configurable by the administrator.</p></section>
       </main>
 
-      <footer className="footer"><div className="footer-brand"><span className="brand-mark">V</span><span>VICE<span className="brand-accent">HUB</span></span></div><p>{t.note}</p><div className="footer-links"><button onClick={() => setNotice("Terms and legal pages are being prepared.")}>Terms</button><button onClick={() => setNotice("Privacy and cookie pages are being prepared.")}>Privacy</button><button onClick={() => setNotice("Copyright and takedown policy is being prepared.")}>Copyright</button></div><small>© 2026 VICEHUB. INDEPENDENT CREATOR PLATFORM.</small></footer>
+      <footer className="footer"><div className="footer-brand"><span className="brand-mark">V</span><span>VICE<span className="brand-accent">HUB</span></span></div><p>{t.note}</p><div className="footer-links"><button onClick={() => window.location.assign("/terms")}>Terms</button><button onClick={() => window.location.assign("/privacy")}>Privacy</button><button onClick={() => window.location.assign("/copyright")}>Copyright</button></div><small>© 2026 VICEHUB. INDEPENDENT CREATOR PLATFORM.</small></footer>
     </div>
   );
 }
