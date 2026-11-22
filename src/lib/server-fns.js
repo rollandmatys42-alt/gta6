@@ -219,7 +219,7 @@ export const publishVideo = createServerFn({ method: "POST" })
       status: "published", published_at: new Date().toISOString(),
     });
   });
-\n
+
 export const getMyAccount = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .handler(async ({ context }) => {
