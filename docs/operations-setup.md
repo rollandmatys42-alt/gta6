@@ -37,7 +37,7 @@ Subscribe to:
 - invoice.payment_failed
 - invoice.paid
 
-Before checkout can open, activate a SubscriptionPlan record for each tier/currency and set a positive monthly price and monthly download limit. Draft plans are deliberately not purchasable. The checkout creates a monthly recurring Stripe price from the active plan configuration. Customers manage or cancel through the Stripe Billing Portal.
+Before checkout can open, activate a SubscriptionPlan record for each tier/currency and set a positive monthly price and monthly download limit. Draft plans are deliberately not purchasable. The checkout creates a monthly recurring Stripe price from the active plan configuration. Customers manage or cancel through the Stripe Billing Portal. Enable the Customer Portal in Stripe settings and allow subscription cancellation. Keep plan switching disabled until VICEHUB supports and verifies tier-change handling.
 
 ## Social platform APIs
 
