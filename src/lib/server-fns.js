@@ -623,7 +623,9 @@ export const saveMyCreatorProfile = createServerFn({method:"POST"}).middleware([
   const db=context.getBase44().asServiceRole.entities.CreatorProfile;
   const payload={user_id:context.user.id,display_name:data.displayName,bio:data.bio,status:"pending_review",skills:data.skills,...(data.avatarUrl?{avatar_url:data.avatarUrl}:{}),...(data.bannerUrl?{banner_url:data.bannerUrl}:{}),...(data.websiteUrl?{website_url:data.websiteUrl}:{}),...(data.locationLabel?{location_label:data.locationLabel}:{})};
   if(context.user.role==="admin")payload.status="published";
-  return data.id?db.update(data.id,payload):db.create(payload);
+  if(data.id){const existing=await db.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id)throw Object.assign(new Error("You can only edit your own creator profile."),{status:403});return db.update(existing.id,payload);}
+  const current=await db.filter({user_id:context.user.id},"-created_date",1,0);if(current.length)return db.update(current[0].id,payload);
+  return db.create(payload);
  });
 export const getAdminCreatorProfiles = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.CreatorProfile.list("-created_date",200,0);});
 export const setCreatorProfileStatus = createServerFn({method:"POST"}).middleware([requireUser])
