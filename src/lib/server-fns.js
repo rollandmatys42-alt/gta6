@@ -502,6 +502,12 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
   db.AIAgentConfig.list("-created_date",100,0),
   db.SubscriptionPlan.list("-created_date",100,0)
  ]);
+ const storageSecrets=["VIDEO_STORAGE_ENDPOINT","VIDEO_STORAGE_BUCKET","VIDEO_STORAGE_ACCESS_KEY_ID","VIDEO_STORAGE_SECRET_ACCESS_KEY"].every(name=>Boolean(secrets.get(name)));
+ const stripeSecret=Boolean(secrets.get("STRIPE_SECRET_KEY"));
+ const stripeWebhook=Boolean(secrets.get("STRIPE_WEBHOOK_SECRET"));
+ const tiktokConfigured=Boolean(secrets.get("TIKTOK_CLIENT_KEY")&&secrets.get("TIKTOK_CLIENT_SECRET"));
+ const instagramConfigured=Boolean(secrets.get("META_APP_ID")&&secrets.get("META_APP_SECRET"));
+ const youtubeConfigured=Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET"));
  return {
   aiProviderConfigured:Boolean(secrets.get("AI_ROUTER_API_KEY")),
   xApiConfigured:Boolean(secrets.get("X_BEARER_TOKEN")),
@@ -510,9 +516,11 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
   enabledAgents:agents.filter(x=>x.enabled).length,
   draftPlans:plans.filter(x=>x.status==="draft").length,
   activePlans:plans.filter(x=>x.status==="active").length,
-  videoStorage:"deferred",
-  payments:"deferred",
-  socialPublishing:"not_connected",
+  videoStorage:storageSecrets?"configured":"missing_credentials",
+  stripeSecretConfigured:stripeSecret,
+  stripeWebhookConfigured:stripeWebhook,
+  payments:stripeSecret&&stripeWebhook?"configured":stripeSecret?"webhook_secret_missing":"missing_credentials",
+  socialPublishing:{tiktokConfigured,instagramConfigured,youtubeConfigured},
   recurringAgentScheduler:"manual_only"
  };
 });
