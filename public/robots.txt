@@ -1,7 +1,10 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /admin/videos
 Disallow: /dashboard
+Disallow: /messages
+Disallow: /notifications
 Disallow: /social
 Disallow: /studio
 Disallow: /api/

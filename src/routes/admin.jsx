@@ -2,7 +2,7 @@ import {useEffect,useState} from "react";
 import {createFileRoute} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import {getAdminOverview,getAdminNews,saveNewsArticle,getNewsSources,saveNewsSource,syncNewsSources,getAdminShopProducts,saveShopProduct,getAdminSitePages,saveSitePage,getAdminReports,updateReportStatus,getAdminAgents,saveAdminAgent,seedPlatformDefaults,runConfiguredAgent,getAdminPlans,saveAdminPlan,getAdminMarketplaceListings,setMarketplaceListingStatus,getAdminCreatorProfiles,setCreatorProfileStatus,grantComplimentaryPremium,translateCmsPage,translateNewsArticle} from "@/lib/server-fns";
-export const Route=createFileRoute("/admin")({ssr:false,head:()=>({meta:[{title:"Administration — VICEHUB"}]}),component:AdminPage});
+export const Route=createFileRoute("/admin")({ssr:false,head:()=>({meta:[{title:"Administration — VICEHUB"},{name:"robots",content:"noindex,nofollow"}]}),component:AdminPage});
 const tabs=["Overview","News","Sources","Creators","Marketplace","Shop","Plans","CMS","Reports","AI agents"];
 function AdminPage(){
  const {user}=Route.useRouteContext();const [tab,setTab]=useState("Overview"),[stats,setStats]=useState(null),[news,setNews]=useState([]),[sources,setSources]=useState([]),[products,setProducts]=useState([]),[pages,setPages]=useState([]),[reports,setReports]=useState([]),[agents,setAgents]=useState([]),[plans,setPlans]=useState([]),[listings,setListings]=useState([]),[creatorProfiles,setCreatorProfiles]=useState([]),[error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false);

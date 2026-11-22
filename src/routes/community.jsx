@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { getCommunity,createForumThread,getForumThread,createForumPost,createContentReport,toggleForumReaction } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
-export const Route=createFileRoute("/community")({head:()=>({meta:[{title:"Community — VICEHUB"}]}),component:CommunityPage});
+export const Route=createFileRoute("/community")({head:()=>({meta:[{title:"Community — VICEHUB"},{name:"description",content:"Join GTA VI discussions, share edits and reply to other creators in the VICEHUB community."},{property:"og:title",content:"Community — VICEHUB"},{property:"og:description",content:"Join GTA VI discussions, share edits and reply to other creators in the VICEHUB community."}]}),component:CommunityPage});
 function CommunityPage(){
  const {isAuthenticated,navigateToLogin,user}=useAuth();
  const [data,setData]=useState({categories:[],threads:[]}),[category,setCategory]=useState(""),[active,setActive]=useState(null),[posts,setPosts]=useState([]),[reactionCount,setReactionCount]=useState(0),[liked,setLiked]=useState(false),[title,setTitle]=useState(""),[body,setBody]=useState(""),[reply,setReply]=useState(""),[showComposer,setShowComposer]=useState(false),[error,setError]=useState(""),[busy,setBusy]=useState(false);

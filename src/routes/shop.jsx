@@ -2,7 +2,7 @@ import { useEffect,useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { getShopProducts } from "@/lib/server-fns";
-export const Route=createFileRoute("/shop")({head:()=>({meta:[{title:"VICEHUB Shop"}]}),component:ShopPage});
+export const Route=createFileRoute("/shop")({head:()=>({meta:[{title:"VICEHUB Shop"},{name:"description",content:"Browse VICEHUB creator tools, digital products and platform merchandise."},{property:"og:title",content:"VICEHUB Shop"},{property:"og:description",content:"Browse VICEHUB creator tools, digital products and platform merchandise."}]}),component:ShopPage});
 function ShopPage(){
  const [items,setItems]=useState([]),[cart,setCart]=useState([]),[error,setError]=useState("");
  useEffect(()=>{getShopProducts().then(setItems).catch(e=>setError(e.message));},[]);

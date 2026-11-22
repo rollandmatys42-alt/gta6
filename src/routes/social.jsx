@@ -3,7 +3,7 @@ import {createFileRoute} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import {getMySocialPosts,saveSocialPost} from "@/lib/server-fns";
 import {useAuth} from "@/lib/AuthContext";
-export const Route=createFileRoute("/social")({head:()=>({meta:[{title:"Social Planner — VICEHUB"}]}),component:SocialPlanner});
+export const Route=createFileRoute("/social")({head:()=>({meta:[{title:"Social Planner — VICEHUB"},{name:"description",content:"Plan social content for TikTok, Instagram, YouTube and X with the VICEHUB social planner."},{property:"og:title",content:"Social Planner — VICEHUB"},{property:"og:description",content:"Plan social content for TikTok, Instagram, YouTube and X with the VICEHUB social planner."}]}),component:SocialPlanner});
 function SocialPlanner(){
  const {isAuthenticated,navigateToLogin}=useAuth();const [posts,setPosts]=useState([]),[platform,setPlatform]=useState("TikTok"),[caption,setCaption]=useState(""),[planned,setPlanned]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const load=()=>getMySocialPosts().then(setPosts).catch(e=>setError(e.message));

@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { generateStudioDraft,getMyStudioDrafts } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
-export const Route=createFileRoute("/studio")({head:()=>({meta:[{title:"AI Creator Studio — VICEHUB"}]}),component:StudioPage});
+export const Route=createFileRoute("/studio")({head:()=>({meta:[{title:"AI Creator Studio — VICEHUB"},{name:"description",content:"Prepare GTA VI video hooks, captions, scripts, SEO and GEO content for creator channels."},{property:"og:title",content:"AI Creator Studio — VICEHUB"},{property:"og:description",content:"Prepare GTA VI video hooks, captions, scripts, SEO and GEO content for creator channels."}]}),component:StudioPage});
 function StudioPage(){
  const {isAuthenticated,navigateToLogin}=useAuth();const [platform,setPlatform]=useState("TikTok"),[type,setType]=useState("Caption"),[topic,setTopic]=useState(""),[tone,setTone]=useState("Energetic"),[language,setLanguage]=useState("English"),[output,setOutput]=useState(""),[drafts,setDrafts]=useState([]),[error,setError]=useState(""),[busy,setBusy]=useState(false);
  useEffect(()=>{if(isAuthenticated)getMyStudioDrafts().then(setDrafts).catch(()=>{});},[isAuthenticated]);
