@@ -1108,7 +1108,8 @@ function toBase64Url(bytes) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 function fromBase64(value) {
-  const binary = atob(value);
+  const standard = String(value).replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(standard.padEnd(Math.ceil(standard.length / 4) * 4, "="));
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
 async function digestText(value) {
