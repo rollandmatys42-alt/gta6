@@ -1,0 +1,53 @@
+/* VICEHUB fan theme for every secondary page (library, news, creators, shop, studio, social, messages, community, marketplace, legal, admin videos).
+   Prefixed with .platform-shell to out-rank each page's own stylesheet. Colours come from fan-theme.css variables. */
+.platform-shell .platform-hero,.platform-shell .vh-library-hero,.platform-shell .social-hero,.platform-shell .future-module-hero,.platform-shell .account-intro{display:flex;justify-content:space-between;align-items:center;gap:24px;background:radial-gradient(600px 260px at 90% 0%,rgba(255,45,149,.3),transparent 70%),linear-gradient(160deg,var(--vc-card2),var(--vc-card));border:1px solid var(--vc-line);border-radius:28px;padding:36px;margin-bottom:26px;overflow:hidden;position:relative}
+.platform-shell .platform-hero h1,.platform-shell .vh-library-hero h1,.platform-shell .social-hero h1,.platform-shell .account-intro h1{font-size:clamp(40px,7vw,84px);line-height:.9;margin:6px 0 10px;background:linear-gradient(180deg,#ffd36e,#ff2d95 70%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.platform-shell .platform-hero p,.platform-shell .vh-library-hero p,.platform-shell .social-hero p{color:var(--vc-muted);max-width:560px}
+.platform-shell .hero-stamp,.platform-shell .social-hero-stamp,.platform-shell .cart-count,.platform-shell .vh-library-hero-index{border:1px solid var(--vc-pink);border-radius:18px;padding:14px 20px;text-align:center;color:var(--vc-pink);font-weight:800;letter-spacing:.12em;box-shadow:0 0 24px rgba(255,45,149,.3)}
+.platform-shell .vh-library-sun,.platform-shell .vh-library-skyline,.platform-shell .vh-library-palm{opacity:.35}
+/* Buttons & chips */
+.platform-shell .primary-btn,.platform-shell .social-primary,.platform-shell .vh-preview-download{background:var(--vc-grad);color:#fff;border:0;border-radius:999px;padding:12px 24px;font-weight:800;text-decoration:none;box-shadow:0 8px 24px rgba(255,45,149,.3)}
+.platform-shell .outline-btn,.platform-shell .social-secondary,.platform-shell .social-quiet-button,.platform-shell .vh-preview-close,.platform-shell .vh-library-page{background:transparent;color:var(--vc-text);border:1px solid var(--vc-line);border-radius:999px;padding:11px 22px;font-weight:700;text-decoration:none}
+.platform-shell .outline-btn:hover,.platform-shell .social-secondary:hover,.platform-shell .vh-library-page:hover{border-color:var(--vc-pink);color:#fff}
+.platform-shell .text-btn{background:none;border:0;color:var(--vc-cyan);font-weight:700;cursor:pointer}
+.platform-shell .source-pill,.platform-shell .social-count,.platform-shell .admin-status,.platform-shell .vh-library-card-tags span{display:inline-block;background:rgba(45,226,230,.12);color:var(--vc-cyan);border:1px solid rgba(45,226,230,.35);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.platform-shell .source-pill.official,.platform-shell .source-pill.confirmed{background:rgba(80,220,140,.14);color:#6ff0a8;border-color:rgba(80,220,140,.4)}
+.platform-shell .source-pill.rumour,.platform-shell .source-pill.theory{background:rgba(255,154,60,.14);color:var(--vc-orange);border-color:rgba(255,154,60,.4)}
+/* Cards & grids */
+.platform-shell .news-grid,.platform-shell .shop-grid,.platform-shell .creator-grid,.platform-shell .vh-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.platform-shell .news-card,.platform-shell .shop-card,.platform-shell .creator-card,.platform-shell .vh-library-card,.platform-shell .social-post-card,.platform-shell .social-provider-card,.platform-shell .message-row,.platform-shell .draft-row,.platform-shell .platform-detail,.platform-shell .legal-page,.platform-shell .studio-output,.platform-shell .studio-form,.platform-shell .cart-panel,.platform-shell .social-section,.platform-shell .social-composer,.platform-shell .admin-panel,.platform-shell .account-content{background:linear-gradient(160deg,var(--vc-card2),var(--vc-card));border:1px solid var(--vc-line);border-radius:20px;color:var(--vc-text)}
+.platform-shell .news-card,.platform-shell .shop-card,.platform-shell .creator-card,.platform-shell .vh-library-card{overflow:hidden;transition:transform .2s,border-color .2s}
+.platform-shell .news-card:hover,.platform-shell .shop-card:hover,.platform-shell .creator-card:hover,.platform-shell .vh-library-card:hover{transform:translateY(-4px);border-color:var(--vc-pink);box-shadow:0 14px 40px rgba(255,45,149,.25)}
+.platform-shell .news-card,.platform-shell .creator-card,.platform-shell .message-row,.platform-shell .draft-row,.platform-shell .social-post-card{padding:20px}
+.platform-shell .shop-info,.platform-shell .vh-library-card-body{padding:18px}
+.platform-shell .shop-art,.platform-shell .vh-library-card-art,.platform-shell .vh-featured-art{background:linear-gradient(135deg,#2a1146,#ff2d95 140%);min-height:180px;display:grid;place-items:center;font-family:'Barlow Condensed',sans-serif;font-size:34px;color:#fff}
+.platform-shell .shop-art img,.platform-shell .vh-library-card-art img{width:100%;height:100%;object-fit:cover}
+.platform-shell .shop-buy{display:flex;justify-content:space-between;align-items:center;margin-top:14px}.platform-shell .shop-buy b{font-size:24px;color:var(--vc-orange)}
+.platform-shell .creator-avatar{width:56px;height:56px;border-radius:50%;background:var(--vc-grad);display:grid;place-items:center;font-weight:900}
+.platform-shell .vh-library-card-number,.platform-shell .vh-library-card-duration{background:rgba(0,0,0,.6);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800}
+.platform-shell .vh-library-card-play,.platform-shell .vh-featured-play{background:var(--vc-grad);color:#fff;border-radius:50%;box-shadow:0 0 24px rgba(255,45,149,.6)}
+.platform-shell .vh-featured-video{border-radius:24px;border:1px solid var(--vc-line);overflow:hidden;background:var(--vc-card)}
+/* Toolbars, search, categories */
+.platform-shell .platform-toolbar,.platform-shell .vh-library-controls,.platform-shell .social-queue-toolbar,.platform-shell .admin-video-library-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:18px 0}
+.platform-shell .vh-library-categories{display:flex;gap:8px;flex-wrap:wrap}.platform-shell .vh-library-categories button{border:1px solid var(--vc-line);background:var(--vc-card);color:var(--vc-text);border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer}
+.platform-shell .vh-library-categories button.active,.platform-shell .vh-library-categories .on{background:var(--vc-grad);border-color:transparent}
+.platform-shell .vh-library-search,.platform-shell .vh-library-select{background:#0e0819;color:var(--vc-text);border:1px solid var(--vc-line);border-radius:999px;padding:11px 18px}
+.platform-shell .vh-library-pagination{display:flex;gap:8px;justify-content:center;margin:26px 0}
+/* Messages */
+.platform-shell .message-columns,.platform-shell .studio-layout,.platform-shell .social-shell,.platform-shell .social-connect-grid,.platform-shell .social-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.platform-shell .message-compose,.platform-shell .platform-form{background:linear-gradient(160deg,var(--vc-card2),var(--vc-card));border:1px solid var(--vc-line);border-radius:20px;padding:22px}
+/* Alerts */
+.platform-shell .platform-empty,.platform-shell .vh-library-empty,.platform-shell .social-empty,.platform-shell .vh-library-placeholder,.platform-shell .studio-placeholder{border:1px dashed var(--vc-line);border-radius:18px;padding:34px;text-align:center;color:var(--vc-muted)}
+.platform-shell .platform-alert,.platform-shell .vh-library-alert,.platform-shell .social-alert,.platform-shell .account-error,.platform-shell .social-post-error{background:rgba(255,60,90,.12);border:1px solid rgba(255,60,90,.45);border-radius:14px;padding:12px 16px;color:#ffb3c0}
+.platform-shell .platform-success,.platform-shell .social-notice{background:rgba(80,220,140,.12);border:1px solid rgba(80,220,140,.4);border-radius:14px;padding:12px 16px;color:#a5f5c8}
+.platform-shell .platform-note,.platform-shell .social-footnote,.platform-shell .admin-warning,.platform-shell .social-provider-warning,.platform-shell .vh-preview-note{background:rgba(255,154,60,.1);border:1px solid rgba(255,154,60,.35);border-radius:14px;padding:12px 16px;color:#ffd2a1;font-size:13px}
+/* Legal + article */
+.platform-shell .legal-page{padding:34px;max-width:860px;margin:0 auto}.platform-shell .legal-content,.platform-shell .article-body{white-space:pre-wrap;line-height:1.7;color:#e6dcf5}
+/* Preview modal */
+.platform-shell .vh-preview-backdrop,.platform-shell .admin-video-edit-backdrop{background:rgba(5,2,10,.85);backdrop-filter:blur(8px)}
+.platform-shell .vh-preview-modal,.platform-shell .admin-video-edit-modal{background:var(--vc-card);border:1px solid var(--vc-pink);border-radius:24px;box-shadow:0 0 60px rgba(255,45,149,.3);color:var(--vc-text)}
+.platform-shell .vh-preview-player{border-radius:16px;background:#000}
+/* Admin videos table */
+.platform-shell .admin-video-library-table{width:100%;border-collapse:collapse}.platform-shell .admin-video-library-table th{color:var(--vc-cyan);font-size:11px;letter-spacing:.12em;text-align:left;padding:10px}.platform-shell .admin-video-library-table td{padding:10px;border-top:1px solid var(--vc-line)}.platform-shell .admin-video-library-table-wrap{overflow-x:auto}
+.platform-shell .quota-track,.platform-shell .watermark-progress-panel{background:#0e0819;border-radius:999px;overflow:hidden}.platform-shell .quota-track i{display:block;height:8px;background:var(--vc-grad)}
+@media(max-width:700px){.platform-shell .platform-hero,.platform-shell .vh-library-hero,.platform-shell .social-hero{flex-direction:column;align-items:flex-start;padding:24px}}
