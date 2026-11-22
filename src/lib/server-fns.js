@@ -694,6 +694,19 @@ export const getAdminAgents = createServerFn({method:"GET"}).middleware([require
 export const saveAdminAgent = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({id:z.string().optional(),agentKey:z.enum(["news_editor","seo_agent","geo_agent","social_agent","platform_analyst"]),displayName:z.string().min(2).max(100),instructions:z.string().max(10000),providerModel:z.string().max(120),enabled:z.boolean(),schedule:z.enum(["manual","hourly","daily","weekly"]),monthlyRunLimit:z.number().int().min(0)}))
  .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.AIAgentConfig;const p={agent_key:data.agentKey,display_name:data.displayName,instructions:data.instructions,provider_model:data.providerModel,enabled:data.enabled,schedule:data.schedule,monthly_run_limit:data.monthlyRunLimit};return data.id?db.update(data.id,p):db.create(p);});
+
+export const getSocialProviderAvailability = createServerFn({method:"GET"}).middleware([requireUser]).handler(async()=>{
+ const meta=Boolean(secrets.get("META_APP_ID")&&secrets.get("META_APP_SECRET"));
+ return {
+  TikTok:Boolean(secrets.get("TIKTOK_CLIENT_KEY")&&secrets.get("TIKTOK_CLIENT_SECRET")),
+  Instagram:meta,
+  Facebook:meta,
+  YouTube:Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET")),
+  X:Boolean(secrets.get("X_CLIENT_ID")&&secrets.get("X_CLIENT_SECRET")),
+  omniRouteConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL"))
+ };
+});
+
 export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",100,0));
 export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X"]),caption:z.string().min(1).max(5000),accountId:z.string().optional(),mediaUrl:z.string().url().max(500).optional(),mediaObjectKey:z.string().max(500).optional(),scheduledAt:z.string().datetime().optional()}))
