@@ -267,7 +267,7 @@ function AdminVideosPage() {
           <div className="eyebrow">BULK CATALOGUE INGESTION</div><h2>Import up to 1,000 video metadata rows</h2>
           <p>CSV import creates draft records only. It does not upload video files, verify licences or publish content.</p>
           <form onSubmit={importCsv}><label>Metadata CSV<input type="file" accept=".csv,text/csv" required onChange={e=>setCsvFile(e.target.files?.[0]||null)}/></label><button className="outline-btn" type="submit" disabled={busy||!csvFile}>{busy?"Importing…":"Import metadata CSV"}</button></form>
-          <small>Required columns: <code>title,category</code>. Optional: <code>description,language,creator_name,source_reference,duration_seconds</code>.</small>
+          <small>Required columns: <code>title,category</code>. Optional: <code>description,language,creator_name,source_reference,duration_seconds</code>. <a download="vicehub-video-import-template.csv" href={"data:text/csv;charset=utf-8,"+encodeURIComponent("title,category,description,language,creator_name,source_reference,duration_seconds"+String.fromCharCode(10))}>Download CSV template</a>.</small>
           {importResult&&<div className="admin-status">Imported: {importResult.imported} · Rejected: {importResult.rejected}{importResult.errors?.length>0&&<ul>{importResult.errors.map((x,i)=><li key={i}>Line {x.line}: {x.reason}</li>)}</ul>}</div>}
         </section>
         <section className="admin-video-library">
