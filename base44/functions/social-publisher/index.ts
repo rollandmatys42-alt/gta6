@@ -179,7 +179,8 @@ Deno.serve(async (req) => {
         if (post.media_type === "video" && mediaUrl.startsWith("social/" + post.user_id + "/")) mediaUrl = await signedR2Get(mediaUrl);
         if (post.media_type === "video" && !mediaUrl.startsWith("https://")) throw new Error("Video source is not a valid HTTPS URL.");
         const token = await getAccessToken(db, account);
-        await db.SocialPost.update(post.id, { status: "publishing", last_attempt_at: new Date().toISOString(), error_message: "" });
+        const claim = await db.SocialPost.updateMany({ id: post.id, status: "scheduled" }, { $set: { status: "publishing", last_attempt_at: new Date().toISOString(), error_message: "" } });
+        if (!claim?.updated) { results.push({ postId: post.id, status: "skipped_already_claimed" }); continue; }
         const result = await publish(post, account, token, mediaUrl);
         await db.SocialPost.update(post.id, { status: result.status, external_post_id: result.externalId || "", ...(result.status === "published" ? { published_at: new Date().toISOString() } : {}), error_message: "" });
         await db.SocialAccount.update(account.id, { last_used_at: new Date().toISOString(), last_error: "" });
