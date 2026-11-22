@@ -5,6 +5,7 @@ import { getNewsFeed,createContentReport } from "@/lib/server-fns";
 import { useLocale, translate } from "@/lib/i18n";
 export const Route=createFileRoute("/news")({head:()=>({meta:[{title:"GTA VI News — VICEHUB"},{name:"description",content:"Source-labelled GTA VI news, official updates and community coverage."}]}),component:NewsPage});
 function NewsPage(){
+ const locale=useLocale(),tx=key=>translate(locale,key);
  const [articles,setArticles]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[filter,setFilter]=useState("all"),[selected,setSelected]=useState(null);
  useEffect(()=>{setLoading(true);getNewsFeed({data:{locale,limit:50}}).then(setArticles).catch(e=>setError(e.message||"News could not be loaded.")).finally(()=>setLoading(false));},[locale]);
  const filtered=articles.filter(a=>filter==="all"||a.confidence===filter||a.source_type===filter);
