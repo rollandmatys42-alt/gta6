@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import "@/styles/social-publishing.css";
 import {
-  beginSocialOAuth, completeSocialOAuth, getMySocialAccounts, getMySocialPosts,
+  beginSocialOAuth, completeSocialOAuth, getMySocialAccounts, getMySocialPosts, getSocialProviderAvailability,
   saveSocialPost, deleteSocialPost, disconnectSocialAccount, publishSocialPost,
   processMyDueSocialPosts, generateStudioDraft, createSocialMediaUploadUrl,
 } from "@/lib/server-fns";
@@ -37,6 +37,7 @@ function SocialPublishingPage() {
   const { isAuthenticated, navigateToLogin } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [availability, setAvailability] = useState({});
   const [platform, setPlatform] = useState("TikTok");
   const [accountId, setAccountId] = useState("");
   const [caption, setCaption] = useState("");
@@ -57,9 +58,10 @@ function SocialPublishingPage() {
     setLoading(true);
     setError("");
     try {
-      const [connected, savedPosts] = await Promise.all([getMySocialAccounts(), getMySocialPosts()]);
+      const [connected, savedPosts, providerAvailability] = await Promise.all([getMySocialAccounts(), getMySocialPosts(), getSocialProviderAvailability()]);
       setAccounts(connected || []);
       setPosts(savedPosts || []);
+      setAvailability(providerAvailability || {});
     } catch (err) {
       setError(err?.message || "Could not load your social workspace.");
     } finally {
@@ -223,7 +225,8 @@ function SocialPublishingPage() {
           {platforms.map(provider => <article className="social-provider-card" key={provider}>
             <div className="social-provider-top"><b>{provider}</b><span>{accounts.filter(a => a.provider === provider).length} CONNECTED</span></div>
             <p>{platformNotes[provider]}</p>
-            <button type="button" onClick={() => connect(provider === "Facebook" ? "Instagram" : provider)} disabled={!!connecting || busy}>{connecting === provider || (provider === "Facebook" && connecting === "Instagram") ? "CONNECTING…" : provider === "Facebook" ? "CONNECT VIA META ↗" : "CONNECT ACCOUNT ↗"}</button>
+            {availability[provider] === false && <small className="social-provider-warning">VICEHUB ADMIN SETUP REQUIRED — provider OAuth credentials are not configured yet.</small>}
+            <button type="button" onClick={() => connect(provider === "Facebook" ? "Instagram" : provider)} disabled={!!connecting || busy || availability[provider] !== true}>{connecting === provider || (provider === "Facebook" && connecting === "Instagram") ? "CONNECTING…" : availability[provider] === false ? "SETUP REQUIRED" : provider === "Facebook" ? "CONNECT VIA META ↗" : "CONNECT ACCOUNT ↗"}</button>
           </article>)}
         </div>
         {accounts.length > 0 && <div className="social-account-list">
@@ -242,7 +245,7 @@ function SocialPublishingPage() {
             <label>DESTINATION ACCOUNT<select required value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">Select your connected account…</option>{accountOptions.map(account => <option value={account.id} key={account.id}>{account.accountName}</option>)}</select></label>
           </div>
           <div className="social-platform-hint">{platformNotes[platform]}</div>
-          <label>CAPTION / DESCRIPTION<textarea required minLength={1} maxLength={5000} rows={5} value={caption} onChange={event => setCaption(event.target.value)} placeholder="Write a short brief, then use OmniRoute to generate a platform-ready caption…" /></label><div className="social-ai-row"><button type="button" className="social-secondary" onClick={generateCaption} disabled={aiBusy || busy}>{aiBusy ? "OMNIROUTE IS WRITING…" : "GENERATE / REWRITE WITH OMNIROUTE ✦"}</button><small>AI output is a draft only. Review factual claims and rights before publication.</small></div>
+          <label>CAPTION / DESCRIPTION<textarea required minLength={1} maxLength={5000} rows={5} value={caption} onChange={event => setCaption(event.target.value)} placeholder="Write a short brief, then use OmniRoute to generate a platform-ready caption…" /></label><div className="social-ai-row"><button type="button" className="social-secondary" onClick={generateCaption} disabled={aiBusy || busy || !availability.omniRouteConfigured}>{aiBusy ? "OMNIROUTE IS WRITING…" : "GENERATE / REWRITE WITH OMNIROUTE ✦"}</button><small>{availability.omniRouteConfigured ? "AI output is a draft only. Review factual claims and rights before publication." : "OmniRoute API credentials are not configured yet. Ask the VICEHUB administrator to add OMNIROUTE_API_KEY and OMNIROUTE_BASE_URL."}</small></div>
           {platform !== "X" && <><label>UPLOAD VIDEO FILE (MP4 / MOV)<input type="file" accept="video/mp4,video/quicktime" onChange={event => { setMediaFile(event.target.files?.[0] || null); setMediaUrl(""); }} /><small>{mediaFile?.name || (existingMediaObjectKey ? "Previously uploaded video retained" : "Up to 250 MB. The file is uploaded directly to private VICEHUB storage.")}</small></label><label>OR USE A PUBLIC VIDEO URL (HTTPS)<input type="url" value={mediaUrl} onChange={event => { setMediaUrl(event.target.value); if(event.target.value) { setMediaFile(null); setExistingMediaObjectKey(""); } }} placeholder="https://your-public-video-host/video.mp4" /><small>Use this instead of uploading a file. The destination network must be able to fetch the URL.</small></label></>}
           <div className="social-form-grid">
             <label>SCHEDULE FOR (OPTIONAL)<input type="datetime-local" min={localDate(new Date(Date.now() + 60000).toISOString())} value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} /><small>Scheduled posts are queued. Run the due queue from this page, or connect a server scheduler before relying on unattended posting.</small></label>
