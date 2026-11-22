@@ -584,7 +584,8 @@ export const adminDeleteSubscriber = createServerFn({method:"POST"}).middleware(
  for(const [entity,filter] of jobs)await removeRecords(entity,filter);
  const ownedVideos=await db.Video.filter({uploaded_by:data.userId},"-created_date",5000,0);
  for(const video of ownedVideos)await db.Video.update(video.id,{uploaded_by:"deleted-account"});
- for(const subscription of subscriptions)await db.UserSubscription.update(subscription.id,{user_id:"deleted:"+data.userId,stripe_customer_id:"",stripe_subscription_id:""});
+ for(const subscription of subscriptions)await db.UserSubscription.update(subscription.id,{user_id:"deleted:"+data.userId});
+ await Promise.all([db.PlatformInvoice.updateMany({user_id:data.userId},{$set:{user_id:"deleted:"+data.userId}}),db.PaymentLedgerEntry.updateMany({user_id:data.userId},{$set:{user_id:"deleted:"+data.userId}})]);
  await db.User.delete(data.userId);
  return {success:true,message:"App user deleted. Associated personal profile and operational records removed; non-draft invoices, payment ledger and anonymised subscription history retained for accounting."};
 });
