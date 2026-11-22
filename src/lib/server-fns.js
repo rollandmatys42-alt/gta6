@@ -489,7 +489,7 @@ export const saveAdminAgent = createServerFn({method:"POST"}).middleware([requir
 export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",50,0));
 export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","YouTube","X"]),caption:z.string().min(1).max(5000),scheduledAt:z.string().datetime().optional()}))
- .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:data.scheduledAt?"scheduled":"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};return data.id?db.update(data.id,p):db.create(p);});
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};return data.id?db.update(data.id,p):db.create(p);});
 export const getMyMarketplaceInquiries = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  const db=context.getBase44().asServiceRole.entities;const [buyer,seller]=await Promise.all([db.MarketplaceInquiry.filter({buyer_id:context.user.id},"-created_date",50,0),db.MarketplaceInquiry.filter({seller_id:context.user.id},"-created_date",50,0)]);return {buyer,seller};
 });
