@@ -551,7 +551,16 @@ export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([
  ];
  let sourcesCreated=0;
  for(const [name,feed_url,source_type] of defaultSources){const exists=await db.NewsSource.filter({feed_url},"created_date",1,0);if(!exists.length){await db.NewsSource.create({name,feed_url,source_type,enabled:true,created_by:context.user.id});sourcesCreated++;}}
- return {categoriesCreated:categoryCount,pagesCreated:pageCount,sourcesCreated,legalPagesRequireReview:true};
+ const defaultAgents=[
+  ["news_editor","News Editor","Review GTA VI source material. Separate official statements, independently confirmed facts, reported claims, rumours, theories and opinions. Never invent facts, never remove uncertainty, cite source URLs, create concise editorial drafts only, and never publish automatically."],
+  ["seo_agent","SEO Agent","Create accurate search titles, meta descriptions, headings, internal-link suggestions and keyword clusters for VICEHUB. Avoid keyword stuffing, trademark misuse and unsupported claims. Return practical recommendations."],
+  ["geo_agent","GEO / Answer Engine Agent","Prepare concise, source-grounded answers and structured FAQ content about GTA VI creator topics. Clearly label uncertainty, link primary sources and never claim affiliation with Rockstar Games."],
+  ["social_agent","Social Media Agent","Prepare platform-native TikTok, Instagram, YouTube and X copy from supplied verified facts. Tailor hooks and captions to the channel, include a clear CTA, and do not invent gameplay details or present rumours as facts."],
+  ["platform_analyst","Platform Analyst","Analyse only the metrics and operational data supplied in the task. Identify trends, anomalies, risks and actionable next steps. Never fabricate missing analytics or imply access to external accounts." ]
+ ];
+ let agentsCreated=0;
+ for(const [agent_key,display_name,instructions] of defaultAgents){const exists=await db.AIAgentConfig.filter({agent_key},"created_date",1,0);if(!exists.length){await db.AIAgentConfig.create({agent_key,display_name,instructions,provider_model:"",enabled:false,schedule:"manual",monthly_run_limit:50});agentsCreated++;}}
+ return {categoriesCreated:categoryCount,pagesCreated:pageCount,sourcesCreated,agentsCreated,legalPagesRequireReview:true};
 });
 
 export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([requireUser])
