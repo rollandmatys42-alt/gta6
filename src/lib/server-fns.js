@@ -486,6 +486,28 @@ export const getAdminOverview = createServerFn({method:"GET"}).middleware([requi
 export const getAdminReports = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.list("-created_date",100,0);
 });
+export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);
+ const db=context.getBase44().asServiceRole.entities;
+ const [sources,agents,plans]=await Promise.all([
+  db.NewsSource.filter({enabled:true},"-created_date",100,0),
+  db.AIAgentConfig.list("-created_date",100,0),
+  db.SubscriptionPlan.list("-created_date",100,0)
+ ]);
+ return {
+  aiProviderConfigured:Boolean(secrets.get("AI_ROUTER_API_KEY")),
+  xApiConfigured:Boolean(secrets.get("X_BEARER_TOKEN")),
+  enabledNewsSources:sources.length,
+  agentTemplates:agents.length,
+  enabledAgents:agents.filter(x=>x.enabled).length,
+  draftPlans:plans.filter(x=>x.status==="draft").length,
+  activePlans:plans.filter(x=>x.status==="active").length,
+  videoStorage:"deferred",
+  payments:"deferred",
+  socialPublishing:"not_connected",
+  recurringAgentScheduler:"manual_only"
+ };
+});
 export const updateReportStatus = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({id:z.string(),status:z.enum(["reviewing","resolved","dismissed"])}))
  .handler(async({data,context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.update(data.id,{status:data.status});});
