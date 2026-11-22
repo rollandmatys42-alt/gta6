@@ -1,6 +1,7 @@
 /* Generated route registry for TanStack Router. Kept in Git so clean builds have a complete route tree. */
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as IndexRouteImport } from "./routes/index";
+import { Route as LibraryRouteImport } from "./routes/library";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as AuthedDashboardRouteImport } from "./routes/_authed/dashboard";
 import { Route as AuthedAdminVideosRouteImport } from "./routes/_authed/admin/videos";
@@ -24,6 +25,7 @@ import { Route as StudioRouteImport } from "./routes/studio";
 import { Route as TermsRouteImport } from "./routes/terms";
 
 const IndexRoute = IndexRouteImport.update({ id: "/", path: "/", getParentRoute: () => rootRouteImport });
+const LibraryRoute = LibraryRouteImport.update({ id: "/library", path: "/library", getParentRoute: () => rootRouteImport });
 const AuthedRoute = AuthedRouteImport.update({ id: "/_authed", getParentRoute: () => rootRouteImport });
 const AuthedDashboardRoute = AuthedDashboardRouteImport.update({ id: "/dashboard", path: "/dashboard", getParentRoute: () => AuthedRoute });
 const AuthedAdminVideosRoute = AuthedAdminVideosRouteImport.update({ id: "/admin/videos", path: "/admin/videos", getParentRoute: () => AuthedRoute });
@@ -52,6 +54,7 @@ const AuthedRouteWithChildren = AuthedRoute._addFileChildren({
 });
 const rootRouteChildren = {
   IndexRoute,
+  LibraryRoute,
   AuthedRoute: AuthedRouteWithChildren,
   AboutRoute,
   AdminRoute,

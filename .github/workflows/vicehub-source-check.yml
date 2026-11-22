@@ -1,0 +1,31 @@
+name: VICEHUB source checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/vicehub-video-library-overhaul]
+
+jobs:
+  frontend-syntax:
+    name: Frontend and server-function syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Parse changed JSX and JavaScript
+        run: |
+          npx --yes esbuild src/routes/library.jsx src/routes/social.jsx src/routes/_authed/admin/videos.jsx src/lib/server-fns.js --bundle --external:* --outdir=/tmp/vicehub-syntax-check --log-level=warning
+
+  scheduled-worker:
+    name: Scheduled social worker type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Deno automation
+        run: deno check base44/functions/social-publisher/index.ts

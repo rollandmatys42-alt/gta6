@@ -641,8 +641,11 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
  const tiktokConfigured=Boolean(secrets.get("TIKTOK_CLIENT_KEY")&&secrets.get("TIKTOK_CLIENT_SECRET"));
  const instagramConfigured=Boolean(secrets.get("META_APP_ID")&&secrets.get("META_APP_SECRET"));
  const youtubeConfigured=Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET"));
+ const xOauthConfigured=Boolean(secrets.get("X_CLIENT_ID")&&secrets.get("X_CLIENT_SECRET"));
+ const socialEncryptionConfigured=Boolean(secrets.get("SOCIAL_TOKEN_ENCRYPTION_KEY")&&secrets.get("SOCIAL_OAUTH_STATE_SECRET"));
  return {
-  aiProviderConfigured:Boolean(secrets.get("AI_ROUTER_API_KEY")),
+  aiProviderConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL")),
+  omniRouteConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL")),
   xApiConfigured:Boolean(secrets.get("X_BEARER_TOKEN")),
   enabledNewsSources:sources.length,
   agentTemplates:agents.length,
@@ -653,7 +656,8 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
   stripeSecretConfigured:stripeSecret,
   stripeWebhookConfigured:stripeWebhook,
   payments:stripeSecret&&stripeWebhook?"configured":stripeSecret?"webhook_secret_missing":"missing_credentials",
-  socialPublishing:{tiktokConfigured,instagramConfigured,youtubeConfigured},
+  socialEncryptionConfigured,
+  socialPublishing:{tiktokConfigured,instagramConfigured,facebookConfigured:instagramConfigured,youtubeConfigured,xOauthConfigured},
   recurringAgentScheduler:"manual_only"
  };
 });
@@ -661,18 +665,24 @@ export const updateReportStatus = createServerFn({method:"POST"}).middleware([re
  .validator(z.object({id:z.string(),status:z.enum(["reviewing","resolved","dismissed"])}))
  .handler(async({data,context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.update(data.id,{status:data.status});});
 
+async function omniRouteChat({messages, model, temperature = 0.4, maxTokens = 1800, title = "VICEHUB"}) {
+ const key=secrets.get("OMNIROUTE_API_KEY"),base=secrets.get("OMNIROUTE_BASE_URL");
+ if(!key||!base)throw Object.assign(new Error("OmniRoute is not configured. Add OMNIROUTE_API_KEY and OMNIROUTE_BASE_URL (OpenAI-compatible /v1 base URL) to Base44 secrets."),{status:503,code:"OMNIROUTE_NOT_CONFIGURED"});
+ const selectedModel=model||secrets.get("OMNIROUTE_MODEL")||"auto";
+ const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","X-Title":title},body:JSON.stringify({model:selectedModel,messages,temperature,max_tokens:maxTokens})});
+ const payload=await response.json().catch(()=>({}));
+ if(!response.ok)throw Object.assign(new Error(payload.error?.message||"OmniRoute returned HTTP "+response.status),{status:502,code:"OMNIROUTE_REQUEST_FAILED"});
+ const output=payload.choices?.[0]?.message?.content;
+ if(!output)throw Object.assign(new Error("OmniRoute returned an empty response."),{status:502,code:"OMNIROUTE_EMPTY_RESPONSE"});
+ return {output,model:payload.model||selectedModel,usage:payload.usage||null};
+}
+
 export const generateStudioDraft = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({platform:z.enum(["TikTok","Instagram","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
+ .validator(z.object({platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
  .handler(async({data,context})=>{
-  const key=secrets.get("AI_ROUTER_API_KEY");
-  if(!key) throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets to activate generation."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
-  const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1";
-  const model=secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
   const prompt="You are a professional GTA VI creator marketing assistant. Generate "+data.contentType+" for "+data.platform+". Topic: "+data.topic+". Tone: "+data.tone+". Language: "+data.language+". Keep claims factual, never present leaks or rumours as confirmed, and do not imply affiliation with Rockstar Games. Return only usable content.";
-  const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://gta6-creator-hub-c26cc578.base44.app","X-Title":"VICEHUB Creator Studio"},body:JSON.stringify({model,messages:[{role:"user",content:prompt}],temperature:0.7,max_tokens:1400})});
-  if(!response.ok) throw Object.assign(new Error("AI provider error: HTTP "+response.status),{status:502,code:"AI_PROVIDER_ERROR"});
-  const payload=await response.json();const output=payload.choices?.[0]?.message?.content;
-  if(!output) throw new Error("AI provider returned an empty response.");
+  const generated=await omniRouteChat({messages:[{role:"user",content:prompt}],temperature:0.7,maxTokens:1400,title:"VICEHUB Creator Studio"});
+  const output=generated.output,model=generated.model;
   const saved=await context.getBase44().asServiceRole.entities.AIContentDraft.create({user_id:context.user.id,platform:data.platform,content_type:data.contentType,topic:data.topic,output,status:"draft",provider:model});
   return {output,id:saved.id,model};
  });
@@ -684,13 +694,13 @@ export const getAdminAgents = createServerFn({method:"GET"}).middleware([require
 export const saveAdminAgent = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({id:z.string().optional(),agentKey:z.enum(["news_editor","seo_agent","geo_agent","social_agent","platform_analyst"]),displayName:z.string().min(2).max(100),instructions:z.string().max(10000),providerModel:z.string().max(120),enabled:z.boolean(),schedule:z.enum(["manual","hourly","daily","weekly"]),monthlyRunLimit:z.number().int().min(0)}))
  .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.AIAgentConfig;const p={agent_key:data.agentKey,display_name:data.displayName,instructions:data.instructions,provider_model:data.providerModel,enabled:data.enabled,schedule:data.schedule,monthly_run_limit:data.monthlyRunLimit};return data.id?db.update(data.id,p):db.create(p);});
-export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",50,0));
+export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",100,0));
 export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","YouTube","X"]),caption:z.string().min(1).max(5000),scheduledAt:z.string().datetime().optional()}))
- .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for your planning reminder."),{status:400});const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};if(data.id){const existing=await db.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id)throw Object.assign(new Error("You can only edit your own social drafts."),{status:403});return db.update(existing.id,p);}return db.create(p);});
+ .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X"]),caption:z.string().min(1).max(5000),accountId:z.string().optional(),mediaUrl:z.string().url().max(500).optional(),mediaObjectKey:z.string().max(500).optional(),scheduledAt:z.string().datetime().optional()}))
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities; if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for scheduled publication."),{status:400}); if(data.mediaUrl&&data.mediaObjectKey)throw Object.assign(new Error("Choose either an uploaded video or a public video URL, not both."),{status:400}); if(data.mediaObjectKey&&!data.mediaObjectKey.startsWith("social/"+context.user.id+"/"))throw Object.assign(new Error("The uploaded media file does not belong to your account."),{status:403}); if(data.accountId){const account=await db.SocialAccount.get(data.accountId).catch(()=>null);if(!account||account.user_id!==context.user.id||account.provider!==data.platform||account.status!=="connected")throw Object.assign(new Error("Select a connected account belonging to your user and matching the chosen network."),{status:403});} const mediaReference=data.mediaObjectKey||data.mediaUrl||""; const p={user_id:context.user.id,platform:data.platform,caption:data.caption,account_id:data.accountId||"",media_type:mediaReference?"video":"none",media_reference:mediaReference,status:data.scheduledAt?"scheduled":"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})}; const posts=db.SocialPost;if(data.id){const existing=await posts.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id||existing.status==="published"||existing.status==="publishing")throw Object.assign(new Error("Only your own unpublished drafts can be edited."),{status:403});return posts.update(existing.id,p);}return posts.create(p);});
 export const deleteSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({postId:z.string().min(1)}))
- .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const post=await db.get(data.postId).catch(()=>null);if(!post||post.user_id!==context.user.id)throw Object.assign(new Error("You can only delete your own social drafts."),{status:403});await db.delete(post.id);return {success:true};});
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const post=await db.get(data.postId).catch(()=>null);if(!post||post.user_id!==context.user.id)throw Object.assign(new Error("You can only delete your own social posts."),{status:403});if(["published","publishing"].includes(post.status))throw Object.assign(new Error("Published or processing posts cannot be deleted from the publication history."),{status:409});if(post.media_reference?.startsWith("social/"+context.user.id+"/")){try{const deleteUrl=await presignR2({method:"DELETE",objectKey:post.media_reference,expiresIn:60});await fetch(deleteUrl,{method:"DELETE"});}catch{}}await db.delete(post.id);return {success:true};});
 export const getMyMarketplaceInquiries = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  const db=context.getBase44().asServiceRole.entities;const [buyer,seller]=await Promise.all([db.MarketplaceInquiry.filter({buyer_id:context.user.id},"-created_date",50,0),db.MarketplaceInquiry.filter({seller_id:context.user.id},"-created_date",50,0)]);return {buyer,seller};
 });
@@ -740,12 +750,9 @@ export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([re
   requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
   const agent=await db.AIAgentConfig.get(data.agentId).catch(()=>null);
   if(!agent||!agent.enabled)throw Object.assign(new Error("This agent is not enabled."),{status:403});
-  const key=secrets.get("AI_ROUTER_API_KEY");if(!key)throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
-  const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1",model=agent.provider_model||secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
-  const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://gta6-creator-hub-c26cc578.base44.app","X-Title":"VICEHUB Agent"},body:JSON.stringify({model,messages:[{role:"system",content:agent.instructions},{role:"user",content:data.taskInput}],temperature:0.4,max_tokens:1800})});
-  if(!response.ok)throw Object.assign(new Error("AI provider error: HTTP "+response.status),{status:502});
-  const result=await response.json(),output=result.choices?.[0]?.message?.content;if(!output)throw new Error("AI provider returned an empty result.");
-  const saved=await db.AIContentDraft.create({user_id:context.user.id,platform:"General",content_type:agent.agent_key==="seo_agent"?"SEO":agent.agent_key==="geo_agent"?"GEO":agent.agent_key==="social_agent"?"Caption":"Description",topic:data.taskInput,output,status:"draft",provider:model});
+  const generated=await omniRouteChat({model:agent.provider_model||undefined,messages:[{role:"system",content:agent.instructions},{role:"user",content:data.taskInput}],temperature:0.4,maxTokens:1800,title:"VICEHUB Agent"});
+   const output=generated.output,model=generated.model;
+   const saved=await db.AIContentDraft.create({user_id:context.user.id,platform:"General",content_type:agent.agent_key==="seo_agent"?"SEO":agent.agent_key==="geo_agent"?"GEO":agent.agent_key==="social_agent"?"Caption":"Description",topic:data.taskInput,output,status:"draft",provider:model});
   await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Completed successfully"});
   return {output,draftId:saved.id,model};
  });
@@ -1026,14 +1033,9 @@ export const grantComplimentaryPremium = createServerFn({method:"POST"}).middlew
  });
 
 async function translateWithConfiguredAI(sourceText,targetLanguage,contextLabel){
- const key=secrets.get("AI_ROUTER_API_KEY");
- if(!key)throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
- const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1";
- const model=secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
- const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({model,messages:[{role:"system",content:"Translate the provided "+contextLabel+" faithfully into "+targetLanguage+". Preserve meaning, factual distinctions, proper names, URLs, HTML/Markdown structure and all GTA VI trademark disclaimers. Return only a valid JSON object with translated fields."},{role:"user",content:sourceText}],temperature:0.2,max_tokens:4000})});
- if(!response.ok)throw Object.assign(new Error("Translation provider error: HTTP "+response.status),{status:502});
- const raw=(await response.json()).choices?.[0]?.message?.content||"";
- const cleaned=raw.replace(/^\s*\x60\x60\x60(?:json)?/i,"").replace(/\x60\x60\x60\s*$/,"").trim();
+ const generated=await omniRouteChat({messages:[{role:"system",content:"Translate the provided "+contextLabel+" faithfully into "+targetLanguage+". Preserve meaning, factual distinctions, proper names, URLs, HTML/Markdown structure and all GTA VI trademark disclaimers. Return only a valid JSON object with translated fields."},{role:"user",content:sourceText}],temperature:0.2,maxTokens:4000,title:"VICEHUB Translation"});
+  const raw=generated.output;
+  const cleaned=raw.replace(/^\s*\x60\x60\x60(?:json)?/i,"").replace(/\x60\x60\x60\s*$/,"").trim();
  try{return JSON.parse(cleaned);}catch{throw new Error("AI translation did not return valid structured JSON.");}
 }
 export const translateCmsPage = createServerFn({method:"POST"}).middleware([requireUser])
@@ -1058,3 +1060,353 @@ export const translateNewsArticle = createServerFn({method:"POST"}).middleware([
   if(!translated.title||!translated.summary||!translated.body)throw new Error("Translation output is missing required article fields.");
   return db.NewsArticle.create({title:translated.title,slug:article.slug,summary:translated.summary,body:translated.body,source_name:article.source_name,source_url:article.source_url,source_type:article.source_type,confidence:article.confidence,locale:data.targetLocale,status:"draft",tags:translated.tags||article.tags||[],created_by:context.user.id});
  });
+
+
+/**
+ * Paginated public catalogue endpoint.
+ * The client requests small pages instead of loading the entire library.
+ */
+export const listPublishedVideosPage = createServerFn({ method: "GET" })
+  .validator(z.object({
+    category: z.enum(["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]).optional(),
+    language: z.enum(["en", "fr", "es", "pt", "it", "de"]).optional(),
+    offset: z.number().int().min(0).max(100000).default(0),
+    limit: z.number().int().min(1).max(48).default(24),
+  }))
+  .handler(async ({ data, context }) => {
+    const base44 = context.getBase44();
+    const filter = { status: "published", license_status: "verified" };
+    if (data.category) filter.category = data.category;
+    if (data.language) filter.language = data.language;
+    const rows = await base44.asServiceRole.entities.Video.filter(
+      filter,
+      "-published_at",
+      data.limit + 1,
+      data.offset,
+      ["id", "title", "description", "category", "language", "is_featured", "tags", "duration_seconds", "thumbnail_url", "creator_name", "published_at"],
+    );
+    const videos = rows.slice(0, data.limit);
+    return {
+      videos,
+      hasMore: rows.length > data.limit,
+      nextOffset: data.offset + videos.length,
+      pageSize: data.limit,
+    };
+  });
+
+
+// -----------------------------------------------------------------------------
+// Per-user social OAuth and publishing. Provider tokens are encrypted at rest.
+// AI copy generation is separate and must never receive provider credentials.
+// -----------------------------------------------------------------------------
+const SOCIAL_CALLBACK_URL = "https://gta6-creator-hub-c26cc578.base44.app/social";
+const SOCIAL_PROVIDERS = ["TikTok", "Instagram", "YouTube", "X"];
+
+function toBase64Url(bytes) {
+  let binary = "";
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function fromBase64(value) {
+  const standard = String(value).replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(standard.padEnd(Math.ceil(standard.length / 4) * 4, "="));
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+async function digestText(value) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value)));
+}
+async function socialEncryptionKey() {
+  const secret = secrets.get("SOCIAL_TOKEN_ENCRYPTION_KEY");
+  if (!secret || secret.length < 32) throw Object.assign(new Error("Social connections are not enabled yet. Configure SOCIAL_TOKEN_ENCRYPTION_KEY (32+ characters) in Base44 secrets."), { status: 503, code: "SOCIAL_ENCRYPTION_NOT_CONFIGURED" });
+  return crypto.subtle.importKey("raw", await digestText(secret), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+async function encryptSocialToken(value) {
+  if (!value) return "";
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await socialEncryptionKey(), encoder.encode(value));
+  return toBase64Url(iv) + "." + toBase64Url(encrypted);
+}
+async function decryptSocialToken(value) {
+  if (!value) return "";
+  const [ivPart, dataPart] = String(value).split(".");
+  if (!ivPart || !dataPart) throw new Error("Stored social credential has an invalid format. Reconnect this account.");
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(ivPart) }, await socialEncryptionKey(), fromBase64(dataPart));
+  return new TextDecoder().decode(plain);
+}
+function randomVerifier() {
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(48)));
+}
+async function createSocialStateHash(state) {
+  const secret = secrets.get("SOCIAL_OAUTH_STATE_SECRET");
+  if (!secret || secret.length < 32) throw Object.assign(new Error("Configure SOCIAL_OAUTH_STATE_SECRET (32+ characters) before enabling social OAuth."), { status: 503, code: "SOCIAL_OAUTH_NOT_CONFIGURED" });
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return toBase64Url(await crypto.subtle.sign("HMAC", key, encoder.encode(state)));
+}
+async function socialTokenRequest(url, body, clientId, clientSecret) {
+  const headers = { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" };
+  if (clientId && clientSecret) headers.Authorization = "Basic " + btoa(clientId + ":" + clientSecret);
+  const response = await fetch(url, { method: "POST", headers, body: body.toString() });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(payload.error_description || payload.error?.message || payload.message || "Social provider token exchange failed (HTTP " + response.status + ")."), { status: 502, code: "SOCIAL_TOKEN_EXCHANGE_FAILED" });
+  return payload;
+}
+async function saveSocialAccount(db, userId, record) {
+  const encryptedAccess = await encryptSocialToken(record.accessToken);
+  const encryptedRefresh = await encryptSocialToken(record.refreshToken || "");
+  const payload = {
+    user_id: userId, provider: record.provider, provider_account_id: String(record.accountId),
+    account_name: String(record.accountName || record.accountId).slice(0, 160),
+    account_type: record.accountType || "profile",
+    encrypted_access_token: encryptedAccess, encrypted_refresh_token: encryptedRefresh,
+    ...(record.expiresAt ? { token_expires_at: record.expiresAt } : {}),
+    ...(record.refreshExpiresAt ? { refresh_expires_at: record.refreshExpiresAt } : {}),
+    scopes: record.scopes || [], status: "connected",
+    metadata_json: JSON.stringify(record.metadata || {}).slice(0, 5000),
+    connected_at: new Date().toISOString(), last_error: "",
+  };
+  const existing = await db.SocialAccount.filter({ user_id: userId, provider: record.provider, provider_account_id: String(record.accountId) }, "-created_date", 1, 0);
+  return existing[0] ? db.SocialAccount.update(existing[0].id, payload) : db.SocialAccount.create(payload);
+}
+async function providerJson(url, token, options = {}) {
+  const response = await fetch(url, { ...options, headers: { Accept: "application/json", ...(options.headers || {}), Authorization: "Bearer " + token } });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(payload.error?.message || payload.error_description || payload.message || "Social provider request failed (HTTP " + response.status + ")."), { status: 502, code: "SOCIAL_PROVIDER_ERROR" });
+  return payload;
+}
+
+export const createSocialMediaUploadUrl = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ fileName: z.string().min(1).max(180).regex(/^[a-zA-Z0-9._ -]+$/), contentType: z.enum(["video/mp4", "video/quicktime"]), sizeBytes: z.number().int().min(1).max(250 * 1024 * 1024) }))
+  .handler(async ({ data, context }) => {
+    const extension = data.contentType === "video/quicktime" ? "mov" : "mp4";
+    const objectKey = "social/" + context.user.id + "/" + crypto.randomUUID() + "." + extension;
+    const uploadUrl = await presignR2({ method: "PUT", objectKey, contentType: data.contentType, expiresIn: 300 });
+    return { uploadUrl, objectKey, expiresInSeconds: 300, maxBytes: 250 * 1024 * 1024 };
+  });
+
+export const beginSocialOAuth = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ provider: z.enum(["TikTok", "Instagram", "YouTube", "X"]) }))
+  .handler(async ({ data, context }) => {
+    const provider = data.provider;
+    const state = randomVerifier();
+    const stateHash = await createSocialStateHash(state);
+    const verifier = randomVerifier();
+    const challenge = toBase64Url(await digestText(verifier));
+    const db = context.getBase44().asServiceRole.entities;
+    await db.SocialOAuthState.create({
+      user_id: context.user.id, provider, state_hash: stateHash, code_verifier: verifier,
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+    let url;
+    if (provider === "TikTok") {
+      const clientKey = secrets.get("TIKTOK_CLIENT_KEY");
+      if (!clientKey || !secrets.get("TIKTOK_CLIENT_SECRET")) throw Object.assign(new Error("TikTok app credentials are missing. Configure TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET."), { status: 503 });
+      const params = new URLSearchParams({ client_key: clientKey, response_type: "code", scope: "user.info.basic,video.publish,video.upload", redirect_uri: SOCIAL_CALLBACK_URL, state, code_challenge: challenge, code_challenge_method: "S256" });
+      url = "https://www.tiktok.com/v2/auth/authorize/?" + params;
+    } else if (provider === "Instagram") {
+      const clientId = secrets.get("META_APP_ID");
+      if (!clientId || !secrets.get("META_APP_SECRET")) throw Object.assign(new Error("Meta app credentials are missing. Configure META_APP_ID and META_APP_SECRET."), { status: 503 });
+      const params = new URLSearchParams({ client_id: clientId, redirect_uri: SOCIAL_CALLBACK_URL, state, response_type: "code", scope: "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,pages_manage_posts" });
+      url = "https://www.facebook.com/v22.0/dialog/oauth?" + params;
+    } else if (provider === "YouTube") {
+      const clientId = secrets.get("GOOGLE_CLIENT_ID");
+      if (!clientId || !secrets.get("GOOGLE_CLIENT_SECRET")) throw Object.assign(new Error("Google app credentials are missing. Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."), { status: 503 });
+      const params = new URLSearchParams({ client_id: clientId, redirect_uri: SOCIAL_CALLBACK_URL, response_type: "code", scope: "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly", access_type: "offline", prompt: "consent", include_granted_scopes: "true", state, code_challenge: challenge, code_challenge_method: "S256" });
+      url = "https://accounts.google.com/o/oauth2/v2/auth?" + params;
+    } else {
+      const clientId = secrets.get("X_CLIENT_ID");
+      if (!clientId || !secrets.get("X_CLIENT_SECRET")) throw Object.assign(new Error("X developer app credentials are missing. Configure X_CLIENT_ID and X_CLIENT_SECRET."), { status: 503 });
+      const params = new URLSearchParams({ client_id: clientId, redirect_uri: SOCIAL_CALLBACK_URL, response_type: "code", scope: "tweet.read tweet.write users.read offline.access", state, code_challenge: challenge, code_challenge_method: "S256" });
+      url = "https://twitter.com/i/oauth2/authorize?" + params;
+    }
+    return { authorizationUrl: url, provider };
+  });
+
+export const completeSocialOAuth = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ code: z.string().min(1).max(4096), state: z.string().min(16).max(256) }))
+  .handler(async ({ data, context }) => {
+    const stateHash = await createSocialStateHash(data.state);
+    const db = context.getBase44().asServiceRole.entities;
+    const states = await db.SocialOAuthState.filter({ user_id: context.user.id, state_hash: stateHash }, "-created_date", 1, 0);
+    const state = states[0];
+    if (!state || state.used_at || new Date(state.expires_at).getTime() < Date.now()) throw Object.assign(new Error("This social connection request has expired or was already used. Start the connection again."), { status: 400, code: "SOCIAL_OAUTH_STATE_INVALID" });
+    await db.SocialOAuthState.update(state.id, { used_at: new Date().toISOString() });
+    const provider = state.provider;
+    const verifier = state.code_verifier;
+    let saved = [];
+    if (provider === "TikTok") {
+      const clientKey = secrets.get("TIKTOK_CLIENT_KEY"), clientSecret = secrets.get("TIKTOK_CLIENT_SECRET");
+      const body = new URLSearchParams({ client_key: clientKey, client_secret: clientSecret, code: data.code, grant_type: "authorization_code", redirect_uri: SOCIAL_CALLBACK_URL, code_verifier: verifier });
+      const token = await socialTokenRequest("https://open.tiktokapis.com/v2/oauth/token/", body);
+      const profile = await providerJson("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,username", token.access_token);
+      const userInfo = profile.data?.user || {};
+      saved.push(await saveSocialAccount(db, context.user.id, { provider: "TikTok", accountId: token.open_id, accountName: userInfo.display_name || userInfo.username || "TikTok creator", accountType: "profile", accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: new Date(Date.now() + Number(token.expires_in || 86400) * 1000).toISOString(), refreshExpiresAt: new Date(Date.now() + Number(token.refresh_expires_in || 0) * 1000).toISOString(), scopes: String(token.scope || "").split(",").filter(Boolean), metadata: { username: userInfo.username || "" } }));
+    } else if (provider === "Instagram") {
+      const clientId = secrets.get("META_APP_ID"), clientSecret = secrets.get("META_APP_SECRET");
+      const params = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, redirect_uri: SOCIAL_CALLBACK_URL, code: data.code });
+      const shortToken = await fetch("https://graph.facebook.com/v22.0/oauth/access_token?" + params).then(async r => { const p = await r.json(); if (!r.ok) throw new Error(p.error?.message || "Meta OAuth exchange failed."); return p; });
+      const longParams = new URLSearchParams({ grant_type: "fb_exchange_token", client_id: clientId, client_secret: clientSecret, fb_exchange_token: shortToken.access_token });
+      const longToken = await fetch("https://graph.facebook.com/v22.0/oauth/access_token?" + longParams).then(async r => { const p = await r.json(); if (!r.ok) throw new Error(p.error?.message || "Meta long-lived token exchange failed."); return p; });
+      const pages = await providerJson("https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}", longToken.access_token);
+      for (const page of pages.data || []) {
+        if (page.id && page.access_token) saved.push(await saveSocialAccount(db, context.user.id, { provider: "Facebook", accountId: page.id, accountName: page.name || "Facebook Page", accountType: "page", accessToken: page.access_token, expiresAt: new Date(Date.now() + Number(longToken.expires_in || 5184000) * 1000).toISOString(), scopes: ["pages_show_list", "pages_manage_posts"], metadata: { pageId: page.id } }));
+        const ig = page.instagram_business_account;
+        if (ig?.id && page.access_token) saved.push(await saveSocialAccount(db, context.user.id, { provider: "Instagram", accountId: ig.id, accountName: ig.username ? "@" + ig.username : "Instagram Business", accountType: "business", accessToken: page.access_token, expiresAt: new Date(Date.now() + Number(longToken.expires_in || 5184000) * 1000).toISOString(), scopes: ["instagram_basic", "instagram_content_publish"], metadata: { pageId: page.id, pageName: page.name || "" } }));
+      }
+      if (!saved.length) throw Object.assign(new Error("Meta authorised the account but returned no Facebook Page or Instagram Business account. Convert or link an Instagram professional account to a Facebook Page, then reconnect."), { status: 409, code: "META_NO_PUBLISHABLE_ACCOUNT" });
+    } else if (provider === "YouTube") {
+      const body = new URLSearchParams({ client_id: secrets.get("GOOGLE_CLIENT_ID"), client_secret: secrets.get("GOOGLE_CLIENT_SECRET"), code: data.code, grant_type: "authorization_code", redirect_uri: SOCIAL_CALLBACK_URL, code_verifier: verifier });
+      const token = await socialTokenRequest("https://oauth2.googleapis.com/token", body);
+      const channel = await providerJson("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", token.access_token);
+      const item = channel.items?.[0];
+      if (!item?.id) throw Object.assign(new Error("No YouTube channel was returned for this Google account."), { status: 409 });
+      saved.push(await saveSocialAccount(db, context.user.id, { provider: "YouTube", accountId: item.id, accountName: item.snippet?.title || "YouTube channel", accountType: "channel", accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: new Date(Date.now() + Number(token.expires_in || 3600) * 1000).toISOString(), scopes: ["youtube.upload", "youtube.readonly"], metadata: { channelId: item.id } }));
+    } else if (provider === "X") {
+      const body = new URLSearchParams({ client_id: secrets.get("X_CLIENT_ID"), code: data.code, grant_type: "authorization_code", redirect_uri: SOCIAL_CALLBACK_URL, code_verifier: verifier });
+      const token = await socialTokenRequest("https://api.x.com/2/oauth2/token", body, secrets.get("X_CLIENT_ID"), secrets.get("X_CLIENT_SECRET"));
+      const profile = await providerJson("https://api.x.com/2/users/me?user.fields=name,username", token.access_token);
+      const userInfo = profile.data || {};
+      if (!userInfo.id) throw new Error("X did not return the authorised profile.");
+      saved.push(await saveSocialAccount(db, context.user.id, { provider: "X", accountId: userInfo.id, accountName: userInfo.name || userInfo.username || "X account", accountType: "profile", accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: new Date(Date.now() + Number(token.expires_in || 7200) * 1000).toISOString(), scopes: String(token.scope || "").split(" ").filter(Boolean), metadata: { username: userInfo.username || "" } }));
+    }
+    for (const row of states) await db.SocialOAuthState.delete(row.id).catch(() => null);
+    return { provider, connectedAccounts: saved.map(x => ({ id: x.id, provider: x.provider, accountName: x.account_name })), count: saved.length };
+  });
+
+export const getMySocialAccounts = createServerFn({ method: "GET" }).middleware([requireUser]).handler(async ({ context }) => {
+  const rows = await context.getBase44().asServiceRole.entities.SocialAccount.filter({ user_id: context.user.id, status: "connected" }, "-connected_at", 100, 0);
+  return rows.map(({ id, provider, provider_account_id, account_name, account_type, token_expires_at, scopes, status, connected_at, last_used_at, last_error }) => ({ id, provider, providerAccountId: provider_account_id, accountName: account_name, accountType: account_type, tokenExpiresAt: token_expires_at || null, scopes: scopes || [], status, connectedAt: connected_at, lastUsedAt: last_used_at || null, lastError: last_error || "" }));
+});
+
+export const disconnectSocialAccount = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ accountId: z.string().min(1) }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities.SocialAccount;
+    const account = await db.get(data.accountId).catch(() => null);
+    if (!account || account.user_id !== context.user.id) throw Object.assign(new Error("You can only disconnect a social account owned by your user."), { status: 403 });
+    await db.update(account.id, { status: "disconnected", encrypted_access_token: "", encrypted_refresh_token: "", last_error: "" });
+    return { success: true };
+  });
+
+async function getUsableSocialToken(db, account) {
+  if (!account.encrypted_access_token) throw Object.assign(new Error("This social account has no usable credential. Reconnect it."), { status: 401 });
+  const expiresAt = account.token_expires_at ? new Date(account.token_expires_at).getTime() : 0;
+  if (expiresAt && expiresAt < Date.now() + 120000) {
+    if (!account.encrypted_refresh_token || !["TikTok", "YouTube", "X"].includes(account.provider)) {
+      await db.SocialAccount.update(account.id, { status: "expired", last_error: "Token expired; reconnect this account." });
+      throw Object.assign(new Error("The social connection has expired. Reconnect this account before publishing."), { status: 401, code: "SOCIAL_TOKEN_EXPIRED" });
+    }
+    const refreshToken = await decryptSocialToken(account.encrypted_refresh_token);
+    let token;
+    if (account.provider === "TikTok") {
+      const body = new URLSearchParams({ client_key: secrets.get("TIKTOK_CLIENT_KEY"), client_secret: secrets.get("TIKTOK_CLIENT_SECRET"), grant_type: "refresh_token", refresh_token: refreshToken });
+      token = await socialTokenRequest("https://open.tiktokapis.com/v2/oauth/token/", body);
+    } else if (account.provider === "YouTube") {
+      const body = new URLSearchParams({ client_id: secrets.get("GOOGLE_CLIENT_ID"), client_secret: secrets.get("GOOGLE_CLIENT_SECRET"), grant_type: "refresh_token", refresh_token: refreshToken });
+      token = await socialTokenRequest("https://oauth2.googleapis.com/token", body);
+    } else {
+      const body = new URLSearchParams({ client_id: secrets.get("X_CLIENT_ID"), grant_type: "refresh_token", refresh_token: refreshToken });
+      token = await socialTokenRequest("https://api.x.com/2/oauth2/token", body, secrets.get("X_CLIENT_ID"), secrets.get("X_CLIENT_SECRET"));
+    }
+    account = await db.SocialAccount.update(account.id, {
+      encrypted_access_token: await encryptSocialToken(token.access_token),
+      ...(token.refresh_token ? { encrypted_refresh_token: await encryptSocialToken(token.refresh_token) } : {}),
+      token_expires_at: new Date(Date.now() + Number(token.expires_in || 3600) * 1000).toISOString(),
+      status: "connected", last_error: "",
+    });
+  }
+  return decryptSocialToken(account.encrypted_access_token);
+}
+
+async function publishSocialPostForUser(context, postId) {
+  const db = context.getBase44().asServiceRole.entities;
+  const post = await db.SocialPost.get(postId).catch(() => null);
+  if (!post || post.user_id !== context.user.id) throw Object.assign(new Error("This publication does not belong to your account."), { status: 403 });
+  if (post.status === "published" || post.status === "publishing") throw Object.assign(new Error("This publication has already been sent or is still processing."), { status: 409 });
+  const account = await db.SocialAccount.get(post.account_id).catch(() => null);
+  if (!account || account.user_id !== context.user.id || account.provider !== post.platform || account.status !== "connected") throw Object.assign(new Error("Connect and select your own account for this network before publishing."), { status: 409, code: "SOCIAL_ACCOUNT_REQUIRED" });
+  let mediaUrl = post.media_reference || "";
+  if (post.media_type === "video" && mediaUrl.startsWith("social/" + context.user.id + "/")) mediaUrl = await presignR2({ method: "GET", objectKey: mediaUrl, expiresIn: 3600 });
+  if (post.media_type === "video" && !mediaUrl.startsWith("https://")) throw Object.assign(new Error("Video publishing requires your uploaded private video or a publicly reachable HTTPS URL."), { status: 400 });
+  const token = await getUsableSocialToken(db, account);
+  const claim = await db.SocialPost.updateMany({ id: post.id, status: { $in: ["draft", "failed", "scheduled"] } }, { $set: { status: "publishing", last_attempt_at: new Date().toISOString(), error_message: "" } });
+  if (!claim?.updated) throw Object.assign(new Error("Another publication process has already claimed this post."), { status: 409, code: "SOCIAL_POST_ALREADY_CLAIMED" });
+  try {
+    let externalId = "";
+    if (post.platform === "Instagram") {
+      if (post.media_type !== "video") throw new Error("Instagram Reels publishing requires a video URL.");
+      const form = new URLSearchParams({ media_type: "REELS", video_url: mediaUrl, caption: post.caption, access_token: token });
+      const container = await fetch("https://graph.facebook.com/v22.0/" + encodeURIComponent(account.provider_account_id) + "/media", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() }).then(async r => { const p = await r.json(); if (!r.ok) throw new Error(p.error?.message || "Instagram media container creation failed."); return p; });
+      if (!container.id) throw new Error("Instagram did not return a media container.");
+      let ready = false;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const status = await fetch("https://graph.facebook.com/v22.0/" + encodeURIComponent(container.id) + "?fields=status_code&access_token=" + encodeURIComponent(token)).then(r => r.json());
+        if (status.status_code === "FINISHED") { ready = true; break; }
+        if (status.status_code === "ERROR" || status.status_code === "EXPIRED") throw new Error("Instagram could not process the video. Check codec, duration and aspect ratio.");
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      if (!ready) throw new Error("Instagram is still processing this video. Save the draft and retry publication shortly.");
+      const publishForm = new URLSearchParams({ creation_id: container.id, access_token: token });
+      const published = await fetch("https://graph.facebook.com/v22.0/" + encodeURIComponent(account.provider_account_id) + "/media_publish", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: publishForm.toString() }).then(async r => { const p = await r.json(); if (!r.ok) throw new Error(p.error?.message || "Instagram publication failed."); return p; });
+      externalId = published.id;
+    } else if (post.platform === "Facebook") {
+      if (post.media_type !== "video") throw new Error("Facebook Page video publishing requires a video URL.");
+      const form = new URLSearchParams({ file_url: mediaUrl, description: post.caption, access_token: token });
+      const published = await fetch("https://graph.facebook.com/v22.0/" + encodeURIComponent(account.provider_account_id) + "/videos", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() }).then(async r => { const p = await r.json(); if (!r.ok) throw new Error(p.error?.message || "Facebook video publication failed."); return p; });
+      externalId = published.id;
+    } else if (post.platform === "TikTok") {
+      if (post.media_type !== "video") throw new Error("TikTok publishing requires a video URL.");
+      const creator = await providerJson("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const privacy = creator.data?.privacy_level_options?.includes("PUBLIC_TO_EVERYONE") ? "PUBLIC_TO_EVERYONE" : creator.data?.privacy_level_options?.[0];
+      if (!privacy) throw new Error("TikTok did not return an available privacy setting for this account.");
+      const response = await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ post_info: { title: post.caption.slice(0, 150), privacy_level: privacy, disable_duet: false, disable_comment: false, disable_stitch: false }, source_info: { source: "PULL_FROM_URL", video_url: mediaUrl } }) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.error?.code && payload.error.code !== "ok") throw new Error(payload.error?.message || "TikTok rejected the video publication.");
+      externalId = payload.data?.publish_id || "";
+    } else if (post.platform === "YouTube") {
+      if (post.media_type !== "video") throw new Error("YouTube upload requires a video URL.");
+      const mediaResponse = await fetch(mediaUrl);
+      if (!mediaResponse.ok) throw new Error("The video URL could not be downloaded for YouTube upload.");
+      const length = Number(mediaResponse.headers.get("content-length") || 0);
+      if (length > 256 * 1024 * 1024) throw new Error("This initial YouTube upload path is limited to 256 MB per video.");
+      const media = await mediaResponse.arrayBuffer();
+      if (media.byteLength > 256 * 1024 * 1024) throw new Error("This initial YouTube upload path is limited to 256 MB per video.");
+      const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": "video/mp4", "X-Upload-Content-Length": String(media.byteLength) }, body: JSON.stringify({ snippet: { title: post.caption.slice(0, 100), description: post.caption, categoryId: "20" }, status: { privacyStatus: "public", selfDeclaredMadeForKids: false } }) });
+      if (!init.ok) throw new Error("YouTube upload initialisation failed (HTTP " + init.status + ").");
+      const uploadUrl = init.headers.get("location");
+      if (!uploadUrl) throw new Error("YouTube did not return a resumable upload URL.");
+      const uploaded = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "video/mp4", "Content-Length": String(media.byteLength) }, body: media });
+      const result = await uploaded.json().catch(() => ({}));
+      if (!uploaded.ok) throw new Error(result.error?.message || "YouTube video upload failed.");
+      externalId = result.id || "";
+    } else if (post.platform === "X") {
+      if (post.media_type === "video") throw new Error("X video upload is not enabled in this release. Publish text posts on X; use Instagram, Facebook, TikTok or YouTube for video.");
+      const published = await providerJson("https://api.x.com/2/tweets", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: post.caption }) });
+      externalId = published.data?.id || "";
+    }
+    const finalStatus = post.platform === "TikTok" ? "publishing" : "published";
+    const postPatch = { status: finalStatus, external_post_id: externalId, error_message: "" };
+    if (finalStatus === "published") postPatch.published_at = new Date().toISOString();
+    const updated = await db.SocialPost.update(post.id, postPatch);
+    await db.SocialAccount.update(account.id, { last_used_at: new Date().toISOString(), last_error: "" });
+    return { success: true, status: updated.status, externalPostId: externalId, message: finalStatus === "publishing" ? "TikTok accepted the video. Processing and moderation continue on TikTok." : "Published successfully." };
+  } catch (error) {
+    await db.SocialPost.update(post.id, { status: "failed", error_message: String(error.message || error).slice(0, 500) });
+    await db.SocialAccount.update(account.id, { last_error: String(error.message || error).slice(0, 1000) });
+    throw error;
+  }
+}
+
+export const publishSocialPost = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ postId: z.string().min(1) }))
+  .handler(async ({ data, context }) => publishSocialPostForUser(context, data.postId));
+
+export const processMyDueSocialPosts = createServerFn({ method: "POST" }).middleware([requireUser]).handler(async ({ context }) => {
+  const rows = await context.getBase44().asServiceRole.entities.SocialPost.filter({ user_id: context.user.id, status: "scheduled" }, "scheduled_at", 30, 0);
+  const due = rows.filter(post => post.scheduled_at && new Date(post.scheduled_at).getTime() <= Date.now());
+  const results = [];
+  for (const post of due) {
+    try { results.push({ postId: post.id, ...(await publishSocialPostForUser(context, post.id)) }); }
+    catch (error) { results.push({ postId: post.id, success: false, error: String(error.message || error) }); }
+  }
+  return { processed: results.length, results };
+});
