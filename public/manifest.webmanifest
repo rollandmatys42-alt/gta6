@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "VICEHUB — GTA VI Creator Network",
+  "short_name": "VICEHUB",
+  "description": "Independent GTA VI creator community, news and content studio.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09090d",
+  "theme_color": "#09090d",
+  "icons": [
+    { "src": "/icons/vicehub.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "categories": ["entertainment", "social", "video"]
+}
