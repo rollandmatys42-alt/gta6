@@ -264,6 +264,7 @@ export const getMyAccount = createServerFn({ method: "GET" })
       planName,
       subscriptionStatus: subscription?.status || "inactive",
       currency: subscription?.currency || "USD",
+      hasBillingCustomer: !!subscription?.stripe_customer_id,
       downloadsUsed: used,
       downloadsLimit: limit,
       downloadsRemaining: Math.max(0, limit - used),
@@ -501,6 +502,12 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
   db.AIAgentConfig.list("-created_date",100,0),
   db.SubscriptionPlan.list("-created_date",100,0)
  ]);
+ const storageSecrets=["VIDEO_STORAGE_ENDPOINT","VIDEO_STORAGE_BUCKET","VIDEO_STORAGE_ACCESS_KEY_ID","VIDEO_STORAGE_SECRET_ACCESS_KEY"].every(name=>Boolean(secrets.get(name)));
+ const stripeSecret=Boolean(secrets.get("STRIPE_SECRET_KEY"));
+ const stripeWebhook=Boolean(secrets.get("STRIPE_WEBHOOK_SECRET"));
+ const tiktokConfigured=Boolean(secrets.get("TIKTOK_CLIENT_KEY")&&secrets.get("TIKTOK_CLIENT_SECRET"));
+ const instagramConfigured=Boolean(secrets.get("META_APP_ID")&&secrets.get("META_APP_SECRET"));
+ const youtubeConfigured=Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET"));
  return {
   aiProviderConfigured:Boolean(secrets.get("AI_ROUTER_API_KEY")),
   xApiConfigured:Boolean(secrets.get("X_BEARER_TOKEN")),
@@ -509,9 +516,11 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
   enabledAgents:agents.filter(x=>x.enabled).length,
   draftPlans:plans.filter(x=>x.status==="draft").length,
   activePlans:plans.filter(x=>x.status==="active").length,
-  videoStorage:"deferred",
-  payments:"deferred",
-  socialPublishing:"not_connected",
+  videoStorage:storageSecrets?"configured":"missing_credentials",
+  stripeSecretConfigured:stripeSecret,
+  stripeWebhookConfigured:stripeWebhook,
+  payments:stripeSecret&&stripeWebhook?"configured":stripeSecret?"webhook_secret_missing":"missing_credentials",
+  socialPublishing:{tiktokConfigured,instagramConfigured,youtubeConfigured},
   recurringAgentScheduler:"manual_only"
  };
 });
@@ -634,6 +643,125 @@ export const getMyPlanQuote = createServerFn({method:"GET"}).middleware([require
   const price=Math.max(Number(plan.loyalty_floor_price_cents||0),raw);
   return {tierCode:data.tierCode,currency:data.currency,basePriceCents:plan.monthly_price_cents,currentPriceCents:price,streakMonths:streak,discountPercent:discount,floorPriceCents:plan.loyalty_floor_price_cents||0,resetOnVoluntaryCancellation:true};
  });
+
+
+const STRIPE_SITE_URL = "https://gta6-creator-hub-c26cc578.base44.app";
+async function stripeApi(path, method = "GET", body = null) {
+  const key = secrets.get("STRIPE_SECRET_KEY");
+  if (!key) throw Object.assign(new Error("Stripe billing is not configured yet. Add STRIPE_SECRET_KEY in the secure app secrets before opening paid memberships."), { status: 503, code: "STRIPE_NOT_CONFIGURED" });
+  const response = await fetch("https://api.stripe.com/v1/" + path, {
+    method,
+    headers: { Authorization: "Bearer " + key, ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    ...(body ? { body: body.toString() } : {}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(payload?.error?.message || "Stripe API request failed."), { status: response.status, code: payload?.error?.code || "STRIPE_API_ERROR" });
+  return payload;
+}
+function stripeLocalStatus(status) {
+  if (status === "active") return "active";
+  if (status === "trialing") return "trialing";
+  if (status === "past_due") return "past_due";
+  if (status === "canceled") return "cancelled";
+  return "inactive";
+}
+
+export const createStripeCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
+  .validator(z.object({tierCode:z.enum(["starter","pro","premium"]),currency:z.enum(["USD","EUR","GBP"])}))
+  .handler(async({data,context})=>{
+    const db=context.getBase44().asServiceRole.entities;
+    const user=context.user;
+    const plans=await db.SubscriptionPlan.filter({tier_code:data.tierCode,currency:data.currency,status:"active"},"-created_date",1,0);
+    const plan=plans[0];
+    if(!plan||Number(plan.monthly_price_cents||0)<=0)throw Object.assign(new Error("This membership is not yet open for sale. Its price must be configured by the administrator first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
+    const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
+    const existing=existingRows[0];
+    if(existing?.status==="active"||existing?.status==="trialing")throw Object.assign(new Error("You already have an active membership. Use Manage membership to change or cancel it."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
+    const streak=existing?.status==="active"&&!existing?.voluntary_cancelled?Number(existing.streak_months||0):0;
+    const discount=Math.min(Number(plan.loyalty_max_discount_percent||0),streak*Number(plan.loyalty_monthly_discount_percent||0));
+    const priceCents=Math.max(Number(plan.loyalty_floor_price_cents||0),Math.round(Number(plan.monthly_price_cents)*(1-discount/100)));
+    if(priceCents<=0)throw Object.assign(new Error("The calculated membership price is invalid. Check the administrator pricing settings."),{status:409,code:"INVALID_PLAN_PRICE"});
+    const form=new URLSearchParams();
+    form.set("mode","subscription");
+    form.set("success_url",STRIPE_SITE_URL+"/subscription/success?session_id={CHECKOUT_SESSION_ID}");
+    form.set("cancel_url",STRIPE_SITE_URL+"/#plans?checkout=cancelled");
+    form.set("client_reference_id",user.id);
+    form.set("metadata[user_id]",user.id);
+    form.set("metadata[tier_code]",data.tierCode);
+    form.set("metadata[currency]",data.currency);
+    form.set("metadata[monthly_price_cents]",String(priceCents));
+    form.set("metadata[discount_percent]",String(discount));
+    form.set("subscription_data[metadata][user_id]",user.id);
+    form.set("subscription_data[metadata][tier_code]",data.tierCode);
+    form.set("subscription_data[metadata][currency]",data.currency);
+    form.set("subscription_data[metadata][monthly_price_cents]",String(priceCents));
+    form.set("subscription_data[metadata][discount_percent]",String(discount));
+    form.set("line_items[0][price_data][currency]",data.currency.toLowerCase());
+    form.set("line_items[0][price_data][unit_amount]",String(priceCents));
+    form.set("line_items[0][price_data][recurring][interval]","month");
+    form.set("line_items[0][price_data][product_data][name]","VICEHUB "+plan.display_name+" membership");
+    form.set("line_items[0][quantity]","1");
+    form.set("billing_address_collection","auto");
+    if(existing?.stripe_customer_id)form.set("customer",existing.stripe_customer_id);
+    else if(user.email)form.set("customer_email",user.email);
+    const session=await stripeApi("checkout/sessions","POST",form);
+    if(!session.url)throw new Error("Stripe did not return a checkout URL.");
+    return {url:session.url,sessionId:session.id,priceCents,currency:data.currency,discountPercent:discount};
+  });
+
+export const confirmStripeCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
+  .validator(z.object({sessionId:z.string().min(10).max(255)}))
+  .handler(async({data,context})=>{
+    const session=await stripeApi("checkout/sessions/"+encodeURIComponent(data.sessionId)+"?expand%5B%5D=subscription");
+    const user=context.user;
+    if(session.client_reference_id!==user.id||session.metadata?.user_id!==user.id)throw Object.assign(new Error("This checkout session does not belong to your account."),{status:403,code:"CHECKOUT_OWNER_MISMATCH"});
+    if(session.mode!=="subscription"||session.status!=="complete"||session.payment_status!=="paid")throw Object.assign(new Error("Stripe has not confirmed a completed membership payment."),{status:409,code:"CHECKOUT_NOT_PAID"});
+    let stripeSubscription=session.subscription;
+    if(typeof stripeSubscription==="string")stripeSubscription=await stripeApi("subscriptions/"+encodeURIComponent(stripeSubscription));
+    if(!stripeSubscription?.id)throw new Error("Stripe did not return the subscription record.");
+    const status=stripeLocalStatus(stripeSubscription.status);
+    if(status!=="active"&&status!=="trialing")throw Object.assign(new Error("The Stripe subscription is not active yet."),{status:409,code:"SUBSCRIPTION_NOT_ACTIVE"});
+    const tierCode=session.metadata?.tier_code;
+    if(!["starter","pro","premium"].includes(tierCode))throw new Error("The checkout metadata does not contain a valid membership tier.");
+    const currency=(session.currency||session.metadata?.currency||"usd").toUpperCase();
+    const priceCents=Number(session.metadata?.monthly_price_cents||stripeSubscription.items?.data?.[0]?.price?.unit_amount||0);
+    const customerId=typeof session.customer==="string"?session.customer:session.customer?.id;
+    const startedAt=stripeSubscription.current_period_start?new Date(stripeSubscription.current_period_start*1000).toISOString():new Date().toISOString();
+    const db=context.getBase44().asServiceRole.entities;
+    const rows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
+    const payload={user_id:user.id,tier_code:tierCode,status,currency,started_at:startedAt,streak_months:0,loyalty_discount_percent:Number(session.metadata?.discount_percent||0),current_monthly_price_cents:priceCents,stripe_customer_id:customerId,stripe_subscription_id:stripeSubscription.id,voluntary_cancelled:false};
+    if(rows[0])await db.UserSubscription.update(rows[0].id,payload);else await db.UserSubscription.create(payload);
+    return {success:true,tierCode,status,currency,priceCents,startedAt};
+  });
+
+export const createStripePortalSession = createServerFn({method:"POST"}).middleware([requireUser])
+  .handler(async({context})=>{
+    const rows=await context.getBase44().asServiceRole.entities.UserSubscription.filter({user_id:context.user.id},"-created_date",1,0);
+    const customerId=rows[0]?.stripe_customer_id;
+    if(!customerId)throw Object.assign(new Error("No Stripe billing customer is linked to this account yet."),{status:404,code:"STRIPE_CUSTOMER_NOT_FOUND"});
+    const form=new URLSearchParams();form.set("customer",customerId);form.set("return_url",STRIPE_SITE_URL+"/dashboard");
+    const portal=await stripeApi("billing_portal/sessions","POST",form);
+    return {url:portal.url};
+  });
+
+export const refreshMySubscription = createServerFn({method:"POST"}).middleware([requireUser])
+  .handler(async({context})=>{
+    const db=context.getBase44().asServiceRole.entities;
+    const rows=await db.UserSubscription.filter({user_id:context.user.id},"-created_date",1,0);
+    const local=rows[0];
+    if(!local?.stripe_subscription_id||!secrets.get("STRIPE_SECRET_KEY"))return {status:local?.status||"inactive",synced:false};
+    const stripeSub=await stripeApi("subscriptions/"+encodeURIComponent(local.stripe_subscription_id));
+    const status=stripeLocalStatus(stripeSub.status);
+    const cancelled=!!stripeSub.cancel_at_period_end||stripeSub.status==="canceled";
+    await db.UserSubscription.update(local.id,{
+      status,
+      voluntary_cancelled:cancelled,
+      ...(stripeSub.current_period_start?{started_at:new Date(stripeSub.current_period_start*1000).toISOString()}:{}),
+      ...(stripeSub.items?.data?.[0]?.price?.unit_amount?{current_monthly_price_cents:stripeSub.items.data[0].price.unit_amount}:{}),
+      ...(stripeSub.cancel_at?{cancelled_at:new Date(stripeSub.cancel_at*1000).toISOString()}:{}),
+    });
+    return {status,synced:true};
+  });
 
 export const getAdminMarketplaceListings = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.MarketplaceListing.list("-created_date",200,0);});
 export const setMarketplaceListingStatus = createServerFn({method:"POST"}).middleware([requireUser])
