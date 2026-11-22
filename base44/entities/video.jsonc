@@ -13,14 +13,10 @@
     },
     "category": {
       "type": "string",
-      "enum": [
-        "Cinematics",
-        "Gameplay",
-        "Edit packs",
-        "Tutorials",
-        "Other"
-      ]
+      "enum": ["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]
     },
+    "language": { "type": "string", "enum": ["en", "fr", "es", "pt", "it", "de"], "default": "en" },
+    "is_featured": { "type": "boolean", "default": false },
     "tags": {
       "type": "array",
       "items": {

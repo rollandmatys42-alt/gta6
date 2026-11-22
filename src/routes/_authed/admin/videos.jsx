@@ -26,6 +26,8 @@ function AdminVideosPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Gameplay");
+  const [language, setLanguage] = useState("en");
+  const [isFeatured, setIsFeatured] = useState(false);
   const [creatorName, setCreatorName] = useState("");
   const [sourceReference, setSourceReference] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -58,7 +60,7 @@ function AdminVideosPage() {
       const watermarkedStorageKey = await uploadAsset(watermarkedFile, "watermarked");
       setMessage("3/3 — Saving video metadata…");
       const video = await createVideoRecord({ data: {
-        title, description, category, creatorName,
+        title, description, category, language, isFeatured, creatorName,
         ...(thumbnailUrl.trim() ? { thumbnailUrl: thumbnailUrl.trim() } : {}),
         ...(sourceReference.trim() ? { sourceReference: sourceReference.trim() } : {}),
         ...(durationSeconds ? { durationSeconds: Number(durationSeconds) } : {}),
@@ -70,7 +72,7 @@ function AdminVideosPage() {
       } else {
         setMessage("Video uploaded as a draft. Verify its rights before publishing.");
       }
-      setTitle(""); setDescription(""); setCreatorName(""); setSourceReference(""); setThumbnailUrl("");
+      setTitle(""); setDescription(""); setCreatorName(""); setSourceReference(""); setThumbnailUrl(""); setLanguage("en"); setIsFeatured(false);
       setDurationSeconds(""); setLicenseVerified(false); setOriginalFile(null); setWatermarkedFile(null);
       event.target.reset();
     } catch (err) {
@@ -96,14 +98,16 @@ function AdminVideosPage() {
           <label>Video title<input required minLength={2} maxLength={140} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Vice City night drive" /></label>
           <label>Description<textarea maxLength={3000} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe the footage and permitted use." /></label>
           <div className="admin-form-row">
-            <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option>Gameplay</option><option>Cinematics</option><option>Edit packs</option><option>Tutorials</option><option>Other</option></select></label>
-            <label>Creator / source name<input maxLength={80} value={creatorName} onChange={(e) => setCreatorName(e.target.value)} placeholder="Creator name" /></label>
+            <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{["Gameplay","Cinematics","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"].map(x=><option key={x}>{x}</option>)}</select></label>
+            <label>Video language<select value={language} onChange={(e) => setLanguage(e.target.value)}><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="pt">Português</option><option value="it">Italiano</option><option value="de">Deutsch</option></select></label>
           </div>
           <div className="admin-form-row">
             <label>Duration (seconds)<input type="number" min="0" max="86400" value={durationSeconds} onChange={(e) => setDurationSeconds(e.target.value)} placeholder="Optional" /></label>
             <label>Thumbnail URL<input type="url" value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} placeholder="https://…" /></label>
           </div>
+          <label>Creator / source name<input maxLength={80} value={creatorName} onChange={(e) => setCreatorName(e.target.value)} placeholder="Creator name" /></label>
           <label>Rights / source reference<input type="url" value={sourceReference} onChange={(e) => setSourceReference(e.target.value)} placeholder="https://…" /></label>
+          <label className="license-check"><input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} /> Feature as “Video of the Moment”</label>
           <div className="admin-form-row upload-pair">
             <label>Original video (.mp4 / .mov)<input required type="file" accept="video/mp4,video/quicktime" onChange={(e) => setOriginalFile(e.target.files?.[0] || null)} /><small>{originalFile?.name || "Private clean master"}</small></label>
             <label>Watermarked video (.mp4 / .mov)<input required type="file" accept="video/mp4,video/quicktime" onChange={(e) => setWatermarkedFile(e.target.files?.[0] || null)} /><small>{watermarkedFile?.name || "Private Free-tier rendition"}</small></label>
