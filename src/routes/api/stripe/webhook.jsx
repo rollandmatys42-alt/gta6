@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { secrets } from "base44:runtime";
+import { priceForMonth } from "@/lib/loyalty";
 
 const encoder = new TextEncoder();
 const hex = bytes => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, "0")).join("");
@@ -45,9 +46,11 @@ async function applyLoyaltyRenewal(db, stripeSub) {
   const plans = await db.SubscriptionPlan.filter({ tier_code: local.tier_code, currency: local.currency, status: "active" }, "-created_date", 1, 0);
   const plan = plans[0];
   if (!plan) return;
-  const streakMonths = Number(local.streak_months || 0) + 1;
-  const discount = Math.min(Number(plan.loyalty_max_discount_percent || 0), streakMonths * Number(plan.loyalty_monthly_discount_percent || 0));
-  const nextPrice = Math.max(Number(plan.loyalty_floor_price_cents || 0), Math.round(Number(plan.monthly_price_cents || 0) * (1 - discount / 100)));
+  // Paid months are counted from the ledger (idempotent per invoice); a new subscription after a cancellation starts again at 0.
+  const paid = await db.PaymentLedgerEntry.filter({ stripe_subscription_id: stripeSub.id, status: "paid" }, "-created_date", 500, 0);
+  const streakMonths = paid.filter(r => Number(r.amount_paid_cents || 0) > 0).length;
+  const discount = 0;
+  const nextPrice = priceForMonth(plan, streakMonths + 1);
   if (nextPrice <= 0) return;
   const item = stripeSub.items?.data?.[0];
   if (item?.id && item?.price?.product && Number(item.price.unit_amount) !== nextPrice) {
@@ -157,9 +160,9 @@ export const Route = createFileRoute("/api/stripe/webhook")({
             if (subscriptionId) {
               const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
               await saveStripeSubscription(db, stripeSub);
+              await saveInvoiceLedger(db, object, event.type === "invoice.paid" ? "paid" : "failed", event.id);
               if (event.type === "invoice.paid") await applyLoyaltyRenewal(db, stripeSub);
-            }
-            await saveInvoiceLedger(db, object, event.type === "invoice.paid" ? "paid" : "failed", event.id);
+            } else await saveInvoiceLedger(db, object, event.type === "invoice.paid" ? "paid" : "failed", event.id);
           } else if (event.type === "charge.refunded" && object.invoice) {
             const invoiceId = typeof object.invoice === "string" ? object.invoice : object.invoice.id;
             const rows = await db.PaymentLedgerEntry.filter({ stripe_invoice_id: invoiceId }, "-created_date", 1, 0);
