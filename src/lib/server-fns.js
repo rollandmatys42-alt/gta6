@@ -1371,7 +1371,9 @@ async function publishSocialPostForUser(context, postId) {
       externalId = published.data?.id || "";
     }
     const finalStatus = post.platform === "TikTok" ? "publishing" : "published";
-    const postPatch = { status: finalStatus, external_post_id: externalId, error_message: "" };\n    if (finalStatus === "published") postPatch.published_at = new Date().toISOString();\n    const updated = await db.SocialPost.update(post.id, postPatch);
+    const postPatch = { status: finalStatus, external_post_id: externalId, error_message: "" };
+    if (finalStatus === "published") postPatch.published_at = new Date().toISOString();
+    const updated = await db.SocialPost.update(post.id, postPatch);
     await db.SocialAccount.update(account.id, { last_used_at: new Date().toISOString(), last_error: "" });
     return { success: true, status: updated.status, externalPostId: externalId, message: finalStatus === "publishing" ? "TikTok accepted the video. Processing and moderation continue on TikTok." : "Published successfully." };
   } catch (error) {
