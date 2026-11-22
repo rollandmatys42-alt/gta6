@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
+import "@/styles/video-library.css";
 import { getVideoPreviewUrl, listPublishedVideosPage, requestVideoDownload } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale } from "@/lib/i18n";
