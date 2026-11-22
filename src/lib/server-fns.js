@@ -527,6 +527,19 @@ export const saveSitePage = createServerFn({method:"POST"}).middleware([requireU
   return data.id?db.update(data.id,p):db.create(p);
  });
 
+export const getAdminSubscribers = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);const base44=context.getBase44();const db=base44.asServiceRole.entities;const monthKey=new Date().toISOString().slice(0,7);
+ const [users,subscriptions,quotas]=await Promise.all([base44.asServiceRole.users.list().catch(()=>[]),db.UserSubscription.list("-created_date",5000,0),db.DownloadQuota.filter({month_key:monthKey},"-created_date",5000,0)]);
+ const latestByUser=new Map();for(const sub of subscriptions){if(!latestByUser.has(sub.user_id))latestByUser.set(sub.user_id,sub);}
+ const quotaByUser=new Map();for(const quota of quotas){if(!quotaByUser.has(quota.user_id))quotaByUser.set(quota.user_id,quota);}
+ return users.map(user=>({id:user.id,email:user.email||"",full_name:user.full_name||"",role:user.role||"user",created_date:user.created_date||null,display_name:user.display_name||"",account_type:user.account_type||"viewer",subscription_tier:user.subscription_tier||"free",subscription_status:user.subscription_status||"inactive",subscription_currency:user.subscription_currency||"",subscription:latestByUser.get(user.id)||null,quota:quotaByUser.get(user.id)||null})).sort((a,b)=>String(b.created_date||"").localeCompare(String(a.created_date||"")));
+});
+export const getAdminFinanceSnapshot = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);const db=context.getBase44().asServiceRole.entities;const [subscriptions,plans]=await Promise.all([db.UserSubscription.list("-created_date",5000,0),db.SubscriptionPlan.list("sort_order",500,0)]);
+ const active=subscriptions.filter(s=>s.status==="active"||s.status==="trialing"||(s.status==="past_due"&&s.grace_period_ends_at&&new Date(s.grace_period_ends_at)>new Date()));const currencies=["GBP","EUR","USD"].map(currency=>{const rows=active.filter(s=>s.currency===currency);return {currency,subscriptions:rows.length,mrrCents:rows.reduce((sum,s)=>sum+Math.max(0,Number(s.current_monthly_price_cents)||0),0)};});
+ const total=currencies.reduce((sum,x)=>sum+x.mrrCents,0);return {activeSubscriptions:active.length,plansCount:plans.length,byCurrency:currencies,mrrLabel:total?currencies.filter(x=>x.mrrCents>0).map(x=>new Intl.NumberFormat("en-GB",{style:"currency",currency:x.currency}).format(x.mrrCents/100)).join(" + "):"0",stripeConfigured:Boolean(secrets.get("STRIPE_SECRET_KEY")),stripeWebhookConfigured:Boolean(secrets.get("STRIPE_WEBHOOK_SECRET")),accountingRevenueAvailable:false};
+});
+
 export const getAdminOverview = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
  const [users,news,products,reports,downloads,videos,subscriptions]=await Promise.all([
