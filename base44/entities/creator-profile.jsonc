@@ -1,0 +1,101 @@
+{
+  "name": "CreatorProfile",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 80
+    },
+    "bio": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "avatar_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "banner_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "website_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "location_label": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "social_links": {
+      "type": "object"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_review",
+        "published",
+        "hidden"
+      ],
+      "default": "draft"
+    }
+  },
+  "required": [
+    "user_id",
+    "display_name",
+    "bio",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.status": "published"
+        },
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": false,
+    "update": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
