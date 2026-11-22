@@ -167,6 +167,11 @@ async function publish(post: any, account: any, token: string, mediaUrl: string)
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    // This worker processes the entire platform queue, so only an authenticated app administrator may invoke it.
+    const caller = await base44.auth.me();
+    if (!caller || caller.role !== "admin") {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
     const db = base44.asServiceRole.entities;
     const now = new Date().toISOString();
     const due = await db.SocialPost.filter({ status: "scheduled", scheduled_at: { $lte: now } }, "scheduled_at", 25, 0);
