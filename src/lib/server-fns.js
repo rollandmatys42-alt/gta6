@@ -700,6 +700,206 @@ export const saveSocialPost = createServerFn({method:"POST"}).middleware([requir
 export const deleteSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({postId:z.string().min(1)}))
  .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const post=await db.get(data.postId).catch(()=>null);if(!post||post.user_id!==context.user.id)throw Object.assign(new Error("You can only delete your own social drafts."),{status:403});await db.delete(post.id);return {success:true};});
+
+async function requireCleanSocialEntitlement(db, userId) {
+  const rows = await db.UserSubscription.filter({ user_id: userId }, "-created_date", 1, 0);
+  const subscription = rows[0];
+  const active = subscription?.status === "active" || (subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date());
+  if (!active) throw Object.assign(new Error("Direct social publishing requires an active paid membership with clean-download rights."), { status: 403, code: "CLEAN_SOCIAL_ENTITLEMENT_REQUIRED" });
+  const plans = await db.SubscriptionPlan.filter({ tier_code: subscription.tier_code, status: "active" }, "-created_date", 1, 0);
+  if (!plans[0]?.clean_downloads) throw Object.assign(new Error("Your current membership does not include clean video files for direct social publishing."), { status: 403, code: "CLEAN_SOCIAL_ENTITLEMENT_REQUIRED" });
+  return plans[0];
+}
+async function requirePublishableVideo(db, videoId) {
+  const video = await db.Video.get(videoId).catch(() => null);
+  if (!video || video.status !== "published" || video.license_status !== "verified" || !video.rights_evidence_reference) throw Object.assign(new Error("This video is not approved for commercial social publishing."), { status: 403, code: "VIDEO_RIGHTS_NOT_VERIFIED" });
+  if (!video.storage_key || !Number(video.file_size_bytes) || !["video/mp4", "video/quicktime"].includes(video.mime_type)) throw Object.assign(new Error("This video is missing its original MP4/MOV file metadata. Ask the administrator to re-ingest it."), { status: 409, code: "VIDEO_FILE_METADATA_MISSING" });
+  return video;
+}
+export const getMySocialConnections = createServerFn({ method: "GET" }).middleware([requireUser]).handler(async ({ context }) => {
+  const rows = await context.getBase44().asServiceRole.entities.SocialConnection.filter({ user_id: context.user.id }, "-created_date", 10, 0);
+  return rows.map(row => ({ provider: row.provider, providerUserId: row.provider_user_id, accountName: row.account_name, status: row.status, connectedAt: row.connected_at, expiresAt: row.expires_at, scopes: row.scopes || [] }));
+});
+export const startSocialOAuth = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ provider: z.enum(["TikTok", "Instagram"]) }))
+  .handler(async ({ data, context }) => {
+    const state = await createSocialState(context.user.id, data.provider);
+    const url = new URL(data.provider === "TikTok" ? "https://www.tiktok.com/v2/auth/authorize/" : "https://www.instagram.com/oauth/authorize");
+    if (data.provider === "TikTok") {
+      const clientKey = secrets.get("TIKTOK_CLIENT_KEY");
+      if (!clientKey || !secrets.get("TIKTOK_CLIENT_SECRET")) throw Object.assign(new Error("TikTok app credentials are not configured."), { status: 503, code: "TIKTOK_APP_NOT_CONFIGURED" });
+      url.searchParams.set("client_key", clientKey);
+      url.searchParams.set("scope", "user.info.basic,video.publish");
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      url.searchParams.set("state", state);
+    } else {
+      const clientId = secrets.get("META_APP_ID");
+      if (!clientId || !secrets.get("META_APP_SECRET")) throw Object.assign(new Error("Instagram app credentials are not configured."), { status: 503, code: "INSTAGRAM_APP_NOT_CONFIGURED" });
+      url.searchParams.set("client_id", clientId);
+      url.searchParams.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("scope", "instagram_business_basic,instagram_business_content_publish");
+      url.searchParams.set("state", state);
+      url.searchParams.set("enable_fb_login", "0");
+    }
+    return { url: url.toString(), provider: data.provider };
+  });
+export const completeSocialOAuth = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ provider: z.enum(["TikTok", "Instagram"]), code: z.string().min(1), state: z.string().min(20) }))
+  .handler(async ({ data, context }) => {
+    await verifySocialState(data.state, context.user.id, data.provider);
+    const db = context.getBase44().asServiceRole.entities;
+    let connection;
+    if (data.provider === "TikTok") {
+      const form = new URLSearchParams();
+      form.set("client_key", secrets.get("TIKTOK_CLIENT_KEY") || "");
+      form.set("client_secret", secrets.get("TIKTOK_CLIENT_SECRET") || "");
+      form.set("code", data.code);
+      form.set("grant_type", "authorization_code");
+      form.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      const tokenPayload = await socialFetchJson("https://open.tiktokapis.com/v2/oauth/token/", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+      const token = tokenPayload.data || tokenPayload;
+      const info = await socialFetchJson("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url", { headers: { Authorization: "Bearer " + token.access_token } });
+      const userInfo = info.data?.user || info.user || {};
+      connection = await saveSocialConnection(db, context.user.id, {
+        provider: "TikTok", providerUserId: token.open_id || userInfo.open_id, accountName: userInfo.display_name || "TikTok creator",
+        accessToken: token.access_token, refreshToken: token.refresh_token,
+        expiresAt: token.expires_in ? new Date(Date.now() + token.expires_in * 1000).toISOString() : null,
+        refreshExpiresAt: token.refresh_expires_in ? new Date(Date.now() + token.refresh_expires_in * 1000).toISOString() : null,
+        scopes: String(token.scope || "user.info.basic,video.publish").split(","),
+      });
+    } else {
+      const form = new URLSearchParams();
+      form.set("client_id", secrets.get("META_APP_ID") || "");
+      form.set("client_secret", secrets.get("META_APP_SECRET") || "");
+      form.set("grant_type", "authorization_code");
+      form.set("redirect_uri", SOCIAL_CALLBACK_URL);
+      form.set("code", data.code);
+      const shortToken = await socialFetchJson("https://api.instagram.com/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+      const longToken = await socialFetchJson("https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=" + encodeURIComponent(secrets.get("META_APP_SECRET") || "") + "&access_token=" + encodeURIComponent(shortToken.access_token));
+      const accessToken = longToken.access_token || shortToken.access_token;
+      const info = await socialFetchJson("https://graph.instagram.com/me?fields=user_id,username&access_token=" + encodeURIComponent(accessToken));
+      connection = await saveSocialConnection(db, context.user.id, {
+        provider: "Instagram", providerUserId: String(info.user_id || info.id), accountName: info.username || "Instagram creator",
+        accessToken, expiresAt: longToken.expires_in ? new Date(Date.now() + longToken.expires_in * 1000).toISOString() : null,
+        scopes: ["instagram_business_basic", "instagram_business_content_publish"],
+      });
+    }
+    return { success: true, provider: data.provider, accountName: connection.account_name };
+  });
+export const disconnectSocialAccount = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ provider: z.enum(["TikTok", "Instagram"]) }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const row = await getSocialConnectionRow(db, context.user.id, data.provider);
+    if (!row) return { success: true };
+    try {
+      const token = await decryptSocialToken(row.access_token_ciphertext);
+      if (data.provider === "TikTok") {
+        const form = new URLSearchParams({ client_key: secrets.get("TIKTOK_CLIENT_KEY") || "", client_secret: secrets.get("TIKTOK_CLIENT_SECRET") || "", token });
+        await fetch("https://open.tiktokapis.com/v2/oauth/revoke/", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+      } else {
+        await fetch("https://graph.instagram.com/me/permissions?access_token=" + encodeURIComponent(token), { method: "DELETE" });
+      }
+    } catch {}
+    await db.SocialConnection.delete(row.id);
+    return { success: true };
+  });
+export const getTikTokCreatorInfo = createServerFn({ method: "POST" }).middleware([requireUser]).handler(async ({ context }) => {
+  const { accessToken } = await getValidSocialToken(context.getBase44().asServiceRole.entities, context.user.id, "TikTok");
+  const result = await socialFetchJson("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", { method: "POST", headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" }, body: "{}" });
+  const data = result.data || {};
+  return { privacyOptions: data.privacy_level_options || [], maxVideoDurationSeconds: data.max_video_post_duration_sec || null, commentDisabled: !!data.comment_disabled, duetDisabled: !!data.duet_disabled, stitchDisabled: !!data.stitch_disabled };
+});
+export const prepareTikTokDirectPost = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ postId: z.string().min(1), privacyLevel: z.string().min(1), disableComment: z.boolean().default(false), disableDuet: z.boolean().default(false), disableStitch: z.boolean().default(false) }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const post = await db.SocialPost.get(data.postId).catch(() => null);
+    if (!post || post.user_id !== context.user.id || post.platform !== "TikTok" || post.status !== "draft" || !post.video_id) throw Object.assign(new Error("Select one of your TikTok drafts with a video attached."), { status: 400, code: "INVALID_SOCIAL_DRAFT" });
+    await requireCleanSocialEntitlement(db, context.user.id);
+    const video = await requirePublishableVideo(db, post.video_id);
+    const { accessToken } = await getValidSocialToken(db, context.user.id, "TikTok");
+    const creatorInfo = await socialFetchJson("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", { method: "POST", headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" }, body: "{}" });
+    const info = creatorInfo.data || {};
+    if (!(info.privacy_level_options || []).includes(data.privacyLevel)) throw Object.assign(new Error("Choose a privacy setting allowed by your TikTok account."), { status: 400, code: "TIKTOK_PRIVACY_NOT_ALLOWED" });
+    if (info.max_video_post_duration_sec && Number(video.duration_seconds || 0) > info.max_video_post_duration_sec) throw Object.assign(new Error("This video is longer than your TikTok account's current publishing limit."), { status: 400, code: "TIKTOK_VIDEO_TOO_LONG" });
+    const fileSize = Number(video.file_size_bytes);
+    if (fileSize > 4000000000) throw Object.assign(new Error("TikTok direct upload supports files up to 4 GB."), { status: 400, code: "TIKTOK_FILE_TOO_LARGE" });
+    const chunkSize = fileSize <= 5 * 1024 * 1024 ? fileSize : 5 * 1024 * 1024;
+    const totalChunks = Math.ceil(fileSize / chunkSize);
+    const payload = await socialFetchJson("https://open.tiktokapis.com/v2/post/publish/video/init/", {
+      method: "POST", headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ post_info: { title: post.caption.slice(0, 2200), privacy_level: data.privacyLevel, disable_comment: data.disableComment, disable_duet: data.disableDuet, disable_stitch: data.disableStitch, is_aigc: false }, source_info: { source: "FILE_UPLOAD", video_size: fileSize, chunk_size: chunkSize, total_chunk_count: totalChunks } }),
+    });
+    const result = payload.data || payload;
+    if (!result.upload_url || !result.publish_id) throw new Error("TikTok did not return an upload session.");
+    const downloadUrl = await presignR2({ method: "GET", objectKey: video.storage_key, expiresIn: 3600 });
+    await db.SocialPost.update(post.id, { status: "scheduled", external_post_id: result.publish_id, privacy_level: data.privacyLevel, error_message: "" });
+    return { publishId: result.publish_id, uploadUrl: result.upload_url, downloadUrl, fileSize, chunkSize, totalChunks, mimeType: video.mime_type };
+  });
+export const finalizeTikTokDirectPost = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ postId: z.string().min(1) }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const post = await db.SocialPost.get(data.postId).catch(() => null);
+    if (!post || post.user_id !== context.user.id || post.platform !== "TikTok" || !post.external_post_id) throw Object.assign(new Error("TikTok publishing session not found."), { status: 404 });
+    if (post.status === "published") return { status: "published", postId: post.external_post_id };
+    const { accessToken } = await getValidSocialToken(db, context.user.id, "TikTok");
+    const result = await socialFetchJson("https://open.tiktokapis.com/v2/post/publish/status/fetch/", { method: "POST", headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ publish_id: post.external_post_id }) });
+    const dataResult = result.data || {};
+    const state = dataResult.status || "PROCESSING";
+    if (state === "PUBLISH_COMPLETE") {
+      await db.SocialPost.update(post.id, { status: "published", published_at: new Date().toISOString(), error_message: "" });
+      return { status: "published", postId: dataResult.publicaly_post_id || dataResult.publicly_post_id || post.external_post_id };
+    }
+    if (state === "FAILED") {
+      const message = dataResult.fail_reason || "TikTok could not publish this video.";
+      await db.SocialPost.update(post.id, { status: "failed", error_message: String(message).slice(0, 500) });
+      return { status: "failed", error: message };
+    }
+    return { status: "processing", providerStatus: state };
+  });
+export const publishInstagramReel = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ postId: z.string().min(1) }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const post = await db.SocialPost.get(data.postId).catch(() => null);
+    if (!post || post.user_id !== context.user.id || post.platform !== "Instagram" || post.status !== "draft" || !post.video_id) throw Object.assign(new Error("Select one of your Instagram drafts with a video attached."), { status: 400, code: "INVALID_SOCIAL_DRAFT" });
+    await requireCleanSocialEntitlement(db, context.user.id);
+    const video = await requirePublishableVideo(db, post.video_id);
+    const { connection, accessToken } = await getValidSocialToken(db, context.user.id, "Instagram");
+    const graphVersion = secrets.get("META_GRAPH_API_VERSION") || "v25.0";
+    const videoUrl = await presignR2({ method: "GET", objectKey: video.storage_key, expiresIn: 3600 });
+    const form = new URLSearchParams({ media_type: "REELS", video_url: videoUrl, caption: post.caption.slice(0, 2200), share_to_feed: "true", access_token: accessToken });
+    const container = await socialFetchJson("https://graph.instagram.com/" + graphVersion + "/" + encodeURIComponent(connection.provider_user_id) + "/media", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+    if (!container.id) throw new Error("Instagram did not return a Reel container ID.");
+    await db.SocialPost.update(post.id, { status: "scheduled", external_post_id: container.id, privacy_level: "REELS", error_message: "" });
+    return { status: "processing", containerId: container.id };
+  });
+export const finalizeInstagramReelPublish = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ postId: z.string().min(1) }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const post = await db.SocialPost.get(data.postId).catch(() => null);
+    if (!post || post.user_id !== context.user.id || post.platform !== "Instagram" || !post.external_post_id) throw Object.assign(new Error("Instagram publishing session not found."), { status: 404 });
+    if (post.status === "published") return { status: "published", postId: post.external_post_id };
+    const { connection, accessToken } = await getValidSocialToken(db, context.user.id, "Instagram");
+    const graphVersion = secrets.get("META_GRAPH_API_VERSION") || "v25.0";
+    const status = await socialFetchJson("https://graph.instagram.com/" + graphVersion + "/" + encodeURIComponent(post.external_post_id) + "?fields=status_code,status&access_token=" + encodeURIComponent(accessToken));
+    if (status.status_code === "ERROR") {
+      const message = status.status || "Instagram could not process this Reel.";
+      await db.SocialPost.update(post.id, { status: "failed", error_message: String(message).slice(0, 500) });
+      return { status: "failed", error: message };
+    }
+    if (status.status_code !== "FINISHED") return { status: "processing", providerStatus: status.status_code || "IN_PROGRESS" };
+    const form = new URLSearchParams({ creation_id: post.external_post_id, access_token: accessToken });
+    const published = await socialFetchJson("https://graph.instagram.com/" + graphVersion + "/" + encodeURIComponent(connection.provider_user_id) + "/media_publish", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+    await db.SocialPost.update(post.id, { status: "published", published_at: new Date().toISOString(), external_post_id: published.id || post.external_post_id, error_message: "" });
+    return { status: "published", postId: published.id || post.external_post_id };
+  });
+
 export const getMyMarketplaceInquiries = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  const db=context.getBase44().asServiceRole.entities;const [buyer,seller]=await Promise.all([db.MarketplaceInquiry.filter({buyer_id:context.user.id},"-created_date",50,0),db.MarketplaceInquiry.filter({seller_id:context.user.id},"-created_date",50,0)]);return {buyer,seller};
 });
