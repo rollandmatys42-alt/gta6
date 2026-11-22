@@ -1,0 +1,75 @@
+{
+  "name": "ForumPost",
+  "type": "object",
+  "properties": {
+    "thread_id": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000
+    },
+    "author_id": {
+      "type": "string"
+    },
+    "author_name": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "published",
+        "hidden"
+      ],
+      "default": "published"
+    }
+  },
+  "required": [
+    "thread_id",
+    "body",
+    "author_id",
+    "author_name",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.status": "published"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "data.author_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.author_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
