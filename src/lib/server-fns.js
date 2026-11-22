@@ -105,6 +105,21 @@ export const listPublishedVideos = createServerFn({ method: "GET" }).handler(asy
   return rows;
 });
 
+export const getVideoPreviewUrl = createServerFn({ method: "GET" })
+  .validator(z.object({ videoId: z.string().min(1).max(128) }))
+  .handler(async ({ data, context }) => {
+    const base44 = context.getBase44();
+    const video = await base44.asServiceRole.entities.Video.get(data.videoId).catch(() => null);
+    if (!video || video.status !== "published" || video.license_status !== "verified") {
+      throw Object.assign(new Error("This video is not available for preview."), { status: 404, code: "VIDEO_NOT_AVAILABLE" });
+    }
+    if (!video.watermarked_storage_key || !video.watermarked_storage_key.startsWith("videos/watermarked/")) {
+      throw Object.assign(new Error("The protected preview is not ready yet."), { status: 409, code: "PREVIEW_NOT_READY" });
+    }
+    const previewUrl = await presignR2({ method: "GET", objectKey: video.watermarked_storage_key, expiresIn: 180 });
+    return { previewUrl, expiresInSeconds: 180, watermarkApplied: true };
+  });
+
 export const requestVideoDownload = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({ videoId: z.string().min(1).max(128) }))
