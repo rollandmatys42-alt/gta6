@@ -223,7 +223,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
     const base44 = context.getBase44();
     const user = context.user;
     const video = await base44.asServiceRole.entities.Video.get(data.videoId).catch(() => null);
-    if (!video || video.status !== "published" || video.license_status !== "verified") {
+    if (!video || video.status !== "published" || video.license_status !== "verified" || !video.source_reference || !video.rights_evidence_reference) {
       throw Object.assign(new Error("This video is not available for download."), { status: 404, code: "VIDEO_NOT_AVAILABLE" });
     }
 
