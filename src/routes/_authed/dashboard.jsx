@@ -50,7 +50,7 @@ function DashboardPage() {
               {account.tier === "free" && <small>Free membership includes five downloads per UTC calendar month.</small>}
             </article>
           </div>
-          {user?.role === "admin" && <div className="admin-shortcut"><div><b>CONTENT ADMINISTRATION</b><small>Upload licensed footage and manage the video catalogue.</small></div><button className="primary-btn" onClick={() => window.location.assign("/admin/videos")}>Manage videos ↗</button></div>}
+          {user?.role === "admin" && <div className="admin-shortcut"><div><b>ADMIN CONTROL ROOM</b><small>Manage news, marketplace, shop, CMS, reports, agents and video content.</small></div><div className="admin-shortcut-actions"><button className="primary-btn" onClick={() => window.location.assign("/admin")}>Open admin ↗</button><button className="outline-btn" onClick={() => window.location.assign("/admin/videos")}>Manage videos</button></div></div>}
           <section className="account-panel history-panel">
             <div className="section-head"><div><div className="eyebrow">RECENT ACTIVITY</div><h2>DOWNLOAD HISTORY</h2></div><button className="outline-btn" onClick={() => window.location.assign("/")}>Browse videos ↗</button></div>
             {account.history?.length ? <div className="history-list">{account.history.map((item) => <div className="history-row" key={item.id}><div><b>Video download</b><small>Video reference: {item.video_id}</small></div><span>{item.watermark_applied ? "Watermarked" : "Clean"} · {item.status}</span><time>{new Date(item.created_date).toLocaleDateString("en-GB")}</time></div>)}</div> : <div className="account-empty">No downloads yet. Your completed downloads will appear here.</div>}

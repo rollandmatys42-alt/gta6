@@ -23,6 +23,14 @@
         "closed"
       ],
       "default": "open"
+    },
+    "seller_reply": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "replied_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [
@@ -48,7 +56,7 @@
         }
       ]
     },
-    "create": {},
+    "create": false,
     "update": {
       "$or": [
         {

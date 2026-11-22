@@ -1,0 +1,51 @@
+{
+  "name": "ForumReaction",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "thread",
+        "post"
+      ]
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "reaction": {
+      "type": "string",
+      "enum": [
+        "like",
+        "insightful",
+        "funny"
+      ],
+      "default": "like"
+    }
+  },
+  "required": [
+    "user_id",
+    "target_type",
+    "target_id",
+    "reaction"
+  ],
+  "rls": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

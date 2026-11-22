@@ -404,8 +404,8 @@ export const saveMarketplaceListing = createServerFn({method:"POST"}).middleware
  .handler(async({data,context})=>{
   const db=context.getBase44().asServiceRole.entities;
   const subs=await db.UserSubscription.filter({user_id:context.user.id},"-created_date",1,0);
-  if(subs[0]?.tier_code!=="premium" || subs[0]?.status!=="active") throw Object.assign(new Error("A Premium membership is required to publish creator listings. You can prepare a draft after Premium billing is enabled."),{status:403,code:"PREMIUM_REQUIRED"});
-  const payload={seller_id:context.user.id,seller_name:context.user.full_name||context.user.email||"Creator",title:data.title,description:data.description,category:data.category,price_cents:data.priceCents,currency:data.currency,license_terms:data.licenseTerms,status:"pending_review",created_by:context.user.id,...(data.previewUrl?{preview_url:data.previewUrl}:{})};
+  const premiumActive=subs[0]?.tier_code==="premium" && subs[0]?.status==="active" && !subs[0]?.voluntary_cancelled;
+  const payload={seller_id:context.user.id,seller_name:context.user.full_name||context.user.email||"Creator",title:data.title,description:data.description,category:data.category,price_cents:data.priceCents,currency:data.currency,license_terms:data.licenseTerms,status:premiumActive?"pending_review":"draft",created_by:context.user.id,...(data.previewUrl?{preview_url:data.previewUrl}:{})};
   return data.id?db.MarketplaceListing.update(data.id,payload):db.MarketplaceListing.create(payload);
  });
 export const createMarketplaceInquiry = createServerFn({method:"POST"}).middleware([requireUser])
@@ -555,4 +555,97 @@ export const getMyPlanQuote = createServerFn({method:"GET"}).middleware([require
   const raw=Math.round(Number(plan.monthly_price_cents||0)*(1-discount/100));
   const price=Math.max(Number(plan.loyalty_floor_price_cents||0),raw);
   return {tierCode:data.tierCode,currency:data.currency,basePriceCents:plan.monthly_price_cents,currentPriceCents:price,streakMonths:streak,discountPercent:discount,floorPriceCents:plan.loyalty_floor_price_cents||0,resetOnVoluntaryCancellation:true};
+ });
+
+export const getAdminMarketplaceListings = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.MarketplaceListing.list("-created_date",200,0);});
+export const setMarketplaceListingStatus = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({listingId:z.string().min(1),status:z.enum(["published","rejected","archived"])}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
+  const listing=await db.MarketplaceListing.get(data.listingId);
+  if(data.status==="published"){
+   const subs=await db.UserSubscription.filter({user_id:listing.seller_id},"-created_date",1,0);
+   if(subs[0]?.tier_code!=="premium"||subs[0]?.status!=="active"||subs[0]?.voluntary_cancelled)throw Object.assign(new Error("Only active Premium creators can have published marketplace listings."),{status:403,code:"PREMIUM_REQUIRED"});
+  }
+  return db.MarketplaceListing.update(listing.id,{status:data.status});
+ });
+
+export const replyMarketplaceInquiry = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({inquiryId:z.string().min(1),reply:z.string().min(2).max(2000)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const inquiry=await db.MarketplaceInquiry.get(data.inquiryId).catch(()=>null);
+  if(!inquiry||inquiry.seller_id!==context.user.id)throw Object.assign(new Error("Only the listing creator can reply to this enquiry."),{status:403});
+  return db.MarketplaceInquiry.update(inquiry.id,{seller_reply:data.reply,status:"replied",replied_at:new Date().toISOString()});
+ });
+
+export const getCreatorDirectory = createServerFn({method:"GET"}).validator(z.object({query:z.string().max(100).optional()})).handler(async({data,context})=>{
+ const rows=await context.getBase44().asServiceRole.entities.CreatorProfile.filter({status:"published"},"-created_date",100,0);
+ const q=(data.query||"").toLowerCase();return rows.filter(x=>!q||x.display_name.toLowerCase().includes(q)||(x.bio||"").toLowerCase().includes(q));
+});
+export const getMyCreatorProfile = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ const rows=await context.getBase44().asServiceRole.entities.CreatorProfile.filter({user_id:context.user.id},"-created_date",1,0);return rows[0]||null;
+});
+export const saveMyCreatorProfile = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),displayName:z.string().min(2).max(80),bio:z.string().max(2000),avatarUrl:z.string().url().or(z.literal("")).optional(),bannerUrl:z.string().url().or(z.literal("")).optional(),websiteUrl:z.string().url().or(z.literal("")).optional(),locationLabel:z.string().max(100).optional(),skills:z.array(z.string().max(40)).max(20)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities.CreatorProfile;
+  const payload={user_id:context.user.id,display_name:data.displayName,bio:data.bio,status:"pending_review",skills:data.skills,...(data.avatarUrl?{avatar_url:data.avatarUrl}:{}),...(data.bannerUrl?{banner_url:data.bannerUrl}:{}),...(data.websiteUrl?{website_url:data.websiteUrl}:{}),...(data.locationLabel?{location_label:data.locationLabel}:{})};
+  if(context.user.role==="admin")payload.status="published";
+  return data.id?db.update(data.id,payload):db.create(payload);
+ });
+export const getAdminCreatorProfiles = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.CreatorProfile.list("-created_date",200,0);});
+export const setCreatorProfileStatus = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({profileId:z.string(),status:z.enum(["published","hidden"])}))
+ .handler(async({data,context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.CreatorProfile.update(data.profileId,{status:data.status});});
+
+export const getMyMessages = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ const db=context.getBase44().asServiceRole.entities;const [inbox,sent]=await Promise.all([db.DirectMessage.filter({recipient_id:context.user.id,status:{$ne:"hidden"}},"-created_date",100,0),db.DirectMessage.filter({sender_id:context.user.id,status:{$ne:"hidden"}},"-created_date",100,0)]);
+ return {inbox,sent};
+});
+export const sendDirectMessage = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({recipientId:z.string().min(1),body:z.string().min(1).max(5000)}))
+ .handler(async({data,context})=>{
+  if(data.recipientId===context.user.id)throw Object.assign(new Error("You cannot message yourself."),{status:400});
+  const db=context.getBase44().asServiceRole.entities;
+  const [blockedBySender,blockedByRecipient]=await Promise.all([db.UserBlock.filter({blocker_id:context.user.id,blocked_id:data.recipientId},"-created_date",1,0),db.UserBlock.filter({blocker_id:data.recipientId,blocked_id:context.user.id},"-created_date",1,0)]);
+  if(blockedBySender.length||blockedByRecipient.length)throw Object.assign(new Error("This message cannot be sent because one user has blocked the other."),{status:403,code:"MESSAGING_BLOCKED"});
+  const message=await db.DirectMessage.create({sender_id:context.user.id,recipient_id:data.recipientId,body:data.body,status:"sent"});
+  await db.UserNotification.create({user_id:data.recipientId,type:"message",title:"New creator message",body:"You have received a new private message.",target_url:"/messages"});
+  return message;
+ });
+export const markMessageRead = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({messageId:z.string()}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities,message=await db.DirectMessage.get(data.messageId);
+  if(message.recipient_id!==context.user.id)throw Object.assign(new Error("You cannot update another user's message."),{status:403});
+  return db.DirectMessage.update(message.id,{status:"seen",read_at:new Date().toISOString()});
+ });
+export const blockCreator = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({userId:z.string().min(1),reason:z.string().max(300).optional()}))
+ .handler(async({data,context})=>{
+  if(data.userId===context.user.id)throw new Error("You cannot block yourself.");
+  const db=context.getBase44().asServiceRole.entities,existing=await db.UserBlock.filter({blocker_id:context.user.id,blocked_id:data.userId},"-created_date",1,0);
+  if(existing.length)return existing[0];return db.UserBlock.create({blocker_id:context.user.id,blocked_id:data.userId,reason:data.reason||""});
+ });
+export const unblockCreator = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({userId:z.string().min(1)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities,rows=await db.UserBlock.filter({blocker_id:context.user.id,blocked_id:data.userId},"-created_date",10,0);
+  for(const row of rows)await db.UserBlock.delete(row.id);return {success:true};
+ });
+export const getMyNotifications = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.UserNotification.filter({user_id:context.user.id},"-created_date",100,0));
+export const markNotificationRead = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({notificationId:z.string()}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities,n=await db.UserNotification.get(data.notificationId);
+  if(n.user_id!==context.user.id)throw Object.assign(new Error("Not your notification."),{status:403});
+  return db.UserNotification.update(n.id,{read_at:new Date().toISOString()});
+ });
+export const toggleForumReaction = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({targetType:z.enum(["thread","post"]),targetId:z.string(),reaction:z.enum(["like","insightful","funny"])}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities,existing=await db.ForumReaction.filter({user_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reaction:data.reaction},"-created_date",1,0);
+  if(existing.length){await db.ForumReaction.delete(existing[0].id);return {active:false};}
+  await db.ForumReaction.create({user_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reaction:data.reaction});return {active:true};
  });
