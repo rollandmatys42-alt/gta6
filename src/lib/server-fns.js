@@ -513,3 +513,19 @@ export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([
  for(const [slug,title,content] of templates){const exists=await db.SitePage.filter({slug,locale:"en"},"created_date",1,0);if(!exists.length){await db.SitePage.create({slug,title,content,locale:"en",status:["about","contact"].includes(slug)?"published":"draft",meta_title:title+" — VICEHUB",meta_description:"VICEHUB platform information",updated_by:context.user.id});pageCount++;}}
  return {categoriesCreated:categoryCount,pagesCreated:pageCount,legalPagesRequireReview:true};
 });
+
+export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({agentId:z.string().min(1),taskInput:z.string().min(5).max(3000)}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
+  const agent=await db.AIAgentConfig.get(data.agentId).catch(()=>null);
+  if(!agent||!agent.enabled)throw Object.assign(new Error("This agent is not enabled."),{status:403});
+  const key=secrets.get("AI_ROUTER_API_KEY");if(!key)throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
+  const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1",model=agent.provider_model||secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
+  const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://gta6-creator-hub-c26cc578.base44.app","X-Title":"VICEHUB Agent"},body:JSON.stringify({model,messages:[{role:"system",content:agent.instructions},{role:"user",content:data.taskInput}],temperature:0.4,max_tokens:1800})});
+  if(!response.ok)throw Object.assign(new Error("AI provider error: HTTP "+response.status),{status:502});
+  const result=await response.json(),output=result.choices?.[0]?.message?.content;if(!output)throw new Error("AI provider returned an empty result.");
+  const saved=await db.AIContentDraft.create({user_id:context.user.id,platform:"General",content_type:agent.agent_key==="seo_agent"?"SEO":agent.agent_key==="geo_agent"?"GEO":agent.agent_key==="social_agent"?"Caption":"Description",topic:data.taskInput,output,status:"draft",provider:model});
+  await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Completed successfully"});
+  return {output,draftId:saved.id,model};
+ });
