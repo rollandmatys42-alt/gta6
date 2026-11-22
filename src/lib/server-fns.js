@@ -219,3 +219,47 @@ export const publishVideo = createServerFn({ method: "POST" })
       status: "published", published_at: new Date().toISOString(),
     });
   });
+
+export const getMyAccount = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .handler(async ({ context }) => {
+    const base44 = context.getBase44();
+    const user = context.user;
+    const subscriptions = await base44.asServiceRole.entities.UserSubscription.filter(
+      { user_id: user.id }, "-created_date", 1, 0,
+    );
+    const subscription = subscriptions[0];
+    const tier = subscription?.status === "active" ? (subscription.tier_code || "free") : "free";
+    let limit = MONTHLY_FREE_LIMIT;
+    let planName = "Free";
+    if (tier !== "free") {
+      const plans = await base44.asServiceRole.entities.SubscriptionPlan.filter(
+        { tier_code: tier, status: "active" }, "-created_date", 1, 0,
+      );
+      if (plans[0]) {
+        limit = Number(plans[0].monthly_download_limit || 0);
+        planName = plans[0].display_name || tier;
+      }
+    }
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const quotas = await base44.asServiceRole.entities.DownloadQuota.filter(
+      { user_id: user.id, month_key: monthKey }, "-created_date", 1, 0,
+    );
+    const used = Number(quotas[0]?.downloads_used || 0);
+    const history = await base44.asServiceRole.entities.DownloadEvent.filter(
+      { user_id: user.id }, "-created_date", 15, 0,
+      ["id", "video_id", "month_key", "tier_code", "watermark_applied", "status", "created_date"],
+    );
+    return {
+      name: user.full_name || user.email || "Creator",
+      email: user.email,
+      tier,
+      planName,
+      subscriptionStatus: subscription?.status || "inactive",
+      currency: subscription?.currency || "USD",
+      downloadsUsed: used,
+      downloadsLimit: limit,
+      downloadsRemaining: Math.max(0, limit - used),
+      history,
+    };
+  });
