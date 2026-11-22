@@ -682,10 +682,12 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     form.set("metadata[tier_code]",data.tierCode);
     form.set("metadata[currency]",data.currency);
     form.set("metadata[monthly_price_cents]",String(priceCents));
+    form.set("metadata[discount_percent]",String(discount));
     form.set("subscription_data[metadata][user_id]",user.id);
     form.set("subscription_data[metadata][tier_code]",data.tierCode);
     form.set("subscription_data[metadata][currency]",data.currency);
     form.set("subscription_data[metadata][monthly_price_cents]",String(priceCents));
+    form.set("subscription_data[metadata][discount_percent]",String(discount));
     form.set("line_items[0][price_data][currency]",data.currency.toLowerCase());
     form.set("line_items[0][price_data][unit_amount]",String(priceCents));
     form.set("line_items[0][price_data][recurring][interval]","month");
