@@ -1058,3 +1058,36 @@ export const translateNewsArticle = createServerFn({method:"POST"}).middleware([
   if(!translated.title||!translated.summary||!translated.body)throw new Error("Translation output is missing required article fields.");
   return db.NewsArticle.create({title:translated.title,slug:article.slug,summary:translated.summary,body:translated.body,source_name:article.source_name,source_url:article.source_url,source_type:article.source_type,confidence:article.confidence,locale:data.targetLocale,status:"draft",tags:translated.tags||article.tags||[],created_by:context.user.id});
  });
+
+
+/**
+ * Paginated public catalogue endpoint.
+ * The client requests small pages instead of loading the entire library.
+ */
+export const listPublishedVideosPage = createServerFn({ method: "GET" })
+  .validator(z.object({
+    category: z.enum(["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]).optional(),
+    language: z.enum(["en", "fr", "es", "pt", "it", "de"]).optional(),
+    offset: z.number().int().min(0).max(100000).default(0),
+    limit: z.number().int().min(1).max(48).default(24),
+  }))
+  .handler(async ({ data, context }) => {
+    const base44 = context.getBase44();
+    const filter = { status: "published", license_status: "verified" };
+    if (data.category) filter.category = data.category;
+    if (data.language) filter.language = data.language;
+    const rows = await base44.asServiceRole.entities.Video.filter(
+      filter,
+      "-published_at",
+      data.limit + 1,
+      data.offset,
+      ["id", "title", "description", "category", "language", "is_featured", "tags", "duration_seconds", "thumbnail_url", "creator_name", "published_at"],
+    );
+    const videos = rows.slice(0, data.limit);
+    return {
+      videos,
+      hasMore: rows.length > data.limit,
+      nextOffset: data.offset + videos.length,
+      pageSize: data.limit,
+    };
+  });
