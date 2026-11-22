@@ -69,7 +69,7 @@ function HomePage() {
     }
   };
   const navigate = (id) => {
-    const routes = { news: "/news", creators: "/community", studio: "/studio", marketplace: "/marketplace", shop: "/shop", social: "/social", pricing: "/#plans" };
+    const routes = { news: "/news", creators: "/creators", studio: "/studio", marketplace: "/marketplace", shop: "/shop", social: "/social", pricing: "/#plans" };
     if (routes[id]) { window.location.assign(routes[id]); return; }
     setActive(id); setNotice("");
     if (id === "library") document.getElementById("library")?.scrollIntoView({ behavior: "smooth" });
