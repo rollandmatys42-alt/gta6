@@ -5,7 +5,7 @@ import "@/styles/social-publishing.css";
 import {
   beginSocialOAuth, completeSocialOAuth, getMySocialAccounts, getMySocialPosts,
   saveSocialPost, deleteSocialPost, disconnectSocialAccount, publishSocialPost,
-  processMyDueSocialPosts,
+  processMyDueSocialPosts, generateStudioDraft,
 } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -47,6 +47,7 @@ function SocialPublishingPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -126,6 +127,16 @@ function SocialPublishingPage() {
       await refresh();
     } catch (err) { setError(err?.message || "Could not disconnect this account."); }
     finally { setBusy(false); }
+  };
+  const generateCaption = async () => {
+    if (caption.trim().length < 5) { setError("Write a short subject or video brief first. OmniRoute will turn it into a platform caption."); return; }
+    setAiBusy(true); setError(""); setNotice("");
+    try {
+      const result = await generateStudioDraft({ data: { platform, contentType: "Caption", topic: caption.trim(), tone: "Energetic", language: "English" } });
+      setCaption(result.output || "");
+      setNotice("Caption generated through OmniRoute. Review and edit it before publishing.");
+    } catch (err) { setError(err?.message || "OmniRoute could not generate this caption."); }
+    finally { setAiBusy(false); }
   };
   const save = async event => {
     event.preventDefault();
@@ -218,7 +229,7 @@ function SocialPublishingPage() {
             <label>DESTINATION ACCOUNT<select required value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">Select your connected account…</option>{accountOptions.map(account => <option value={account.id} key={account.id}>{account.accountName}</option>)}</select></label>
           </div>
           <div className="social-platform-hint">{platformNotes[platform]}</div>
-          <label>CAPTION / DESCRIPTION<textarea required minLength={1} maxLength={5000} rows={5} value={caption} onChange={event => setCaption(event.target.value)} placeholder="Write your caption, hook, call to action and hashtags…" /></label>
+          <label>CAPTION / DESCRIPTION<textarea required minLength={1} maxLength={5000} rows={5} value={caption} onChange={event => setCaption(event.target.value)} placeholder="Write a short brief, then use OmniRoute to generate a platform-ready caption…" /></label><div className="social-ai-row"><button type="button" className="social-secondary" onClick={generateCaption} disabled={aiBusy || busy}>{aiBusy ? "OMNIROUTE IS WRITING…" : "GENERATE / REWRITE WITH OMNIROUTE ✦"}</button><small>AI output is a draft only. Review factual claims and rights before publication.</small></div>
           {platform !== "X" && <label>PUBLIC VIDEO URL (HTTPS)<input required type="url" value={mediaUrl} onChange={event => setMediaUrl(event.target.value)} placeholder="https://your-public-video-host/video.mp4" /><small>The selected network must be able to fetch this URL. Private R2 links and local files are not accepted here.</small></label>}
           <div className="social-form-grid">
             <label>SCHEDULE FOR (OPTIONAL)<input type="datetime-local" min={localDate(new Date(Date.now() + 60000).toISOString())} value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} /><small>Scheduled posts are queued. Run the due queue from this page, or connect a server scheduler before relying on unattended posting.</small></label>
