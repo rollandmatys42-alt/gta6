@@ -25,13 +25,41 @@ function localStatus(status) {
   if (status === "canceled") return "cancelled";
   return "inactive";
 }
-async function stripeGet(path) {
+async function stripeRequest(path, method = "GET", form = null) {
   const key = secrets.get("STRIPE_SECRET_KEY");
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured.");
-  const response = await fetch("https://api.stripe.com/v1/" + path, { headers: { Authorization: "Bearer " + key } });
+  const response = await fetch("https://api.stripe.com/v1/" + path, {
+    method,
+    headers: { Authorization: "Bearer " + key, ...(form ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    ...(form ? { body: form.toString() } : {}),
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body?.error?.message || "Stripe API request failed.");
   return body;
+}
+const stripeGet = path => stripeRequest(path);
+async function applyLoyaltyRenewal(db, stripeSub) {
+  const rows = await db.UserSubscription.filter({ stripe_subscription_id: stripeSub.id }, "-created_date", 1, 0);
+  const local = rows[0];
+  if (!local || local.voluntary_cancelled || stripeSub.cancel_at_period_end || stripeSub.status !== "active") return;
+  const plans = await db.SubscriptionPlan.filter({ tier_code: local.tier_code, currency: local.currency, status: "active" }, "-created_date", 1, 0);
+  const plan = plans[0];
+  if (!plan) return;
+  const streakMonths = Number(local.streak_months || 0) + 1;
+  const discount = Math.min(Number(plan.loyalty_max_discount_percent || 0), streakMonths * Number(plan.loyalty_monthly_discount_percent || 0));
+  const nextPrice = Math.max(Number(plan.loyalty_floor_price_cents || 0), Math.round(Number(plan.monthly_price_cents || 0) * (1 - discount / 100)));
+  if (nextPrice <= 0) return;
+  const item = stripeSub.items?.data?.[0];
+  if (item?.id && item?.price?.product && Number(item.price.unit_amount) !== nextPrice) {
+    const form = new URLSearchParams();
+    form.set("price_data[currency]", String(local.currency || "USD").toLowerCase());
+    form.set("price_data[product]", typeof item.price.product === "string" ? item.price.product : item.price.product.id);
+    form.set("price_data[recurring][interval]", item.price.recurring?.interval || "month");
+    form.set("price_data[unit_amount]", String(nextPrice));
+    form.set("proration_behavior", "none");
+    await stripeRequest("subscription_items/" + encodeURIComponent(item.id), "POST", form);
+  }
+  await db.UserSubscription.update(local.id, { streak_months: streakMonths, loyalty_discount_percent: discount, current_monthly_price_cents: nextPrice });
 }
 async function saveStripeSubscription(db, stripeSub, fallback = {}) {
   const userId = stripeSub.metadata?.user_id || fallback.user_id;
@@ -73,6 +101,8 @@ export const Route = createFileRoute("/api/stripe/webhook")({
         catch { return Response.json({ error: "Invalid event JSON." }, { status: 400 }); }
         try {
           const db = context.getBase44().asServiceRole.entities;
+          const seen = await db.StripeWebhookEvent.filter({ event_id: event.id }, "-created_date", 1, 0);
+          if (seen.length) return Response.json({ received: true, duplicate: true });
           const object = event.data?.object || {};
           if (event.type === "checkout.session.completed" && object.mode === "subscription" && object.subscription) {
             const subscriptionId = typeof object.subscription === "string" ? object.subscription : object.subscription.id;
@@ -87,15 +117,15 @@ export const Route = createFileRoute("/api/stripe/webhook")({
           } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
             await saveStripeSubscription(db, object);
           } else if (event.type === "invoice.payment_failed" || event.type === "invoice.paid") {
-            const subscriptionId = object.subscription || object.parent?.subscription_details?.subscription;
+            let subscriptionId = object.subscription || object.parent?.subscription_details?.subscription;
+            if (typeof subscriptionId === "object") subscriptionId = subscriptionId.id;
             if (subscriptionId) {
-              const rows = await db.UserSubscription.filter({ stripe_subscription_id: subscriptionId }, "-created_date", 1, 0);
-              if (rows[0]) {
-                const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
-                await saveStripeSubscription(db, stripeSub);
-              }
+              const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
+              await saveStripeSubscription(db, stripeSub);
+              if (event.type === "invoice.paid") await applyLoyaltyRenewal(db, stripeSub);
             }
           }
+          await db.StripeWebhookEvent.create({ event_id: event.id, event_type: event.type, processed_at: new Date().toISOString() });
           return Response.json({ received: true });
         } catch (error) {
           return Response.json({ error: error?.message || "Webhook processing failed." }, { status: 500 });
