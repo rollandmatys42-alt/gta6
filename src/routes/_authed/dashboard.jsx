@@ -4,6 +4,9 @@ import SiteFrame from "@/components/SiteFrame";
 import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile, refreshMySubscription, createStripePortalSession } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 import {useLocale,translate} from "@/lib/i18n";
+import { getMyPlanQuote } from "@/lib/server-fns";
+import { formatMoney } from "@/lib/loyalty";
+import "@/styles/fan-theme.css";
 
 export const Route = createFileRoute("/_authed/dashboard")({
   ssr: false,
@@ -33,6 +36,8 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [billingBusy, setBillingBusy] = useState(false);
+  const [quote, setQuote] = useState(null);
+  useEffect(() => { getMyPlanQuote({ data: { tierCode: "starter", currency: "USD" } }).then(setQuote).catch(() => setQuote(null)); }, []);
 
   const load = async () => {
     setLoading(true); setError("");
@@ -62,7 +67,13 @@ function DashboardPage() {
     catch (err) { setError(err?.message || "Billing portal could not be opened."); setBillingBusy(false); }
   };
 
-  return <SiteFrame eyebrow="VICEHUB / CREATOR CONTROL ROOM">
+  return <SiteFrame eyebrow="VICEHUB / FAN CONTROL ROOM">
+    {quote && <section className="ladder-wrap" style={{ marginBottom: 24 }}>
+      <div className="eyebrow">YOUR LOYALTY PRICE</div>
+      <h2 style={{ margin: 0 }}>{quote.streakMonths > 0 ? `Month ${quote.streakMonths} paid — next charge ${formatMoney(quote.currentPriceCents, quote.currency)}` : `Starts at ${formatMoney(quote.currentPriceCents, quote.currency)}/month`}</h2>
+      <div className="ladder">{quote.schedule.map(st => { const now = quote.nextChargeMonth >= st.fromMonth && (st.toMonth === null || quote.nextChargeMonth <= st.toMonth); return <div key={st.fromMonth} className={"ladder-step" + (now ? " now" : "")}><small>{st.toMonth ? `Months ${st.fromMonth}–${st.toMonth}` : `Month ${st.fromMonth}+`}</small><b>{formatMoney(st.priceCents, quote.currency)}</b></div>; })}</div>
+      <small>Cancelling and resubscribing restarts at the first step.</small>
+    </section>}
     <section className="vice-dashboard-hero">
       <div className="vice-dashboard-sky"><span className="vice-dashboard-sun" /><span className="vice-dashboard-tower tower-a" /><span className="vice-dashboard-tower tower-b" /><span className="vice-dashboard-tower tower-c" /><span className="vice-dashboard-palm">🌴</span><span className="vice-dashboard-road" /></div>
       <div className="vice-dashboard-copy">
