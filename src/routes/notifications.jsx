@@ -3,7 +3,7 @@ import {createFileRoute} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import {getMyNotifications,markNotificationRead} from "@/lib/server-fns";
 import {useAuth} from "@/lib/AuthContext";
-export const Route=createFileRoute("/notifications")({ssr:false,head:()=>({meta:[{title:"Notifications — VICEHUB"}]}),component:NotificationsPage});
+export const Route=createFileRoute("/notifications")({ssr:false,head:()=>({meta:[{title:"Notifications — VICEHUB"},{name:"robots",content:"noindex,nofollow"}]}),component:NotificationsPage});
 function NotificationsPage(){
  const {isAuthenticated,navigateToLogin}=useAuth();const [items,setItems]=useState([]),[error,setError]=useState("");
  const load=()=>getMyNotifications().then(setItems).catch(e=>setError(e.message));
