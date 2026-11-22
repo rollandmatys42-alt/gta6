@@ -69,7 +69,7 @@ export const listPublishedVideos = createServerFn({ method: "GET" }).handler(asy
     "-published_at",
     60,
     0,
-    ["id", "title", "description", "category", "tags", "duration_seconds", "thumbnail_url", "creator_name", "published_at"],
+    ["id", "title", "description", "category", "language", "is_featured", "tags", "duration_seconds", "thumbnail_url", "creator_name", "published_at"],
   );
   return rows;
 });
@@ -177,7 +177,9 @@ export const createVideoRecord = createServerFn({ method: "POST" })
   .validator(z.object({
     title: z.string().min(2).max(140),
     description: z.string().max(3000).optional(),
-    category: z.enum(["Cinematics", "Gameplay", "Edit packs", "Tutorials", "Other"]),
+    category: z.enum(["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]),
+    language: z.enum(["en", "fr", "es", "pt", "it", "de"]).default("en"),
+    isFeatured: z.boolean().default(false),
     tags: z.array(z.string().max(40)).max(20).optional(),
     durationSeconds: z.number().int().min(0).max(86400).optional(),
     thumbnailUrl: z.string().url().max(1000).optional(),
@@ -195,6 +197,7 @@ export const createVideoRecord = createServerFn({ method: "POST" })
     const base44 = context.getBase44();
     return base44.asServiceRole.entities.Video.create({
       title: data.title, description: data.description || "", category: data.category,
+      language: data.language || "en", is_featured: !!data.isFeatured,
       tags: data.tags || [], duration_seconds: data.durationSeconds || 0,
       ...(data.thumbnailUrl ? { thumbnail_url: data.thumbnailUrl } : {}),
       creator_name: data.creatorName || "",
