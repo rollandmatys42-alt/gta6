@@ -253,6 +253,10 @@ export const getMyAccount = createServerFn({ method: "GET" })
       { user_id: user.id }, "-created_date", 15, 0,
       ["id", "video_id", "month_key", "tier_code", "watermark_applied", "status", "created_date"],
     );
+    const historyWithTitles = await Promise.all(history.map(async event => {
+      const video = await base44.asServiceRole.entities.Video.get(event.video_id).catch(() => null);
+      return { ...event, video_title: video?.title || "Video download" };
+    }));
     return {
       name: user.full_name || user.email || "Creator",
       email: user.email,
@@ -263,7 +267,7 @@ export const getMyAccount = createServerFn({ method: "GET" })
       downloadsUsed: used,
       downloadsLimit: limit,
       downloadsRemaining: Math.max(0, limit - used),
-      history,
+      history: historyWithTitles,
     };
   });
 
