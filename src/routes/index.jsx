@@ -32,7 +32,6 @@ const sections = [
   { id: "library", icon: "▧", title: "Video library", desc: "Curated clips, cinematic scenes and creator-ready footage." },
   { id: "studio", icon: "✳", title: "AI creator studio", desc: "Hooks, captions, titles and hashtag ideas for each platform." },
   { id: "news", icon: "◉", title: "GTA VI news desk", desc: "Official updates, press coverage and clearly labelled community reports." },
-  { id: "marketplace", icon: "◇", title: "Creator marketplace", desc: "Sell original edits, packs and licensed creator content." },
 ];
 
 
@@ -107,7 +106,7 @@ function HomePage() {
     {tier:"free",name:t.free,priceText:"FREE",desc:t.freeDesc,features:[t.monthly,"Curated library access","Community browsing"],cta:t.startFree},
     {tier:"starter",name:t.starter,desc:t.starterDesc,features:["Expanded monthly downloads","Clean downloads where licensed","Creator tools"],cta:t.choose},
     {tier:"pro",name:t.pro,desc:t.proDesc,features:["Higher download allowance","AI content workspace","Priority library access"],cta:t.choose},
-    {tier:"premium",name:t.premium,desc:t.premiumDesc,features:["Marketplace seller access","Creator subscriptions","Sales and audience insights"],cta:t.choose}
+    {tier:"premium",name:t.premium,desc:t.premiumDesc,features:["Direct social publishing when approved","Creator analytics","Advanced download allowance"],cta:t.choose}
   ].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat("en-US",{style:"currency",currency}).format(configured.monthly_price_cents/100):"Pricing pending"};});
   return (
     <div className="hub-shell">
