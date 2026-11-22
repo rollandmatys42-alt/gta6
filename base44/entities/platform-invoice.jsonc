@@ -1,0 +1,32 @@
+{
+  "name": "PlatformInvoice",
+  "type": "object",
+  "properties": {
+    "invoice_number": { "type": "string", "maxLength": 80 },
+    "user_id": { "type": "string" },
+    "customer_name": { "type": "string", "maxLength": 160 },
+    "customer_email": { "type": "string", "maxLength": 254 },
+    "customer_address": { "type": "string", "maxLength": 1000 },
+    "customer_country": { "type": "string", "maxLength": 2 },
+    "currency": { "type": "string", "enum": ["GBP", "EUR", "USD"] },
+    "description": { "type": "string", "maxLength": 1000 },
+    "subtotal_cents": { "type": "integer", "minimum": 0 },
+    "tax_cents": { "type": "integer", "minimum": 0 },
+    "total_cents": { "type": "integer", "minimum": 0 },
+    "tax_rate_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "tax_treatment": { "type": "string", "enum": ["not_applicable", "outside_scope", "reverse_charge", "standard_rate", "zero_rate", "unknown"] },
+    "issue_date": { "type": "string", "format": "date" },
+    "due_date": { "type": "string", "format": "date" },
+    "status": { "type": "string", "enum": ["draft", "issued", "paid", "void"], "default": "draft" },
+    "payment_reference": { "type": "string", "maxLength": 200 },
+    "pdf_url": { "type": "string", "format": "uri" },
+    "internal_note": { "type": "string", "maxLength": 1000 }
+  },
+  "required": ["currency", "description", "subtotal_cents", "tax_cents", "total_cents", "tax_treatment", "status"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}

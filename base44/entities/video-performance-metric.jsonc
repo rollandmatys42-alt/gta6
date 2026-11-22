@@ -1,0 +1,28 @@
+{
+  "name": "VideoPerformanceMetric",
+  "type": "object",
+  "properties": {
+    "video_id": { "type": "string" },
+    "platform": { "type": "string", "enum": ["TikTok", "Instagram", "YouTube", "Other"] },
+    "period_start": { "type": "string", "format": "date-time" },
+    "period_end": { "type": "string", "format": "date-time" },
+    "views": { "type": "integer", "minimum": 0, "default": 0 },
+    "impressions": { "type": "integer", "minimum": 0, "default": 0 },
+    "likes": { "type": "integer", "minimum": 0, "default": 0 },
+    "comments": { "type": "integer", "minimum": 0, "default": 0 },
+    "shares": { "type": "integer", "minimum": 0, "default": 0 },
+    "saves": { "type": "integer", "minimum": 0, "default": 0 },
+    "average_watch_seconds": { "type": "number", "minimum": 0, "default": 0 },
+    "video_length_seconds": { "type": "number", "minimum": 0, "default": 0 },
+    "profile_clicks": { "type": "integer", "minimum": 0, "default": 0 },
+    "followers_gained": { "type": "integer", "minimum": 0, "default": 0 },
+    "source": { "type": "string", "enum": ["manual", "platform_export", "api"], "default": "manual" }
+  },
+  "required": ["video_id", "platform", "views", "impressions", "likes", "comments", "shares", "saves", "average_watch_seconds", "video_length_seconds", "source"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}

@@ -61,6 +61,39 @@ async function applyLoyaltyRenewal(db, stripeSub) {
   }
   await db.UserSubscription.update(local.id, { streak_months: streakMonths, loyalty_discount_percent: discount, current_monthly_price_cents: nextPrice });
 }
+async function saveInvoiceLedger(db, invoice, status, eventId) {
+  const invoiceId = invoice.id;
+  if (!invoiceId) return;
+  const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id || "";
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id || "";
+  const subscriptions = subscriptionId ? await db.UserSubscription.filter({ stripe_subscription_id: subscriptionId }, "-created_date", 1, 0) : [];
+  const linePeriod = invoice.lines?.data?.[0]?.period || {};
+  const taxRows = invoice.total_taxes || invoice.total_tax_amounts || [];
+  const taxCents = taxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const payload = {
+    stripe_invoice_id: invoiceId,
+    stripe_customer_id: customerId,
+    stripe_subscription_id: subscriptionId,
+    user_id: subscriptions[0]?.user_id || "",
+    customer_email: invoice.customer_email || invoice.customer_details?.email || "",
+    currency: String(invoice.currency || "gbp").toUpperCase(),
+    amount_paid_cents: Number(invoice.amount_paid || 0),
+    amount_due_cents: Number(invoice.amount_due || 0),
+    tax_cents: taxCents,
+    refund_amount_cents: 0,
+    status,
+    billing_reason: invoice.billing_reason || "",
+    ...(linePeriod.start ? { period_start: new Date(linePeriod.start * 1000).toISOString() } : {}),
+    ...(linePeriod.end ? { period_end: new Date(linePeriod.end * 1000).toISOString() } : {}),
+    ...(invoice.status_transitions?.paid_at ? { paid_at: new Date(invoice.status_transitions.paid_at * 1000).toISOString() } : {}),
+    ...(invoice.invoice_pdf ? { invoice_pdf_url: invoice.invoice_pdf } : {}),
+    ...(invoice.hosted_invoice_url ? { hosted_invoice_url: invoice.hosted_invoice_url } : {}),
+    source_event_id: eventId,
+  };
+  const existing = await db.PaymentLedgerEntry.filter({ stripe_invoice_id: invoiceId }, "-created_date", 1, 0);
+  if (existing[0]) return db.PaymentLedgerEntry.update(existing[0].id, payload);
+  return db.PaymentLedgerEntry.create(payload);
+}
 async function saveStripeSubscription(db, stripeSub, fallback = {}) {
   const userId = stripeSub.metadata?.user_id || fallback.user_id;
   const tierCode = stripeSub.metadata?.tier_code || fallback.tier_code;
@@ -126,6 +159,15 @@ export const Route = createFileRoute("/api/stripe/webhook")({
               await saveStripeSubscription(db, stripeSub);
               if (event.type === "invoice.paid") await applyLoyaltyRenewal(db, stripeSub);
             }
+            await saveInvoiceLedger(db, object, event.type === "invoice.paid" ? "paid" : "failed", event.id);
+          } else if (event.type === "charge.refunded" && object.invoice) {
+            const invoiceId = typeof object.invoice === "string" ? object.invoice : object.invoice.id;
+            const rows = await db.PaymentLedgerEntry.filter({ stripe_invoice_id: invoiceId }, "-created_date", 1, 0);
+            if (rows[0]) await db.PaymentLedgerEntry.update(rows[0].id, {
+              status: Number(object.amount_refunded || 0) >= Number(object.amount || 0) ? "refunded" : rows[0].status,
+              refund_amount_cents: Number(object.amount_refunded || 0),
+              source_event_id: event.id,
+            });
           }
           await db.StripeWebhookEvent.create({ event_id: event.id, event_type: event.type, processed_at: new Date().toISOString() });
           return Response.json({ received: true });
