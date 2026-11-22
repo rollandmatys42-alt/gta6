@@ -209,11 +209,15 @@ export const listPublishedVideos = createServerFn({ method: "GET" }).handler(asy
   const rows = await base44.asServiceRole.entities.Video.filter(
     { status: "published", license_status: "verified" },
     "-published_at",
-    60,
+    2000,
     0,
-    ["id", "title", "description", "category", "language", "is_featured", "tags", "duration_seconds", "thumbnail_url", "creator_name", "published_at"],
+    ["id", "title", "description", "category", "language", "is_featured", "tags", "duration_seconds", "thumbnail_url", "creator_name", "published_at", "source_reference", "rights_evidence_reference"],
   );
-  return rows;
+  return rows.filter(video => video.source_reference && video.rights_evidence_reference).map(video => ({
+    id: video.id, title: video.title, description: video.description, category: video.category, language: video.language,
+    is_featured: video.is_featured, tags: video.tags, duration_seconds: video.duration_seconds,
+    thumbnail_url: video.thumbnail_url, creator_name: video.creator_name, published_at: video.published_at,
+  }));
 });
 
 export const requestVideoDownload = createServerFn({ method: "POST" })
