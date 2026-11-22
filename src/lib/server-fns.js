@@ -587,7 +587,7 @@ export const getMyCreatorProfile = createServerFn({method:"GET"}).middleware([re
  const rows=await context.getBase44().asServiceRole.entities.CreatorProfile.filter({user_id:context.user.id},"-created_date",1,0);return rows[0]||null;
 });
 export const saveMyCreatorProfile = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({id:z.string().optional(),displayName:z.string().min(2).max(80),bio:z.string().max(2000),avatarUrl:z.string().url().optional(),bannerUrl:z.string().url().optional(),websiteUrl:z.string().url().optional(),locationLabel:z.string().max(100).optional(),skills:z.array(z.string().max(40)).max(20)}))
+ .validator(z.object({id:z.string().optional(),displayName:z.string().min(2).max(80),bio:z.string().max(2000),avatarUrl:z.string().url().or(z.literal("")).optional(),bannerUrl:z.string().url().or(z.literal("")).optional(),websiteUrl:z.string().url().or(z.literal("")).optional(),locationLabel:z.string().max(100).optional(),skills:z.array(z.string().max(40)).max(20)}))
  .handler(async({data,context})=>{
   const db=context.getBase44().asServiceRole.entities.CreatorProfile;
   const payload={user_id:context.user.id,display_name:data.displayName,bio:data.bio,status:"pending_review",skills:data.skills,...(data.avatarUrl?{avatar_url:data.avatarUrl}:{}),...(data.bannerUrl?{banner_url:data.bannerUrl}:{}),...(data.websiteUrl?{website_url:data.websiteUrl}:{}),...(data.locationLabel?{location_label:data.locationLabel}:{})};
