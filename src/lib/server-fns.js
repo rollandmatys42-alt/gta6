@@ -677,6 +677,19 @@ async function omniRouteChat({messages, model, temperature = 0.4, maxTokens = 18
  return {output,model:payload.model||selectedModel,usage:payload.usage||null};
 }
 
+export const testOmniRouteConnection = createServerFn({method:"POST"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);
+ const started=Date.now();
+ const result=await omniRouteChat({
+  messages:[{role:"user",content:"Reply with exactly VICEHUB_OMNIROUTE_OK"}],
+  temperature:0,
+  maxTokens:16,
+  title:"VICEHUB Admin health check"
+ });
+ if(!result.output.trim().includes("VICEHUB_OMNIROUTE_OK"))throw Object.assign(new Error("OmniRoute responded, but the health-check response was invalid."),{status:502,code:"OMNIROUTE_HEALTHCHECK_INVALID"});
+ return {ok:true,model:result.model,latencyMs:Date.now()-started};
+});
+
 export const generateStudioDraft = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
  .handler(async({data,context})=>{
