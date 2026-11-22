@@ -427,7 +427,8 @@ export const saveMarketplaceListing = createServerFn({method:"POST"}).middleware
   const subs=await db.UserSubscription.filter({user_id:context.user.id},"-created_date",1,0);
   const premiumActive=subs[0]?.tier_code==="premium" && subs[0]?.status==="active" && !subs[0]?.voluntary_cancelled;
   const payload={seller_id:context.user.id,seller_name:context.user.full_name||context.user.email||"Creator",title:data.title,description:data.description,category:data.category,price_cents:data.priceCents,currency:data.currency,license_terms:data.licenseTerms,status:premiumActive?"pending_review":"draft",created_by:context.user.id,...(data.previewUrl?{preview_url:data.previewUrl}:{})};
-  return data.id?db.MarketplaceListing.update(data.id,payload):db.MarketplaceListing.create(payload);
+  if(data.id){const existing=await db.MarketplaceListing.get(data.id).catch(()=>null);if(!existing||existing.seller_id!==context.user.id)throw Object.assign(new Error("You can only edit your own listing."),{status:403});return db.MarketplaceListing.update(existing.id,payload);}
+  return db.MarketplaceListing.create(payload);
  });
 export const createMarketplaceInquiry = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({listingId:z.string().min(1),message:z.string().min(5).max(2000)}))
@@ -514,7 +515,10 @@ export const saveAdminAgent = createServerFn({method:"POST"}).middleware([requir
 export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",50,0));
 export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","YouTube","X"]),caption:z.string().min(1).max(5000),scheduledAt:z.string().datetime().optional()}))
- .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};return data.id?db.update(data.id,p):db.create(p);});
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for your planning reminder."),{status:400});const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};if(data.id){const existing=await db.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id)throw Object.assign(new Error("You can only edit your own social drafts."),{status:403});return db.update(existing.id,p);}return db.create(p);});
+export const deleteSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({postId:z.string().min(1)}))
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const post=await db.get(data.postId).catch(()=>null);if(!post||post.user_id!==context.user.id)throw Object.assign(new Error("You can only delete your own social drafts."),{status:403});await db.delete(post.id);return {success:true};});
 export const getMyMarketplaceInquiries = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  const db=context.getBase44().asServiceRole.entities;const [buyer,seller]=await Promise.all([db.MarketplaceInquiry.filter({buyer_id:context.user.id},"-created_date",50,0),db.MarketplaceInquiry.filter({seller_id:context.user.id},"-created_date",50,0)]);return {buyer,seller};
 });
@@ -619,7 +623,9 @@ export const saveMyCreatorProfile = createServerFn({method:"POST"}).middleware([
   const db=context.getBase44().asServiceRole.entities.CreatorProfile;
   const payload={user_id:context.user.id,display_name:data.displayName,bio:data.bio,status:"pending_review",skills:data.skills,...(data.avatarUrl?{avatar_url:data.avatarUrl}:{}),...(data.bannerUrl?{banner_url:data.bannerUrl}:{}),...(data.websiteUrl?{website_url:data.websiteUrl}:{}),...(data.locationLabel?{location_label:data.locationLabel}:{})};
   if(context.user.role==="admin")payload.status="published";
-  return data.id?db.update(data.id,payload):db.create(payload);
+  if(data.id){const existing=await db.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id)throw Object.assign(new Error("You can only edit your own creator profile."),{status:403});return db.update(existing.id,payload);}
+  const current=await db.filter({user_id:context.user.id},"-created_date",1,0);if(current.length)return db.update(current[0].id,payload);
+  return db.create(payload);
  });
 export const getAdminCreatorProfiles = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.CreatorProfile.list("-created_date",200,0);});
 export const setCreatorProfileStatus = createServerFn({method:"POST"}).middleware([requireUser])
