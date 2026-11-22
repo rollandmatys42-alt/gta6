@@ -1,14 +1,7 @@
 {
+  "name": "User",
   "type": "object",
   "properties": {
-    "role": {
-      "type": "string",
-      "enum": [
-        "admin",
-        "user"
-      ],
-      "description": "Base44 access role"
-    },
     "display_name": {
       "type": "string",
       "maxLength": 80,
@@ -21,14 +14,7 @@
         "creator"
       ],
       "default": "viewer",
-      "description": "Creator profile type",
-      "rls": {
-        "update": {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      }
+      "description": "Creator profile type"
     },
     "subscription_tier": {
       "type": "string",
@@ -121,8 +107,5 @@
         }
       }
     }
-  },
-  "required": [
-    "role"
-  ]
+  }
 }
