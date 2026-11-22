@@ -10,6 +10,7 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "A creator-first hub for GTA VI video inspiration, community, news and creator tools." },
       { name: "theme-color", content: "#09090d" },
     ],
+    links: [{ rel: "manifest", href: "/manifest.webmanifest" }, { rel: "icon", href: "/icons/vicehub.svg", type: "image/svg+xml" }],
   }),
   component: HomePage,
 });
@@ -44,6 +45,8 @@ function HomePage() {
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [downloadMessage, setDownloadMessage] = useState("");
   const t = copy[language];
+  useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); }, []);
+
   useEffect(() => {
     let active = true;
     listPublishedVideos()
