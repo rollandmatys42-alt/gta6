@@ -64,9 +64,9 @@ function DashboardPage() {
 
   return <SiteFrame eyebrow="VICEHUB / CREATOR CONTROL ROOM">
     <section className="vice-dashboard-hero">
-      <div className="vice-dashboard-sky"><span className="vice-dashboard-sun" /><span className="vice-dashboard-tower tower-a" /><span className="vice-dashboard-tower tower-b" /><span className="vice-dashboard-tower tower-c" /><span className="vice-dashboard-palm">✦</span><span className="vice-dashboard-road" /></div>
+      <div className="vice-dashboard-sky"><span className="vice-dashboard-sun" /><span className="vice-dashboard-tower tower-a" /><span className="vice-dashboard-tower tower-b" /><span className="vice-dashboard-tower tower-c" /><span className="vice-dashboard-palm">🌴</span><span className="vice-dashboard-road" /></div>
       <div className="vice-dashboard-copy">
-        <div className="eyebrow"><i className="live-dot" /> VICE CITY / LEONIDA · CREATOR HQ</div>
+        <div className="eyebrow"><i className="live-dot" /> WELCOME TO LEONIDA · YOUR CREATOR ACCOUNT</div>
         <div className="vice-dashboard-kicker">{tx("dashboard.heroKicker")}</div>
         <h1>{tx("dashboard.title")}<br/><em>{(user?.full_name || user?.email || "CREATOR").split(" ")[0].toUpperCase()}.</em></h1>
         <p>{tx("dashboard.desc")}</p>
@@ -78,7 +78,7 @@ function DashboardPage() {
         <button className="vice-dashboard-refresh" onClick={load} disabled={loading}>{loading ? tx("dashboard.sync") : "↻ " + tx("dashboard.sync")}</button>
         <button className="vice-dashboard-signout" onClick={logout}>{tx("dashboard.signout")} ↗</button>
       </div>
-      <div className="vice-dashboard-coordinate">VICEHUB // PERSONAL CREATOR NETWORK <span>26°07' N · 80°08' W</span></div>
+      <div className="vice-dashboard-coordinate">YOUR VICEHUB ACCOUNT <span>VICE CITY · LEONIDA</span></div>
     </section>
     {error && <div className="platform-alert" role="alert">{error}</div>}
     {loading && !data && <div className="platform-empty">Loading your creator workspace…</div>}
