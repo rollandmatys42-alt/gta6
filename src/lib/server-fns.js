@@ -192,8 +192,9 @@ export const createVideoRecord = createServerFn({ method: "POST" })
     return base44.asServiceRole.entities.Video.create({
       title: data.title, description: data.description || "", category: data.category,
       tags: data.tags || [], duration_seconds: data.durationSeconds || 0,
-      thumbnail_url: data.thumbnailUrl || "", creator_name: data.creatorName || "",
-      source_reference: data.sourceReference || "",
+      ...(data.thumbnailUrl ? { thumbnail_url: data.thumbnailUrl } : {}),
+      creator_name: data.creatorName || "",
+      ...(data.sourceReference ? { source_reference: data.sourceReference } : {}),
       license_status: data.licenseVerified ? "verified" : "pending",
       storage_key: data.originalStorageKey, watermarked_storage_key: data.watermarkedStorageKey,
       uploaded_by: context.user.id, status: "draft",
