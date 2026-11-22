@@ -1,0 +1,87 @@
+{
+  "name": "SubscriptionPlan",
+  "type": "object",
+  "properties": {
+    "tier_code": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "premium"
+      ]
+    },
+    "display_name": {
+      "type": "string",
+      "maxLength": 50
+    },
+    "monthly_price_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP"
+      ]
+    },
+    "monthly_download_limit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "clean_downloads": {
+      "type": "boolean",
+      "default": false
+    },
+    "marketplace_enabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "archived"
+      ],
+      "default": "draft"
+    }
+  },
+  "required": [
+    "tier_code",
+    "display_name",
+    "monthly_download_limit",
+    "currency",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.status": "active"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
