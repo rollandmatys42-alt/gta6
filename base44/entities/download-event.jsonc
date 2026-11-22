@@ -1,0 +1,76 @@
+{
+  "name": "DownloadEvent",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "video_id": {
+      "type": "string"
+    },
+    "month_key": {
+      "type": "string"
+    },
+    "tier_code": {
+      "type": "string",
+      "enum": [
+        "free",
+        "starter",
+        "pro",
+        "premium"
+      ]
+    },
+    "watermark_applied": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "signed",
+        "failed",
+        "denied"
+      ]
+    },
+    "delivery_expires_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "user_id",
+    "video_id",
+    "month_key",
+    "tier_code",
+    "watermark_applied",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
