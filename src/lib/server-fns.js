@@ -376,8 +376,8 @@ export const getForumThread = createServerFn({method:"GET"}).validator(z.object(
   const db=context.getBase44().asServiceRole.entities;
   const thread=await db.ForumThread.get(data.threadId).catch(()=>null);
   if(!thread || thread.status!=="published") throw Object.assign(new Error("Discussion not found."),{status:404});
-  const posts=await db.ForumPost.filter({thread_id:data.threadId,status:"published"},"created_date",100,0);
-  return {thread,posts};
+  const [posts,reactions]=await Promise.all([db.ForumPost.filter({thread_id:data.threadId,status:"published"},"created_date",100,0),db.ForumReaction.filter({target_type:"thread",target_id:data.threadId},"-created_date",500,0)]);
+  return {thread,posts,reactions};
  });
 export const createForumPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({threadId:z.string().min(1),body:z.string().min(1).max(5000)}))
@@ -389,6 +389,7 @@ export const createForumPost = createServerFn({method:"POST"}).middleware([requi
   const user=context.user;
   const post=await db.ForumPost.create({thread_id:thread.id,body:data.body,author_id:user.id,author_name:user.full_name||user.email||"Creator",status:"published"});
   await db.ForumThread.update(thread.id,{reply_count:Number(thread.reply_count||0)+1,last_activity_at:new Date().toISOString()});
+  if(thread.author_id!==user.id)await db.UserNotification.create({user_id:thread.author_id,type:"reply",title:"New reply to your discussion",body:"Someone replied to: "+thread.title.slice(0,120),target_url:"/community"});
   return post;
  });
 
