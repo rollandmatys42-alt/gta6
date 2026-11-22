@@ -1,0 +1,16 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "country_code": { "type": "string", "maxLength": 2, "description": "ISO 3166-1 alpha-2 country selected by the account holder or admin" },
+    "country_name": { "type": "string", "maxLength": 100 },
+    "account_notes": { "type": "string", "maxLength": 2000, "description": "Private administrator notes" }
+  },
+  "required": [],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": false,
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": false
+  }
+}
