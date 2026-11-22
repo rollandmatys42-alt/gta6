@@ -64,7 +64,7 @@
         }
       ]
     },
-    "create": {},
+    "create": false,
     "update": {
       "$or": [
         {
