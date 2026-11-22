@@ -62,6 +62,37 @@ async function presignR2({ method, objectKey, contentType, expiresIn = DOWNLOAD_
   return base.origin + canonicalUri + "?" + params + "&X-Amz-Signature=" + signature;
 }
 
+export const testVideoStorage = createServerFn({ method: "POST" }).middleware([requireUser]).handler(async ({ context }) => {
+  requireAdmin(context);
+  const objectKey = "system/health-check-" + Date.now() + ".txt";
+  const marker = "VICEHUB-R2-PRIVATE-HEALTH-CHECK";
+  const started = Date.now();
+  let uploaded = false;
+  try {
+    const putUrl = await presignR2({ method: "PUT", objectKey, contentType: "text/plain", expiresIn: 60 });
+    const putResponse = await fetch(putUrl, { method: "PUT", headers: { "Content-Type": "text/plain" }, body: marker });
+    if (!putResponse.ok) throw new Error("R2 write test failed with HTTP " + putResponse.status + ".");
+    uploaded = true;
+    const getUrl = await presignR2({ method: "GET", objectKey, expiresIn: 60 });
+    const getResponse = await fetch(getUrl);
+    if (!getResponse.ok) throw new Error("R2 read test failed with HTTP " + getResponse.status + ".");
+    const actual = await getResponse.text();
+    if (actual !== marker) throw new Error("R2 read-back verification did not match the test marker.");
+    const deleteUrl = await presignR2({ method: "DELETE", objectKey, expiresIn: 60 });
+    const deleteResponse = await fetch(deleteUrl, { method: "DELETE" });
+    if (!deleteResponse.ok) throw new Error("R2 cleanup failed with HTTP " + deleteResponse.status + ".");
+    uploaded = false;
+    return { ok: true, checkedAt: new Date().toISOString(), latencyMs: Date.now() - started, testObjectRemoved: true };
+  } finally {
+    if (uploaded) {
+      try {
+        const deleteUrl = await presignR2({ method: "DELETE", objectKey, expiresIn: 60 });
+        await fetch(deleteUrl, { method: "DELETE" });
+      } catch {}
+    }
+  }
+});
+
 export const listPublishedVideos = createServerFn({ method: "GET" }).handler(async ({ context }) => {
   const base44 = context.getBase44();
   const rows = await base44.asServiceRole.entities.Video.filter(
@@ -483,13 +514,13 @@ export const saveSitePage = createServerFn({method:"POST"}).middleware([requireU
 
 export const getAdminOverview = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
- const [users,news,threads,listings,products,reports,downloads]=await Promise.all([
+ const [users,news,products,reports,downloads,videos,subscriptions]=await Promise.all([
   context.getBase44().asServiceRole.users.list().catch(()=>[]),
-  db.NewsArticle.list("-created_date",200,0),db.ForumThread.list("-created_date",200,0),
-  db.MarketplaceListing.list("-created_date",200,0),db.ShopProduct.list("-created_date",200,0),
-  db.ContentReport.filter({status:"open"},"-created_date",100,0),db.DownloadEvent.list("-created_date",500,0)
+  db.NewsArticle.list("-created_date",200,0),db.ShopProduct.list("-created_date",200,0),
+  db.ContentReport.filter({status:"open"},"-created_date",100,0),db.DownloadEvent.list("-created_date",1000,0),
+  db.Video.list("-created_date",2000,0),db.UserSubscription.list("-created_date",2000,0)
  ]);
- return {users:users.length,news:news.length,publishedNews:news.filter(x=>x.status==="published").length,threads:threads.length,listings:listings.length,products:products.length,openReports:reports.length,downloads:downloads.length};
+ return {users:users.length,news:news.length,publishedNews:news.filter(x=>x.status==="published").length,products:products.length,openReports:reports.length,downloads:downloads.length,videos:videos.length,publishedVideos:videos.filter(x=>x.status==="published"&&x.license_status==="verified").length,activeSubscriptions:subscriptions.filter(x=>x.status==="active"||x.status==="trialing").length};
 });
 export const getAdminReports = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.list("-created_date",100,0);
