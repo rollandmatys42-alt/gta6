@@ -374,6 +374,7 @@ export const getMyAccount = createServerFn({ method: "GET" })
     const tier = subscription?.status === "active" || (subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date()) ? (subscription.tier_code || "free") : "free";
     let limit = MONTHLY_FREE_LIMIT;
     let planName = "Free";
+    let cleanDownloads = false;
     if (tier !== "free") {
       const plans = await base44.asServiceRole.entities.SubscriptionPlan.filter(
         { tier_code: tier, status: "active" }, "-created_date", 1, 0,
@@ -381,6 +382,7 @@ export const getMyAccount = createServerFn({ method: "GET" })
       if (plans[0]) {
         limit = Number(plans[0].monthly_download_limit || 0);
         planName = plans[0].display_name || tier;
+        cleanDownloads = !!plans[0].clean_downloads;
       }
     }
     const monthKey = new Date().toISOString().slice(0, 7);
@@ -404,6 +406,7 @@ export const getMyAccount = createServerFn({ method: "GET" })
       subscriptionStatus: subscription?.status || "inactive",
       currency: subscription?.currency || "USD",
       hasBillingCustomer: !!subscription?.stripe_customer_id,
+      cleanDownloads,
       downloadsUsed: used,
       downloadsLimit: limit,
       downloadsRemaining: Math.max(0, limit - used),
@@ -692,8 +695,8 @@ export const saveAdminAgent = createServerFn({method:"POST"}).middleware([requir
  .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.AIAgentConfig;const p={agent_key:data.agentKey,display_name:data.displayName,instructions:data.instructions,provider_model:data.providerModel,enabled:data.enabled,schedule:data.schedule,monthly_run_limit:data.monthlyRunLimit};return data.id?db.update(data.id,p):db.create(p);});
 export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",50,0));
 export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","YouTube","X"]),caption:z.string().min(1).max(5000),scheduledAt:z.string().datetime().optional()}))
- .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for your planning reminder."),{status:400});const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};if(data.id){const existing=await db.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id)throw Object.assign(new Error("You can only edit your own social drafts."),{status:403});return db.update(existing.id,p);}return db.create(p);});
+ .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","YouTube","X"]),caption:z.string().min(1).max(5000),videoId:z.string().min(1).optional(),scheduledAt:z.string().datetime().optional()}))
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for your planning reminder."),{status:400});if(data.videoId){const video=await context.getBase44().asServiceRole.entities.Video.get(data.videoId).catch(()=>null);if(!video||video.status!=="published"||video.license_status!=="verified"||!video.rights_evidence_reference)throw Object.assign(new Error("Choose a published video with verified commercial-use rights."),{status:400,code:"VIDEO_RIGHTS_NOT_VERIFIED"});}const p={user_id:context.user.id,platform:data.platform,caption:data.caption,status:"draft",...(data.videoId?{video_id:data.videoId}:{video_id:null}),...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})};if(data.id){const existing=await db.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id)throw Object.assign(new Error("You can only edit your own social drafts."),{status:403});if(existing.status==="published")throw Object.assign(new Error("Published posts cannot be edited here."),{status:409});return db.update(existing.id,p);}return db.create(p);});
 export const deleteSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({postId:z.string().min(1)}))
  .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const post=await db.get(data.postId).catch(()=>null);if(!post||post.user_id!==context.user.id)throw Object.assign(new Error("You can only delete your own social drafts."),{status:403});await db.delete(post.id);return {success:true};});
