@@ -17,7 +17,8 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const cp = require('node:child_process');
-          const ts = require('typescript');
+          const tsModule = require('typescript');
+          const ts = tsModule.default || tsModule;
           const files = cp.execSync('git ls-files', {encoding:'utf8'}).trim().split('\n').filter(p => /^src\/.*\.(jsx|js|tsx|ts)$/.test(p));
           let failed = false;
           for (const file of files) {
