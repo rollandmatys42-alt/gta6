@@ -1,0 +1,25 @@
+{
+  "name": "SocialConnection",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string" },
+    "provider": { "type": "string", "enum": ["TikTok", "Instagram", "YouTube"] },
+    "provider_user_id": { "type": "string", "maxLength": 200 },
+    "account_name": { "type": "string", "maxLength": 160 },
+    "access_token_ciphertext": { "type": "string", "rls": { "read": { "user_condition": { "role": "admin" } }, "update": { "user_condition": { "role": "admin" } } } },
+    "refresh_token_ciphertext": { "type": "string", "rls": { "read": { "user_condition": { "role": "admin" } }, "update": { "user_condition": { "role": "admin" } } } },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "refresh_expires_at": { "type": "string", "format": "date-time" },
+    "scopes": { "type": "array", "items": { "type": "string" } },
+    "status": { "type": "string", "enum": ["connected", "expired", "revoked", "error"], "default": "connected" },
+    "connected_at": { "type": "string", "format": "date-time" },
+    "last_error": { "type": "string", "maxLength": 500 }
+  },
+  "required": ["user_id", "provider", "provider_user_id", "account_name", "access_token_ciphertext", "status"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
