@@ -5,7 +5,7 @@ import "@/styles/social-publishing.css";
 import {
   beginSocialOAuth, completeSocialOAuth, getMySocialAccounts, getMySocialPosts,
   saveSocialPost, deleteSocialPost, disconnectSocialAccount, publishSocialPost,
-  processMyDueSocialPosts, generateStudioDraft,
+  processMyDueSocialPosts, generateStudioDraft, createSocialMediaUploadUrl,
 } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -41,6 +41,8 @@ function SocialPublishingPage() {
   const [accountId, setAccountId] = useState("");
   const [caption, setCaption] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaFile, setMediaFile] = useState(null);
+  const [existingMediaObjectKey, setExistingMediaObjectKey] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [editingId, setEditingId] = useState("");
   const [filter, setFilter] = useState("All");
@@ -105,7 +107,7 @@ function SocialPublishingPage() {
   const accountOptions = accounts.filter(account => account.provider === platform);
   const visiblePosts = useMemo(() => posts.filter(post => filter === "All" || post.platform === filter), [posts, filter]);
   const resetForm = () => {
-    setEditingId(""); setPlatform("TikTok"); setAccountId(""); setCaption(""); setMediaUrl(""); setScheduledAt("");
+    setEditingId(""); setPlatform("TikTok"); setAccountId(""); setCaption(""); setMediaUrl(""); setMediaFile(null); setExistingMediaObjectKey(""); setScheduledAt("");
   };
   const connect = async provider => {
     if (!isAuthenticated) { navigateToLogin(); return; }
@@ -142,14 +144,24 @@ function SocialPublishingPage() {
     event.preventDefault();
     if (!isAuthenticated) { navigateToLogin(); return; }
     if (!accountId) { setError("Connect and select the destination account before saving a publishable post."); return; }
-    if (platform !== "X" && !mediaUrl.trim()) { setError("This network requires a publicly reachable HTTPS video URL."); return; }
+    if (platform !== "X" && !mediaUrl.trim() && !mediaFile && !existingMediaObjectKey) { setError("Choose a video file or provide a publicly reachable HTTPS video URL."); return; }
+    if (mediaFile && (mediaFile.size > 250 * 1024 * 1024 || !["video/mp4","video/quicktime"].includes(mediaFile.type))) { setError("Choose an MP4 or MOV video smaller than 250 MB."); return; }
     if (mediaUrl.trim() && !/^https:\/\//i.test(mediaUrl.trim())) { setError("Media URL must use HTTPS."); return; }
     setBusy(true); setError(""); setNotice("");
     try {
+      let uploadedObjectKey = existingMediaObjectKey;
+      if (mediaFile) {
+        setNotice("Uploading your video to private storage…");
+        const signed = await createSocialMediaUploadUrl({ data: { fileName: mediaFile.name, contentType: mediaFile.type, sizeBytes: mediaFile.size } });
+        const uploaded = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": mediaFile.type }, body: mediaFile });
+        if (!uploaded.ok) throw new Error("Private video storage rejected the upload (HTTP " + uploaded.status + ").");
+        uploadedObjectKey = signed.objectKey;
+      }
       await saveSocialPost({ data: {
         ...(editingId ? { id: editingId } : {}),
         platform, accountId, caption,
         ...(mediaUrl.trim() ? { mediaUrl: mediaUrl.trim() } : {}),
+        ...(uploadedObjectKey ? { mediaObjectKey: uploadedObjectKey } : {}),
         ...(scheduledAt ? { scheduledAt: new Date(scheduledAt).toISOString() } : {}),
       }});
       setNotice(scheduledAt ? "Publication added to your scheduled queue." : "Draft saved to your private planner.");
@@ -230,7 +242,7 @@ function SocialPublishingPage() {
           </div>
           <div className="social-platform-hint">{platformNotes[platform]}</div>
           <label>CAPTION / DESCRIPTION<textarea required minLength={1} maxLength={5000} rows={5} value={caption} onChange={event => setCaption(event.target.value)} placeholder="Write a short brief, then use OmniRoute to generate a platform-ready caption…" /></label><div className="social-ai-row"><button type="button" className="social-secondary" onClick={generateCaption} disabled={aiBusy || busy}>{aiBusy ? "OMNIROUTE IS WRITING…" : "GENERATE / REWRITE WITH OMNIROUTE ✦"}</button><small>AI output is a draft only. Review factual claims and rights before publication.</small></div>
-          {platform !== "X" && <label>PUBLIC VIDEO URL (HTTPS)<input required type="url" value={mediaUrl} onChange={event => setMediaUrl(event.target.value)} placeholder="https://your-public-video-host/video.mp4" /><small>The selected network must be able to fetch this URL. Private R2 links and local files are not accepted here.</small></label>}
+          {platform !== "X" && <><label>UPLOAD VIDEO FILE (MP4 / MOV)<input type="file" accept="video/mp4,video/quicktime" onChange={event => { setMediaFile(event.target.files?.[0] || null); setMediaUrl(""); }} /><small>{mediaFile?.name || (existingMediaObjectKey ? "Previously uploaded video retained" : "Up to 250 MB. The file is uploaded directly to private VICEHUB storage.")}</small></label><label>OR USE A PUBLIC VIDEO URL (HTTPS)<input type="url" value={mediaUrl} onChange={event => { setMediaUrl(event.target.value); if(event.target.value) { setMediaFile(null); setExistingMediaObjectKey(""); } }} placeholder="https://your-public-video-host/video.mp4" /><small>Use this instead of uploading a file. The destination network must be able to fetch the URL.</small></label></>}
           <div className="social-form-grid">
             <label>SCHEDULE FOR (OPTIONAL)<input type="datetime-local" min={localDate(new Date(Date.now() + 60000).toISOString())} value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} /><small>Scheduled posts are queued. Run the due queue from this page, or connect a server scheduler before relying on unattended posting.</small></label>
             <div className="social-composer-side"><span>CONTENT CHECK</span><b>{platform === "X" ? "TEXT POST" : "VIDEO POST"}</b><small>Always review the final caption and destination account before publication.</small></div>
@@ -246,7 +258,7 @@ function SocialPublishingPage() {
           {visiblePosts.map(post => <article className="social-post-card" key={post.id}>
             <div className="social-post-top"><span>{post.platform}</span><b className={"social-status status-" + post.status}>{statusLabel(post.status)}</b></div>
             <p>{post.caption}</p>
-            {post.media_reference && <a href={post.media_reference} target="_blank" rel="noreferrer">VIDEO SOURCE ↗</a>}
+            {post.media_reference && (post.media_reference.startsWith("social/") ? <small>VIDEO STORED PRIVATELY BY VICEHUB</small> : <a href={post.media_reference} target="_blank" rel="noreferrer">VIDEO SOURCE ↗</a>)}
             {post.scheduled_at && <small>{post.status === "scheduled" ? "Scheduled for " : "Scheduled "} {new Date(post.scheduled_at).toLocaleString()}</small>}
             {post.error_message && <div className="social-post-error">{post.error_message}</div>}
             {post.external_post_id && <small>Provider reference: {post.external_post_id}</small>}
