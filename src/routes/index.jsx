@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listPublishedVideos, requestVideoDownload, getNewsFeed, getPublicPlans, createStripeCheckoutSession } from "@/lib/server-fns";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/AuthContext";
+import { setSiteLocale } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,7 +37,11 @@ const sections = [
 
 function HomePage() {
   const { isAuthenticated, navigateToLogin, logout } = useAuth();
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(() => {
+    if (typeof window === "undefined") return "en";
+    const saved = window.localStorage.getItem("vicehub-language");
+    return saved && ["en","fr","es","pt","it","de"].includes(saved) ? saved : "en";
+  });
   const [videoLanguage, setVideoLanguage] = useState("All");
   const [installPrompt, setInstallPrompt] = useState(null);
   const [installHelp, setInstallHelp] = useState(false);
@@ -58,14 +63,12 @@ function HomePage() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-    const saved = window.localStorage.getItem("vicehub-language");
-    if (saved && ["en","fr","es","pt","it","de"].includes(saved)) setLanguage(saved);
-    setIsInstalled(window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true);
+     setIsInstalled(window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true);
     const handler = event => { event.preventDefault(); setInstallPrompt(event); };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
-  useEffect(() => { window.localStorage.setItem("vicehub-language", language); document.documentElement.lang = language; }, [language]);
+  useEffect(() => { setSiteLocale(language); }, [language]);
   const installApp = async () => {
     if (installPrompt) { installPrompt.prompt(); const choice = await installPrompt.userChoice; if (choice?.outcome === "accepted") setIsInstalled(true); setInstallPrompt(null); }
     else setInstallHelp(true);
