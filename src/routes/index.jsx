@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listPublishedVideos, requestVideoDownload, getNewsFeed } from "@/lib/server-fns";
+import { listPublishedVideos, requestVideoDownload, getNewsFeed, getPublicPlans } from "@/lib/server-fns";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -38,11 +38,11 @@ function HomePage() {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
   const [liveVideos, setLiveVideos] = useState([]);
-  const [liveNews, setLiveNews] = useState([]);
+  const [liveNews, setLiveNews] = useState([]);\n  const [livePlans, setLivePlans] = useState([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [downloadMessage, setDownloadMessage] = useState("");
   const t = copy[language];
-  useEffect(() => { getNewsFeed({ data: { locale: language, limit: 3 } }).then((rows) => setLiveNews(Array.isArray(rows) ? rows : [])).catch(() => setLiveNews([])); }, [language]);
+  useEffect(() => { getPublicPlans({ data: { currency } }).then((rows) => setLivePlans(Array.isArray(rows) ? rows : [])).catch(() => setLivePlans([])); }, [currency]);\n  useEffect(() => { getNewsFeed({ data: { locale: language, limit: 3 } }).then((rows) => setLiveNews(Array.isArray(rows) ? rows : [])).catch(() => setLiveNews([])); }, [language]);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); }, []);
 
@@ -52,7 +52,7 @@ function HomePage() {
       .then((rows) => { if (active) setLiveVideos(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (active) setLiveVideos([]); })
       .finally(() => { if (active) setIsLoadingVideos(false); });
-    return () => { active = false; };
+    const planCards = [{tier:"free",name:t.free,priceText:"FREE",desc:t.freeDesc,features:[t.monthly,"Curated library access","Community browsing"],cta:t.startFree},{tier:"starter",name:t.starter,desc:t.starterDesc,features:["Expanded monthly downloads","Clean downloads where licensed","Creator tools"],cta:t.choose},{tier:"pro",name:t.pro,desc:t.proDesc,features:["Higher download allowance","AI content workspace","Priority library access"],cta:t.choose},{tier:"premium",name:t.premium,desc:t.premiumDesc,features:["Marketplace seller access","Creator subscriptions","Sales and audience insights"],cta:t.choose}].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat("en-US",{style:"currency",currency}).format(configured.monthly_price_cents/100):"Pricing pending"};});\n  return () => { active = false; };
   }, []);
   const filtered = useMemo(() => liveVideos.filter((v) =>
     (category === "All" || v.category === category) &&
@@ -122,8 +122,8 @@ function HomePage() {
         <section className="features-section"><div className="section-head"><div><div className="eyebrow">03 / CREATOR WORKSPACE</div><h2>{t.tools}</h2><p>{t.toolsSub}</p></div></div><div className="feature-grid">{sections.map((item, i) => <button className="feature-card" key={item.id} onClick={() => navigate(item.id)}><div className="feature-top"><span className="feature-icon">{item.icon}</span><span>0{i + 1} / 04</span></div><h3>{item.title}</h3><p>{item.desc}</p><span className="feature-link">{t.open} ↗</span></button>)}</div></section>
 
         <section id="plans" className="pricing-section"><div className="pricing-intro"><div className="eyebrow">04 / MEMBERSHIP</div><h2>{t.plans}</h2><p>{t.plansSub}</p><div className="currency-note">DISPLAY CURRENCY <b>{currency}</b><small>Illustrative converted display. Final billing currency and prices are set at checkout.</small></div></div><div className="plans-grid">
-          {[{name:t.free,price:0,desc:t.freeDesc,features:[t.monthly,"Curated library access","Community browsing"],cta:t.startFree},{name:t.starter,price:null,desc:t.starterDesc,features:["Expanded monthly downloads","Clean downloads where licensed","Creator tools"],cta:t.choose},{name:t.pro,price:null,desc:t.proDesc,features:["Higher download allowance","AI content workspace","Priority library access"],cta:t.choose},{name:t.premium,price:null,desc:t.premiumDesc,features:["Marketplace seller access","Creator subscriptions","Sales and audience insights"],cta:t.choose}].map((plan,i)=><article className={i===2?"plan-card highlighted":"plan-card"} key={plan.name}><div className="plan-name">{plan.name}{i===2&&<span>POPULAR</span>}</div><div className="plan-price">{plan.price===0?"FREE":"Set at launch"}<small>{plan.price===0?"":t.month}</small></div><p>{plan.desc}</p><ul>{plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}</ul><button className={i===2?"primary-btn full":"outline-btn full"} onClick={() => setNotice("Subscription checkout is not connected yet. Prices and loyalty discounts will be configured before sales open.")}>{plan.cta} <span>↗</span></button></article>)}
-        </div><p className="loyalty-note"><span>✳</span> Loyalty pricing is planned: the monthly price decreases for each uninterrupted paid month. A voluntary cancellation resets the introductory price on a later return. Exact reductions and minimum price will be configurable by the administrator.</p></section>
+          {planCards.map((plan,i)=><article className={i===2?"plan-card highlighted":"plan-card"} key={plan.name}><div className="plan-name">{plan.name}{i===2&&<span>POPULAR</span>}</div><div className="plan-price">{plan.priceText}<small>{plan.tier==="free"?"":t.month}</small></div><p>{plan.desc}</p><ul>{plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}</ul><button className={i===2?"primary-btn full":"outline-btn full"} onClick={() => setNotice("Subscription checkout is not connected yet. Prices and loyalty discounts will be configured before sales open.")}>{plan.cta} <span>↗</span></button></article>)}
+        </div><p className="loyalty-note"><span>✳</span> Loyalty reductions and minimum prices are configurable by the administrator. Uninterrupted paid months increase the discount; voluntary cancellation resets the introductory price. Billing remains disabled until Stripe is connected.</p></section>
       </main>
 
       <footer className="footer"><div className="footer-brand"><span className="brand-mark">V</span><span>VICE<span className="brand-accent">HUB</span></span></div><p>{t.note}</p><div className="footer-links"><button onClick={() => window.location.assign("/terms")}>Terms</button><button onClick={() => window.location.assign("/privacy")}>Privacy</button><button onClick={() => window.location.assign("/copyright")}>Copyright</button></div><small>© 2026 VICEHUB. INDEPENDENT CREATOR PLATFORM.</small></footer>
