@@ -1,15 +1,4 @@
 {
   "name": "social-publisher",
-  "entry": "index.ts",
-  "automations": [
-    {
-      "name": "Process scheduled social posts",
-      "type": "scheduled",
-      "schedule_mode": "recurring",
-      "schedule_type": "cron",
-      "cron_expression": "*/5 * * * *",
-      "description": "Publish due VICEHUB social posts every five minutes.",
-      "is_active": true
-    }
-  ]
+  "entry": "index.ts"
 }
