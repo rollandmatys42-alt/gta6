@@ -1,0 +1,106 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { secrets } from "base44:runtime";
+
+const encoder = new TextEncoder();
+const hex = bytes => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, "0")).join("");
+const safeEqual = (a, b) => {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+};
+async function verifyStripeSignature(rawBody, header, secret) {
+  const parts = Object.fromEntries(header.split(",").map(part => part.trim().split("=", 2)));
+  const timestamp = Number(parts.t);
+  const signatures = header.split(",").map(part => part.trim()).filter(part => part.startsWith("v1=")).map(part => part.slice(3));
+  if (!timestamp || Math.abs(Date.now() / 1000 - timestamp) > 300 || !signatures.length) return false;
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const digest = hex(await crypto.subtle.sign("HMAC", key, encoder.encode(timestamp + "." + rawBody)));
+  return signatures.some(signature => safeEqual(signature, digest));
+}
+function localStatus(status) {
+  if (status === "active") return "active";
+  if (status === "trialing") return "trialing";
+  if (status === "past_due") return "past_due";
+  if (status === "canceled") return "cancelled";
+  return "inactive";
+}
+async function stripeGet(path) {
+  const key = secrets.get("STRIPE_SECRET_KEY");
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured.");
+  const response = await fetch("https://api.stripe.com/v1/" + path, { headers: { Authorization: "Bearer " + key } });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body?.error?.message || "Stripe API request failed.");
+  return body;
+}
+async function saveStripeSubscription(db, stripeSub, fallback = {}) {
+  const userId = stripeSub.metadata?.user_id || fallback.user_id;
+  const tierCode = stripeSub.metadata?.tier_code || fallback.tier_code;
+  if (!userId || !["starter", "pro", "premium"].includes(tierCode)) return false;
+  const rows = await db.UserSubscription.filter({ stripe_subscription_id: stripeSub.id }, "-created_date", 1, 0);
+  const existing = rows[0] || (await db.UserSubscription.filter({ user_id: userId }, "-created_date", 1, 0))[0];
+  const status = localStatus(stripeSub.status);
+  const item = stripeSub.items?.data?.[0];
+  const customerId = typeof stripeSub.customer === "string" ? stripeSub.customer : stripeSub.customer?.id;
+  const currency = (item?.price?.currency || fallback.currency || "usd").toUpperCase();
+  const startedAt = stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000).toISOString() : new Date().toISOString();
+  const payload = {
+    user_id: userId, tier_code: tierCode, status, currency, started_at: startedAt,
+    stripe_customer_id: customerId, stripe_subscription_id: stripeSub.id,
+    current_monthly_price_cents: Number(item?.price?.unit_amount || fallback.price_cents || 0),
+    loyalty_discount_percent: Number(stripeSub.metadata?.discount_percent || fallback.discount_percent || 0),
+    voluntary_cancelled: !!stripeSub.cancel_at_period_end || stripeSub.status === "canceled",
+    ...(stripeSub.cancel_at ? { cancelled_at: new Date(stripeSub.cancel_at * 1000).toISOString() } : {}),
+  };
+  if (existing) await db.UserSubscription.update(existing.id, payload);
+  else await db.UserSubscription.create({ ...payload, streak_months: 0 });
+  return true;
+}
+
+export const Route = createFileRoute("/api/stripe/webhook")({
+  server: {
+    handlers: {
+      POST: async ({ request, context }) => {
+        const signingSecret = secrets.get("STRIPE_WEBHOOK_SECRET");
+        if (!signingSecret) return Response.json({ error: "Webhook signing secret is not configured." }, { status: 503 });
+        const signature = request.headers.get("stripe-signature") || "";
+        const rawBody = await request.text();
+        if (!(await verifyStripeSignature(rawBody, signature, signingSecret))) {
+          return Response.json({ error: "Invalid Stripe signature." }, { status: 400 });
+        }
+        let event;
+        try { event = JSON.parse(rawBody); }
+        catch { return Response.json({ error: "Invalid event JSON." }, { status: 400 }); }
+        try {
+          const db = context.getBase44().asServiceRole.entities;
+          const object = event.data?.object || {};
+          if (event.type === "checkout.session.completed" && object.mode === "subscription" && object.subscription) {
+            const subscriptionId = typeof object.subscription === "string" ? object.subscription : object.subscription.id;
+            const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
+            await saveStripeSubscription(db, stripeSub, {
+              user_id: object.metadata?.user_id || object.client_reference_id,
+              tier_code: object.metadata?.tier_code,
+              currency: object.metadata?.currency,
+              price_cents: Number(object.metadata?.monthly_price_cents || 0),
+              discount_percent: Number(object.metadata?.discount_percent || 0),
+            });
+          } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+            await saveStripeSubscription(db, object);
+          } else if (event.type === "invoice.payment_failed" || event.type === "invoice.paid") {
+            const subscriptionId = object.subscription || object.parent?.subscription_details?.subscription;
+            if (subscriptionId) {
+              const rows = await db.UserSubscription.filter({ stripe_subscription_id: subscriptionId }, "-created_date", 1, 0);
+              if (rows[0]) {
+                const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
+                await saveStripeSubscription(db, stripeSub);
+              }
+            }
+          }
+          return Response.json({ received: true });
+        } catch (error) {
+          return Response.json({ error: error?.message || "Webhook processing failed." }, { status: 500 });
+        }
+      },
+    },
+  },
+});
