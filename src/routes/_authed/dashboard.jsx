@@ -12,13 +12,13 @@ export const Route = createFileRoute("/_authed/dashboard")({
 });
 
 const modules = [
-  ["/", "01", "VIDEO LIBRARY", "Discover, filter and download creator-ready clips."],
-  ["/social", "02", "SOCIAL PUBLISHING", "Prepare content for TikTok, Instagram, YouTube and X."],
-  ["/studio", "03", "CREATOR STUDIO", "Build hooks, captions, scripts and metadata."],
-  ["/creators", "04", "CREATOR PROFILE", "Manage your identity, bio and public links."],
-  ["/messages", "05", "MESSAGES", "Manage private creator conversations."],
-  ["/notifications", "06", "NOTIFICATIONS", "Review account and content updates."],
-  ["/shop", "07", "VICE SUPPLY", "Browse creator tools and platform merchandise."],
+  ["/", "01", "dashboard.module.video", "dashboard.module.videoDesc"],
+  ["/social", "02", "dashboard.module.social", "dashboard.module.socialDesc"],
+  ["/studio", "03", "dashboard.module.studio", "dashboard.module.studioDesc"],
+  ["/creators", "04", "dashboard.module.profile", "dashboard.module.profileDesc"],
+  ["/messages", "05", "dashboard.module.messages", "dashboard.module.messagesDesc"],
+  ["/notifications", "06", "dashboard.module.notifications", "dashboard.module.notificationsDesc"],
+  ["/shop", "07", "dashboard.module.shop", "dashboard.module.shopDesc"],
 ];
 
 function Metric({ label, value, note, href }) {
