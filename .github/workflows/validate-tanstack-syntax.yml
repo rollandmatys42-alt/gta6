@@ -11,23 +11,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-save typescript
+      - run: npm install --no-save @babel/parser
       - name: Parse every JS and JSX source file
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const cp = require('node:child_process');
-          const tsModule = require('typescript');
-          const ts = tsModule.default || tsModule;
+          const { parse } = require('@babel/parser');
           const files = cp.execSync('git ls-files', {encoding:'utf8'}).trim().split('\n').filter(p => /^src\/.*\.(jsx|js|tsx|ts)$/.test(p));
           let failed = false;
           for (const file of files) {
-            const kind = /\.tsx?$/.test(file) ? 4 : file.endsWith('.jsx') ? 2 : file.endsWith('.ts') ? 3 : 1;
-            const source = ts.createSourceFile(file, fs.readFileSync(file,'utf8'), ts.ScriptTarget.Latest, true, kind);
-            for (const d of source.parseDiagnostics) {
+            try {
+              parse(fs.readFileSync(file,'utf8'), {sourceType:'module', sourceFilename:file, plugins:['jsx','typescript','decorators-legacy','importAttributes']});
+            } catch (e) {
               failed = true;
-              const pos = source.getLineAndCharacterOfPosition(d.start || 0);
-              console.error(file + ':' + (pos.line+1) + ':' + (pos.character+1) + ' ' + ts.flattenDiagnosticMessageText(d.messageText,' '));
+              console.error(file + ':' + (e.loc?.line||1) + ':' + (e.loc?.column||1) + ' ' + e.message);
             }
           }
           console.log('Parsed ' + files.length + ' source files.');
