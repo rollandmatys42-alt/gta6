@@ -72,8 +72,10 @@ async function saveStripeSubscription(db, stripeSub, fallback = {}) {
   const customerId = typeof stripeSub.customer === "string" ? stripeSub.customer : stripeSub.customer?.id;
   const currency = (item?.price?.currency || fallback.currency || "usd").toUpperCase();
   const startedAt = stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000).toISOString() : new Date().toISOString();
+  const resetStreak = !!existing && existing.stripe_subscription_id !== stripeSub.id;
   const payload = {
     user_id: userId, tier_code: tierCode, status, currency, started_at: startedAt,
+    streak_months: resetStreak ? 0 : Number(existing?.streak_months || 0),
     stripe_customer_id: customerId, stripe_subscription_id: stripeSub.id,
     current_monthly_price_cents: Number(item?.price?.unit_amount || fallback.price_cents || 0),
     loyalty_discount_percent: Number(stripeSub.metadata?.discount_percent || fallback.discount_percent || 0),
