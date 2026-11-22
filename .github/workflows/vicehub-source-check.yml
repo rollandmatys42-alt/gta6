@@ -17,7 +17,7 @@ jobs:
           node-version: 22
       - name: Parse changed JSX and JavaScript
         run: |
-          npx --yes esbuild src/routes/library.jsx src/routes/social.jsx src/routes/_authed/admin/videos.jsx src/lib/server-fns.js --bundle --external:* --outdir=/tmp/vicehub-syntax-check --log-level=warning
+          npx --yes esbuild src/routes/library.jsx src/routes/social.jsx src/routes/admin.jsx src/routes/api/social/publisher.jsx src/routes/api/social/publisher/cron.jsx src/routes/_authed/admin/videos.jsx src/lib/server-fns.js --bundle --external:* --outdir=/tmp/vicehub-syntax-check --log-level=warning
 
   scheduled-worker:
     name: Scheduled social worker type check
