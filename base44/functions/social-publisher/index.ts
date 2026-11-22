@@ -12,6 +12,7 @@ const unb64 = (value: string) => {
   return Uint8Array.from(binary, c => c.charCodeAt(0));
 };
 const hex = (bytes: Uint8Array) => Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+const safeEqual = (a: string, b: string) => { if (a.length !== b.length) return false; let diff = 0; for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i); return diff === 0; };
 const sha = async (value: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(value)));
 const hmac = async (keyBytes: Uint8Array, value: string) => {
   const key = await crypto.subtle.importKey("raw", new Uint8Array(keyBytes).buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -167,9 +168,14 @@ async function publish(post: any, account: any, token: string, mediaUrl: string)
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    // This worker processes the entire platform queue, so only an authenticated app administrator may invoke it.
-    const caller = await base44.auth.me();
-    if (!caller || caller.role !== "admin") {
+    // This worker processes the entire platform queue. Allow only an authenticated admin
+    // or the GitHub Actions scheduler presenting the server-side shared secret.
+    const input = await req.json().catch(() => ({}));
+    const expectedCronSecret = Deno.env.get("SOCIAL_PUBLISHER_CRON_SECRET") || "";
+    const suppliedCronSecret = typeof input?.cronSecret === "string" ? input.cronSecret : "";
+    const isCron = expectedCronSecret.length >= 32 && safeEqual(suppliedCronSecret, expectedCronSecret);
+    const caller = await base44.auth.me().catch(() => null);
+    if (!isCron && (!caller || caller.role !== "admin")) {
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
     const db = base44.asServiceRole.entities;
