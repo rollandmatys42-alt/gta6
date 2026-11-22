@@ -1,0 +1,25 @@
+{
+  "name": "SubscriberPromotion",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+    "code": { "type": "string", "minLength": 3, "maxLength": 40 },
+    "discount_percent": { "type": "number", "minimum": 1, "maximum": 100 },
+    "target_tiers": { "type": "array", "items": { "type": "string", "enum": ["free", "starter", "pro", "premium"] } },
+    "target_countries": { "type": "array", "items": { "type": "string", "maxLength": 2 } },
+    "starts_at": { "type": "string", "format": "date-time" },
+    "ends_at": { "type": "string", "format": "date-time" },
+    "max_redemptions": { "type": "integer", "minimum": 0, "default": 0 },
+    "redemptions": { "type": "integer", "minimum": 0, "default": 0 },
+    "status": { "type": "string", "enum": ["draft", "active", "paused", "expired"], "default": "draft" },
+    "stripe_coupon_id": { "type": "string" },
+    "internal_note": { "type": "string", "maxLength": 1000 }
+  },
+  "required": ["name", "code", "discount_percent", "target_tiers", "target_countries", "status"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
