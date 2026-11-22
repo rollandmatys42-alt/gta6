@@ -71,7 +71,8 @@ const dictionaries = {
   }
 };
 
-for (const locale of supportedLocales) Object.assign(dictionaries[locale], dashboardWords[locale] || {});
+const legalWords = {"en":{"legal.platform":"PLATFORM INFORMATION","legal.terms":"Terms of Service","legal.privacy":"Privacy Policy","legal.copyright":"Copyright & Takedown","legal.preparing":"This page is being prepared. Please check back later."},"fr":{"legal.platform":"INFORMATIONS SUR LA PLATEFORME","legal.terms":"Conditions d'utilisation","legal.privacy":"Politique de confidentialité","legal.copyright":"Droits d'auteur et signalement","legal.preparing":"Cette page est en préparation. Veuillez revenir plus tard."},"es":{"legal.platform":"INFORMACIÓN DE LA PLATAFORMA","legal.terms":"Condiciones del servicio","legal.privacy":"Política de privacidad","legal.copyright":"Derechos de autor y retirada","legal.preparing":"Esta página está en preparación. Vuelve más tarde."},"pt":{"legal.platform":"INFORMAÇÕES DA PLATAFORMA","legal.terms":"Termos de serviço","legal.privacy":"Política de privacidade","legal.copyright":"Direitos de autor e remoção","legal.preparing":"Esta página está a ser preparada. Volte mais tarde."},"it":{"legal.platform":"INFORMAZIONI SULLA PIATTAFORMA","legal.terms":"Termini di servizio","legal.privacy":"Informativa sulla privacy","legal.copyright":"Copyright e rimozione","legal.preparing":"Questa pagina è in preparazione. Torna più tardi."},"de":{"legal.platform":"PLATTFORMINFORMATIONEN","legal.terms":"Nutzungsbedingungen","legal.privacy":"Datenschutzerklärung","legal.copyright":"Urheberrecht & Meldung","legal.preparing":"Diese Seite wird vorbereitet. Bitte später erneut besuchen."}};
+for (const locale of supportedLocales) Object.assign(dictionaries[locale], dashboardWords[locale] || {}, legalWords[locale] || {});
 
 export function translate(locale, key) {
   return dictionaries[locale]?.[key] || dictionaries.en[key] || key;
