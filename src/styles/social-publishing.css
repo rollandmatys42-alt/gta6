@@ -3,3 +3,6 @@
 @media(max-width:650px){.social-shell{padding-top:4px}.social-hero{min-height:330px;padding:24px 20px}.social-hero h1{font-size:49px}.social-hero-stamp{display:none}.social-section{padding:16px;margin-top:18px}.social-section-head{align-items:flex-start;flex-direction:column}.social-section-head h2{font-size:29px}.social-connect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.social-provider-card p{min-height:90px}.social-account-list,.social-post-list,.social-form-grid{grid-template-columns:1fr}.social-composer{padding:14px}.social-queue-toolbar{flex-wrap:wrap}.social-queue-toolbar button{margin-left:0}.social-account-row{align-items:flex-start}.social-account-row>div{min-width:0}}
 
 .social-ai-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:-8px}.social-ai-row small{color:#8290a8;font-size:9px;line-height:1.5}
+
+.social-provider-warning{display:block;margin:8px 0 12px;color:#ffb982;font-size:10px;line-height:1.55;letter-spacing:.04em}
+.social-provider-card button:disabled{opacity:.55;cursor:not-allowed}
