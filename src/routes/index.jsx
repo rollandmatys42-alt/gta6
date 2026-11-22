@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listPublishedVideos, requestVideoDownload, getNewsFeed, getPublicPlans } from "@/lib/server-fns";
+import { listPublishedVideos, requestVideoDownload, getNewsFeed, getPublicPlans, createStripeCheckoutSession } from "@/lib/server-fns";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -46,6 +46,7 @@ function HomePage() {
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
+  const [checkoutBusy, setCheckoutBusy] = useState("");
   const [liveVideos, setLiveVideos] = useState([]);
   const [liveNews, setLiveNews] = useState([]);
   const [livePlans, setLivePlans] = useState([]);
@@ -84,6 +85,18 @@ function HomePage() {
     ((v.title || "").toLowerCase().includes(search.toLowerCase()) || (v.category || "").toLowerCase().includes(search.toLowerCase()))
   ), [liveVideos, category, videoLanguage, search]);
   const featuredVideo = liveVideos.find(v => v.is_featured) || liveVideos[0] || null;
+  const startCheckout = async (plan) => {
+    if (!isAuthenticated) { navigateToLogin(); return; }
+    if (!plan.checkoutReady) { setNotice(t.pricePending); return; }
+    setCheckoutBusy(plan.tier); setNotice("");
+    try {
+      const result = await createStripeCheckoutSession({ data: { tierCode: plan.tier, currency } });
+      window.location.assign(result.url);
+    } catch (error) {
+      setNotice(error?.message || "Secure checkout could not be opened.");
+      setCheckoutBusy("");
+    }
+  };
   const downloadVideo = async (video) => {
     try {
       setDownloadMessage("Checking your account and monthly download allowance…");
@@ -106,7 +119,7 @@ function HomePage() {
     {tier:"starter",name:t.starter,desc:t.starterDesc,features:[t.expandedDownloads,t.cleanDownloads,t.creatorTools],cta:t.choose},
     {tier:"pro",name:t.pro,desc:t.proDesc,features:[t.higherAllowance,t.aiWorkspace,t.priorityAccess],cta:t.choose},
     {tier:"premium",name:t.premium,desc:t.premiumDesc,features:[t.directSocial,t.analytics,t.advancedAllowance],cta:t.choose}
-  ].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat(language,{style:"currency",currency}).format(configured.monthly_price_cents/100):t.pricePending};});
+  ].map((p)=>{const configured=livePlans.find((x)=>x.tier_code===p.tier);return {...p,priceText:p.tier==="free"?"FREE":configured?new Intl.NumberFormat(language,{style:"currency",currency}).format(configured.monthly_price_cents/100):t.pricePending,checkoutReady:!!configured&&Number(configured.monthly_price_cents)>0};});
   return (
     <div className="hub-shell">
       <header className="topbar">
@@ -158,7 +171,7 @@ function HomePage() {
         <section className="features-section"><div className="section-head"><div><div className="eyebrow">03 / CREATOR WORKSPACE</div><h2>{t.tools}</h2><p>{t.toolsSub}</p></div></div><div className="feature-grid">{sections.map((item, i) => <button className="feature-card" key={item.id} onClick={() => navigate(item.id)}><div className="feature-top"><span className="feature-icon">{item.icon}</span><span>0{i + 1} / 04</span></div><h3>{t[item.titleKey] || t.studio}</h3><p>{t[item.descKey] || t.latestSub}</p><span className="feature-link">{t.open} ↗</span></button>)}</div></section>
 
         <section id="plans" className="pricing-section"><div className="pricing-intro"><div className="eyebrow">04 / MEMBERSHIP</div><h2>{t.plans}</h2><p>{t.plansSub}</p><div className="currency-note">{t.currencyLabel} <b>{currency}</b><small>{t.checkoutDisabled}</small></div></div><div className="plans-grid">
-          {planCards.map((plan,i)=><article className={i===2?"plan-card highlighted":"plan-card"} key={plan.name}><div className="plan-name">{plan.name}{i===2&&<span>{t.popular}</span>}</div><div className="plan-price">{plan.priceText}<small>{plan.tier==="free"?"":t.month}</small></div><p>{plan.desc}</p><ul>{plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}</ul><button className={i===2?"primary-btn full":"outline-btn full"} onClick={() => setNotice(t.checkoutDisabled)}>{plan.cta} <span>↗</span></button></article>)}
+          {planCards.map((plan,i)=><article className={i===2?"plan-card highlighted":"plan-card"} key={plan.name}><div className="plan-name">{plan.name}{i===2&&<span>{t.popular}</span>}</div><div className="plan-price">{plan.priceText}<small>{plan.tier==="free"?"":t.month}</small></div><p>{plan.desc}</p><ul>{plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}</ul><button className={i===2?"primary-btn full":"outline-btn full"} disabled={plan.tier!=="free"&&(!plan.checkoutReady||!!checkoutBusy)} onClick={() => plan.tier==="free" ? (isAuthenticated?window.location.assign("/dashboard"):navigateToLogin()) : startCheckout(plan)}>{checkoutBusy===plan.tier?"OPENING SECURE CHECKOUT…":plan.tier==="free"?plan.cta:plan.checkoutReady?plan.cta:t.pricePending} <span>↗</span></button></article>)}
         </div><p className="loyalty-note"><span>✳</span> {t.loyaltyNote}</p></section>
       </main>
 

@@ -64,6 +64,8 @@
       "minimum": 0,
       "default": 0
     },
+    "stripe_product_id": { "type": "string" },
+    "stripe_price_id": { "type": "string" },
     "sort_order": {
       "type": "integer",
       "default": 0
