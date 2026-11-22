@@ -62,6 +62,37 @@ async function presignR2({ method, objectKey, contentType, expiresIn = DOWNLOAD_
   return base.origin + canonicalUri + "?" + params + "&X-Amz-Signature=" + signature;
 }
 
+export const testVideoStorage = createServerFn({ method: "POST" }).middleware([requireUser]).handler(async ({ context }) => {
+  requireAdmin(context);
+  const objectKey = "system/health-check-" + Date.now() + ".txt";
+  const marker = "VICEHUB-R2-PRIVATE-HEALTH-CHECK";
+  const started = Date.now();
+  let uploaded = false;
+  try {
+    const putUrl = await presignR2({ method: "PUT", objectKey, contentType: "text/plain", expiresIn: 60 });
+    const putResponse = await fetch(putUrl, { method: "PUT", headers: { "Content-Type": "text/plain" }, body: marker });
+    if (!putResponse.ok) throw new Error("R2 write test failed with HTTP " + putResponse.status + ".");
+    uploaded = true;
+    const getUrl = await presignR2({ method: "GET", objectKey, expiresIn: 60 });
+    const getResponse = await fetch(getUrl);
+    if (!getResponse.ok) throw new Error("R2 read test failed with HTTP " + getResponse.status + ".");
+    const actual = await getResponse.text();
+    if (actual !== marker) throw new Error("R2 read-back verification did not match the test marker.");
+    const deleteUrl = await presignR2({ method: "DELETE", objectKey, expiresIn: 60 });
+    const deleteResponse = await fetch(deleteUrl, { method: "DELETE" });
+    if (!deleteResponse.ok) throw new Error("R2 cleanup failed with HTTP " + deleteResponse.status + ".");
+    uploaded = false;
+    return { ok: true, checkedAt: new Date().toISOString(), latencyMs: Date.now() - started, testObjectRemoved: true };
+  } finally {
+    if (uploaded) {
+      try {
+        const deleteUrl = await presignR2({ method: "DELETE", objectKey, expiresIn: 60 });
+        await fetch(deleteUrl, { method: "DELETE" });
+      } catch {}
+    }
+  }
+});
+
 export const listPublishedVideos = createServerFn({ method: "GET" }).handler(async ({ context }) => {
   const base44 = context.getBase44();
   const rows = await base44.asServiceRole.entities.Video.filter(
@@ -483,13 +514,13 @@ export const saveSitePage = createServerFn({method:"POST"}).middleware([requireU
 
 export const getAdminOverview = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
- const [users,news,threads,listings,products,reports,downloads]=await Promise.all([
+ const [users,news,products,reports,downloads,videos,subscriptions]=await Promise.all([
   context.getBase44().asServiceRole.users.list().catch(()=>[]),
-  db.NewsArticle.list("-created_date",200,0),db.ForumThread.list("-created_date",200,0),
-  db.MarketplaceListing.list("-created_date",200,0),db.ShopProduct.list("-created_date",200,0),
-  db.ContentReport.filter({status:"open"},"-created_date",100,0),db.DownloadEvent.list("-created_date",500,0)
+  db.NewsArticle.list("-created_date",200,0),db.ShopProduct.list("-created_date",200,0),
+  db.ContentReport.filter({status:"open"},"-created_date",100,0),db.DownloadEvent.list("-created_date",1000,0),
+  db.Video.list("-created_date",2000,0),db.UserSubscription.list("-created_date",2000,0)
  ]);
- return {users:users.length,news:news.length,publishedNews:news.filter(x=>x.status==="published").length,threads:threads.length,listings:listings.length,products:products.length,openReports:reports.length,downloads:downloads.length};
+ return {users:users.length,news:news.length,publishedNews:news.filter(x=>x.status==="published").length,products:products.length,openReports:reports.length,downloads:downloads.length,videos:videos.length,publishedVideos:videos.filter(x=>x.status==="published"&&x.license_status==="verified").length,activeSubscriptions:subscriptions.filter(x=>x.status==="active"||x.status==="trialing").length};
 });
 export const getAdminReports = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.list("-created_date",100,0);
@@ -564,7 +595,7 @@ export const getMyMarketplaceInquiries = createServerFn({method:"GET"}).middlewa
 
 export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
- const categories=[["General","general","General GTA VI discussion"],["News & Updates","news-updates","Official updates and reported news"],["Gameplay","gameplay","Missions, mechanics and discoveries"],["Creative Work","creative-work","Edits, cinematics and creator showcases"],["Help & Tutorials","help-tutorials","Editing workflows and technical help"]];
+ const categories=[]; // Community/forum taxonomy is intentionally on hold for the later launch phase.
  let categoryCount=0;
  for(let i=0;i<categories.length;i++){const [name,slug,description]=categories[i];const exists=await db.ForumCategory.filter({slug},"created_date",1,0);if(!exists.length){await db.ForumCategory.create({name,slug,description,sort_order:i,status:"active"});categoryCount++;}}
  const templates=[
@@ -622,7 +653,7 @@ export const createContentReport = createServerFn({method:"POST"}).middleware([r
  .handler(async({data,context})=>context.getBase44().asServiceRole.entities.ContentReport.create({reporter_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reason:data.reason,details:data.details||"",status:"open"}));
 
 export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object({currency:z.enum(["USD","EUR","GBP"]).default("USD")})).handler(async({data,context})=>{
- const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({status:"active",currency:data.currency},"sort_order",20,0);
+ const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",20,0);
  return rows;
 });
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
@@ -673,7 +704,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     const user=context.user;
     const plans=await db.SubscriptionPlan.filter({tier_code:data.tierCode,currency:data.currency,status:"active"},"-created_date",1,0);
     const plan=plans[0];
-    if(!plan||Number(plan.monthly_price_cents||0)<=0)throw Object.assign(new Error("This membership is not yet open for sale. Its price must be configured by the administrator first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
+    if(!plan||Number(plan.monthly_price_cents||0)<=0||Number(plan.monthly_download_limit||0)<1)throw Object.assign(new Error("This membership is not yet open for sale. The administrator must configure a positive monthly price and download allowance first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
     if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
