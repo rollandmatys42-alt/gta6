@@ -676,7 +676,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     if(!plan||Number(plan.monthly_price_cents||0)<=0)throw Object.assign(new Error("This membership is not yet open for sale. Its price must be configured by the administrator first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
-    if(existing?.status==="active"||existing?.status==="trialing")throw Object.assign(new Error("You already have an active membership. Use Manage membership to change or cancel it."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
+    if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
     const streak=existing?.status==="active"&&!existing?.voluntary_cancelled?Number(existing.streak_months||0):0;
     const discount=Math.min(Number(plan.loyalty_max_discount_percent||0),streak*Number(plan.loyalty_monthly_discount_percent||0));
     const priceCents=Math.max(Number(plan.loyalty_floor_price_cents||0),Math.round(Number(plan.monthly_price_cents)*(1-discount/100)));
