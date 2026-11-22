@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-const links=[["/","HOME"],["/news","NEWS"],["/creators","CREATORS"],["/messages","MESSAGES"],["/notifications","ALERTS"],["/shop","SHOP"],["/studio","AI STUDIO"],["/social","SOCIAL PLANNER"],["/dashboard","ACCOUNT"]];
+const links=[["/","nav.home"],["/news","nav.news"],["/creators","nav.creators"],["/messages","nav.messages"],["/notifications","nav.alerts"],["/shop","nav.shop"],["/studio","nav.studio"],["/social","nav.social"],["/dashboard","nav.account"]];
 export default function SiteFrame({children,eyebrow="VICEHUB / CREATOR NETWORK"}) {
  return <div className="platform-shell">
   <header className="platform-topbar"><Link to="/" className="brand"><span className="brand-mark">V</span><span>VICE<span className="brand-accent">HUB</span><small>CREATOR NETWORK</small></span></Link>
