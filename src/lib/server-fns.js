@@ -1080,10 +1080,8 @@ export const listPublishedVideosPage = createServerFn({ method: "GET" })
     if (data.category) filter.category = data.category;
     if (data.language) filter.language = data.language;
     if (data.search) {
-      // Escape user input before passing it to the database's case-insensitive regex filter.
-      const term = data.search.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\    if (data.category) filter.category = data.category;
-    if (data.language) filter.language = data.language;
-    const rows = await base44.asServiceRole.entities.Video.filter(");
+      // Escape regular-expression metacharacters so search input remains literal.
+      const term = data.search.split("").map((char) => "\\^$.*+?()[]{}|".includes(char) ? "\\" + char : char).join("");
       filter.$or = [
         { title: { $regex: term, $options: "i" } },
         { description: { $regex: term, $options: "i" } },
