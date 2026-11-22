@@ -88,6 +88,7 @@ function VideoLibraryPage() {
   }, [videos, query]);
 
   const featured = videos.find(video => video.is_featured) || videos[0] || null;
+  const gridVideos = filtered.filter(video => video.id !== featured?.id);
   const openPreview = async video => {
     setSelected(video);
     setPreviewUrl("");
@@ -156,7 +157,7 @@ function VideoLibraryPage() {
       <section className="vh-library-results">
         {loading && videos.length === 0 ? <div className="vh-library-empty">{t.loading}</div> :
           filtered.length === 0 ? <div className="vh-library-empty">{t.empty}</div> :
-          <div className="vh-library-grid">{filtered.map((video, index) => <article className="vh-library-card" key={video.id}>
+          <div className="vh-library-grid">{gridVideos.map((video, index) => <article className="vh-library-card" key={video.id}>
             <button type="button" className="vh-library-card-art" onClick={() => openPreview(video)} aria-label={t.preview + ": " + video.title}>
               {video.thumbnail_url ? <img src={video.thumbnail_url} alt={video.title} loading="lazy" /> : <div className="vh-library-placeholder"><b>VICEHUB</b><span>{(video.category || "GTA VI").toUpperCase()}</span></div>}
               <span className="vh-library-card-number">{String(index + 1).padStart(2, "0")}</span>
