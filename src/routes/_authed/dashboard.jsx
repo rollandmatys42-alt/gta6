@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile } from "@/lib/server-fns";
+import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile, refreshMySubscription, createStripePortalSession } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 
 export const Route = createFileRoute("/_authed/dashboard")({
@@ -30,9 +30,11 @@ function DashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [billingBusy, setBillingBusy] = useState(false);
 
   const load = async () => {
     setLoading(true); setError("");
+    await refreshMySubscription().catch(() => null);
     const jobs = await Promise.allSettled([getMyAccount(), getMyMessages(), getMyNotifications(), getMySocialPosts(), getMyStudioDrafts(), getMyCreatorProfile()]);
     const val = (i, fallback) => jobs[i].status === "fulfilled" ? jobs[i].value : fallback;
     if (jobs[0].status === "rejected") setError(jobs[0].reason?.message || "Your account data could not be loaded.");
@@ -52,6 +54,11 @@ function DashboardPage() {
   const percent = limit ? Math.min(100, used / limit * 100) : 0;
   const unreadMessages = data?.messages?.inbox?.filter(m => m.status !== "seen").length || 0;
   const unreadAlerts = data?.notifications?.filter(n => !n.read_at).length || 0;
+  const manageBilling = async () => {
+    setBillingBusy(true); setError("");
+    try { const result = await createStripePortalSession(); window.location.assign(result.url); }
+    catch (err) { setError(err?.message || "Billing portal could not be opened."); setBillingBusy(false); }
+  };
 
   return <SiteFrame eyebrow="VICEHUB / CREATOR CONTROL ROOM">
     <section className="account-dashboard-hero">
@@ -82,6 +89,8 @@ function DashboardPage() {
           <div className="account-plan-foot"><span>{used} downloads used</span><b>{account?.downloadsRemaining ?? 0} left</b></div>
           <p className="account-muted">{account?.tier === "free" ? "Your free membership currently includes five downloads per UTC calendar month. Paid memberships will appear here once billing is activated." : "Your allowance is controlled by your active membership."}</p>
           <a className="outline-btn account-wide-link" href="/">OPEN VIDEO LIBRARY ↗</a>
+          {account?.hasBillingCustomer && <button className="primary-btn account-wide-link" type="button" disabled={billingBusy} onClick={manageBilling}>{billingBusy?"OPENING BILLING…":"MANAGE MEMBERSHIP / CANCEL ↗"}</button>}
+          {!account?.hasBillingCustomer && <p className="account-muted">Billing is not yet linked to this account. Paid memberships will become available when the platform opens subscriptions.</p>}
         </section>
         <section className="account-panel account-profile-panel">
           <div className="eyebrow">CREATOR IDENTITY</div><h2>{data.profile?.display_name || "YOUR CREATOR PROFILE"}</h2>
