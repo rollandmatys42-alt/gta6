@@ -696,8 +696,8 @@ export const saveAdminAgent = createServerFn({method:"POST"}).middleware([requir
  .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.AIAgentConfig;const p={agent_key:data.agentKey,display_name:data.displayName,instructions:data.instructions,provider_model:data.providerModel,enabled:data.enabled,schedule:data.schedule,monthly_run_limit:data.monthlyRunLimit};return data.id?db.update(data.id,p):db.create(p);});
 export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",100,0));
 export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X"]),caption:z.string().min(1).max(5000),accountId:z.string().optional(),mediaUrl:z.string().url().max(500).optional(),scheduledAt:z.string().datetime().optional()}))
- .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities; if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for scheduled publication."),{status:400}); if(data.accountId){const account=await db.SocialAccount.get(data.accountId).catch(()=>null);if(!account||account.user_id!==context.user.id||account.provider!==data.platform||account.status!=="connected")throw Object.assign(new Error("Select a connected account belonging to your user and matching the chosen network."),{status:403});} const p={user_id:context.user.id,platform:data.platform,caption:data.caption,account_id:data.accountId||"",media_type:data.mediaUrl?"video":"none",media_reference:data.mediaUrl||"",status:data.scheduledAt?"scheduled":"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})}; const posts=db.SocialPost;if(data.id){const existing=await posts.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id||existing.status==="published"||existing.status==="publishing")throw Object.assign(new Error("Only your own unpublished drafts can be edited."),{status:403});return posts.update(existing.id,p);}return posts.create(p);});
+ .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X"]),caption:z.string().min(1).max(5000),accountId:z.string().optional(),mediaUrl:z.string().url().max(500).optional(),mediaObjectKey:z.string().max(500).optional(),scheduledAt:z.string().datetime().optional()}))
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities; if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for scheduled publication."),{status:400}); if(data.mediaUrl&&data.mediaObjectKey)throw Object.assign(new Error("Choose either an uploaded video or a public video URL, not both."),{status:400}); if(data.mediaObjectKey&&!data.mediaObjectKey.startsWith("social/"+context.user.id+"/"))throw Object.assign(new Error("The uploaded media file does not belong to your account."),{status:403}); if(data.accountId){const account=await db.SocialAccount.get(data.accountId).catch(()=>null);if(!account||account.user_id!==context.user.id||account.provider!==data.platform||account.status!=="connected")throw Object.assign(new Error("Select a connected account belonging to your user and matching the chosen network."),{status:403});} const mediaReference=data.mediaObjectKey||data.mediaUrl||""; const p={user_id:context.user.id,platform:data.platform,caption:data.caption,account_id:data.accountId||"",media_type:mediaReference?"video":"none",media_reference:mediaReference,status:data.scheduledAt?"scheduled":"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})}; const posts=db.SocialPost;if(data.id){const existing=await posts.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id||existing.status==="published"||existing.status==="publishing")throw Object.assign(new Error("Only your own unpublished drafts can be edited."),{status:403});return posts.update(existing.id,p);}return posts.create(p);});
 export const deleteSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({postId:z.string().min(1)}))
  .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const post=await db.get(data.postId).catch(()=>null);if(!post||post.user_id!==context.user.id)throw Object.assign(new Error("You can only delete your own social drafts."),{status:403});await db.delete(post.id);return {success:true};});
@@ -1174,6 +1174,15 @@ async function providerJson(url, token, options = {}) {
   return payload;
 }
 
+export const createSocialMediaUploadUrl = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ fileName: z.string().min(1).max(180).regex(/^[a-zA-Z0-9._ -]+$/), contentType: z.enum(["video/mp4", "video/quicktime"]), sizeBytes: z.number().int().min(1).max(250 * 1024 * 1024) }))
+  .handler(async ({ data, context }) => {
+    const extension = data.contentType === "video/quicktime" ? "mov" : "mp4";
+    const objectKey = "social/" + context.user.id + "/" + crypto.randomUUID() + "." + extension;
+    const uploadUrl = await presignR2({ method: "PUT", objectKey, contentType: data.contentType, expiresIn: 300 });
+    return { uploadUrl, objectKey, expiresInSeconds: 300, maxBytes: 250 * 1024 * 1024 };
+  });
+
 export const beginSocialOAuth = createServerFn({ method: "POST" }).middleware([requireUser])
   .validator(z.object({ provider: z.enum(["TikTok", "Instagram", "YouTube", "X"]) }))
   .handler(async ({ data, context }) => {
@@ -1315,14 +1324,16 @@ async function publishSocialPostForUser(context, postId) {
   if (post.status === "published" || post.status === "publishing") throw Object.assign(new Error("This publication has already been sent or is still processing."), { status: 409 });
   const account = await db.SocialAccount.get(post.account_id).catch(() => null);
   if (!account || account.user_id !== context.user.id || account.provider !== post.platform || account.status !== "connected") throw Object.assign(new Error("Connect and select your own account for this network before publishing."), { status: 409, code: "SOCIAL_ACCOUNT_REQUIRED" });
-  if (post.media_type === "video" && (!post.media_reference || !post.media_reference.startsWith("https://"))) throw Object.assign(new Error("Video publishing requires a publicly reachable HTTPS media URL."), { status: 400 });
+  let mediaUrl = post.media_reference || "";
+  if (post.media_type === "video" && mediaUrl.startsWith("social/" + context.user.id + "/")) mediaUrl = await presignR2({ method: "GET", objectKey: mediaUrl, expiresIn: 3600 });
+  if (post.media_type === "video" && !mediaUrl.startsWith("https://")) throw Object.assign(new Error("Video publishing requires your uploaded private video or a publicly reachable HTTPS URL."), { status: 400 });
   const token = await getUsableSocialToken(db, account);
   await db.SocialPost.update(post.id, { status: "publishing", last_attempt_at: new Date().toISOString(), error_message: "" });
   try {
     let externalId = "";
     if (post.platform === "Instagram") {
       if (post.media_type !== "video") throw new Error("Instagram Reels publishing requires a video URL.");
-      const form = new URLSearchParams({ media_type: "REELS", video_url: post.media_reference, caption: post.caption, access_token: token });
+      const form = new URLSearchParams({ media_type: "REELS", video_url: mediaUrl, caption: post.caption, access_token: token });
       const container = await fetch("https://graph.facebook.com/v22.0/" + encodeURIComponent(account.provider_account_id) + "/media", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() }).then(async r => { const p = await r.json(); if (!r.ok) throw new Error(p.error?.message || "Instagram media container creation failed."); return p; });
       if (!container.id) throw new Error("Instagram did not return a media container.");
       let ready = false;
@@ -1338,7 +1349,7 @@ async function publishSocialPostForUser(context, postId) {
       externalId = published.id;
     } else if (post.platform === "Facebook") {
       if (post.media_type !== "video") throw new Error("Facebook Page video publishing requires a video URL.");
-      const form = new URLSearchParams({ file_url: post.media_reference, description: post.caption, access_token: token });
+      const form = new URLSearchParams({ file_url: mediaUrl, description: post.caption, access_token: token });
       const published = await fetch("https://graph.facebook.com/v22.0/" + encodeURIComponent(account.provider_account_id) + "/videos", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() }).then(async r => { const p = await r.json(); if (!r.ok) throw new Error(p.error?.message || "Facebook video publication failed."); return p; });
       externalId = published.id;
     } else if (post.platform === "TikTok") {
@@ -1346,13 +1357,13 @@ async function publishSocialPostForUser(context, postId) {
       const creator = await providerJson("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const privacy = creator.data?.privacy_level_options?.includes("PUBLIC_TO_EVERYONE") ? "PUBLIC_TO_EVERYONE" : creator.data?.privacy_level_options?.[0];
       if (!privacy) throw new Error("TikTok did not return an available privacy setting for this account.");
-      const response = await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ post_info: { title: post.caption.slice(0, 150), privacy_level: privacy, disable_duet: false, disable_comment: false, disable_stitch: false }, source_info: { source: "PULL_FROM_URL", video_url: post.media_reference } }) });
+      const response = await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ post_info: { title: post.caption.slice(0, 150), privacy_level: privacy, disable_duet: false, disable_comment: false, disable_stitch: false }, source_info: { source: "PULL_FROM_URL", video_url: mediaUrl } }) });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.error?.code && payload.error.code !== "ok") throw new Error(payload.error?.message || "TikTok rejected the video publication.");
       externalId = payload.data?.publish_id || "";
     } else if (post.platform === "YouTube") {
       if (post.media_type !== "video") throw new Error("YouTube upload requires a video URL.");
-      const mediaResponse = await fetch(post.media_reference);
+      const mediaResponse = await fetch(mediaUrl);
       if (!mediaResponse.ok) throw new Error("The video URL could not be downloaded for YouTube upload.");
       const length = Number(mediaResponse.headers.get("content-length") || 0);
       if (length > 256 * 1024 * 1024) throw new Error("This initial YouTube upload path is limited to 256 MB per video.");
