@@ -1,0 +1,26 @@
+{
+  "name": "InvoiceSettings",
+  "type": "object",
+  "properties": {
+    "legal_entity_name": { "type": "string", "maxLength": 180 },
+    "company_number": { "type": "string", "maxLength": 80 },
+    "registered_address": { "type": "string", "maxLength": 1000 },
+    "vat_number": { "type": "string", "maxLength": 80 },
+    "vat_registered": { "type": "boolean", "default": false },
+    "invoice_prefix": { "type": "string", "maxLength": 24 },
+    "next_sequence": { "type": "integer", "minimum": 1, "default": 1 },
+    "default_currency": { "type": "string", "enum": ["GBP", "EUR", "USD"], "default": "GBP" },
+    "payment_terms_days": { "type": "integer", "minimum": 0, "maximum": 365, "default": 14 },
+    "logo_url": { "type": "string", "format": "uri" },
+    "legal_email": { "type": "string", "maxLength": 254 },
+    "footer_text": { "type": "string", "maxLength": 2000 },
+    "tax_treatment_default": { "type": "string", "enum": ["unknown", "not_applicable", "outside_scope", "reverse_charge", "standard_rate", "zero_rate"], "default": "unknown" }
+  },
+  "required": ["legal_entity_name", "company_number", "registered_address", "vat_registered", "invoice_prefix", "next_sequence", "default_currency", "payment_terms_days", "tax_treatment_default"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
