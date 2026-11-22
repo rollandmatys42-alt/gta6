@@ -151,7 +151,7 @@ function AdminVideosPage() {
   const [editingVideo, setEditingVideo] = useState(null);
   const [editBusy, setEditBusy] = useState(false);
   const refreshLibrary = async () => { setLibraryBusy(true); try { setVideos(await getAdminVideoLibrary()); } catch (err) { setError(err?.message || "Could not load the video library."); } finally { setLibraryBusy(false); } };
-  const importCsv = async (event) => { event.preventDefault(); if (!csvFile) return; setBusy(true); setError(""); setMessage(""); try { const result = await importAdminVideoMetadataCsv({ data: { csvText: await csvFile.text() } }); setImportResult(result); setMessage(result.message); setCsvFile(null); event.currentTarget.reset(); await refreshLibrary(); } catch (err) { setError(err?.message || "CSV import failed."); } finally { setBusy(false); } };
+  const importCsv = async (event) => { event.preventDefault(); const form = event.currentTarget; if (!csvFile) return; setBusy(true); setError(""); setMessage(""); try { const result = await importAdminVideoMetadataCsv({ data: { csvText: await csvFile.text() } }); setImportResult(result); setMessage(result.message); setCsvFile(null); form.reset(); await refreshLibrary(); } catch (err) { setError(err?.message || "CSV import failed."); } finally { setBusy(false); } };
   useEffect(() => { if (user?.role === "admin") refreshLibrary(); }, [user?.id]);
 
   if (user?.role !== "admin") return <main className="account-page"><section className="account-content"><h1>ACCESS DENIED.</h1><p className="account-intro">Administrator permissions are required to manage video content.</p><button className="outline-btn" onClick={() => window.location.assign("/dashboard")}>Back to account</button></section></main>;
