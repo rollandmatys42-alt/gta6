@@ -595,7 +595,7 @@ export const getMyMarketplaceInquiries = createServerFn({method:"GET"}).middlewa
 
 export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
- const categories=[["General","general","General GTA VI discussion"],["News & Updates","news-updates","Official updates and reported news"],["Gameplay","gameplay","Missions, mechanics and discoveries"],["Creative Work","creative-work","Edits, cinematics and creator showcases"],["Help & Tutorials","help-tutorials","Editing workflows and technical help"]];
+ const categories=[]; // Community/forum taxonomy is intentionally on hold for the later launch phase.
  let categoryCount=0;
  for(let i=0;i<categories.length;i++){const [name,slug,description]=categories[i];const exists=await db.ForumCategory.filter({slug},"created_date",1,0);if(!exists.length){await db.ForumCategory.create({name,slug,description,sort_order:i,status:"active"});categoryCount++;}}
  const templates=[
