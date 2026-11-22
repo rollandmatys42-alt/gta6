@@ -263,3 +263,221 @@ export const getMyAccount = createServerFn({ method: "GET" })
       history,
     };
   });
+
+
+function requireAdmin(context) {
+  if (context.user?.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
+}
+function publicArticle(article) {
+  const { storage_key, watermarked_storage_key, ...safe } = article;
+  return safe;
+}
+
+export const getNewsFeed = createServerFn({ method: "GET" })
+  .validator(z.object({ locale: z.enum(["en","fr","es","de","it","pt"]).optional(), limit: z.number().int().min(1).max(50).optional() }))
+  .handler(async ({ data, context }) => {
+    const base44 = context.getBase44();
+    const query = { status: "published", ...(data.locale ? { locale: data.locale } : { locale: "en" }) };
+    const rows = await base44.asServiceRole.entities.NewsArticle.filter(query, "-published_at", data.limit || 30, 0);
+    return rows.map(publicArticle);
+  });
+
+export const getAdminNews = createServerFn({ method: "GET" })
+  .middleware([requireUser]).handler(async ({ context }) => {
+    requireAdmin(context);
+    return context.getBase44().asServiceRole.entities.NewsArticle.filter({}, "-created_date", 100, 0);
+  });
+
+export const saveNewsArticle = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    id: z.string().optional(), title: z.string().min(3).max(180), slug: z.string().min(3).max(200).regex(/^[a-z0-9-]+$/),
+    summary: z.string().max(500), body: z.string().min(1).max(20000), sourceName: z.string().min(2).max(100),
+    sourceUrl: z.string().url().max(1000), sourceType: z.enum(["official","media","community","social"]),
+    confidence: z.enum(["official","confirmed","reported","rumour","theory","opinion"]),
+    locale: z.enum(["en","fr","es","de","it","pt"]), tags: z.array(z.string().max(40)).max(15).optional(),
+    status: z.enum(["draft","published","archived"])
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const base44 = context.getBase44();
+    const payload = { title:data.title, slug:data.slug, summary:data.summary, body:data.body, source_name:data.sourceName,
+      source_url:data.sourceUrl, source_type:data.sourceType, confidence:data.confidence, locale:data.locale,
+      tags:data.tags||[], status:data.status, created_by:context.user.id,
+      ...(data.status==="published" ? {published_at:new Date().toISOString()} : {}) };
+    if (data.id) return base44.asServiceRole.entities.NewsArticle.update(data.id,payload);
+    return base44.asServiceRole.entities.NewsArticle.create(payload);
+  });
+
+export const getNewsSources = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  requireAdmin(context); return context.getBase44().asServiceRole.entities.NewsSource.list("-created_date",100,0);
+});
+export const saveNewsSource = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),name:z.string().min(2).max(100),feedUrl:z.string().url().max(1000),sourceType:z.enum(["official","media","community","social"]),enabled:z.boolean()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context); const db=context.getBase44().asServiceRole.entities.NewsSource;
+  const payload={name:data.name,feed_url:data.feedUrl,source_type:data.sourceType,enabled:data.enabled,created_by:context.user.id};
+  return data.id?db.update(data.id,payload):db.create(payload);
+ });
+
+export const syncNewsSources = createServerFn({method:"POST"}).middleware([requireUser]).handler(async({context})=>{
+  requireAdmin(context);
+  const db=context.getBase44().asServiceRole;
+  const sources=await db.entities.NewsSource.filter({enabled:true},"-created_date",30,0);
+  const report=[];
+  for(const source of sources){
+    try{
+      const url=new URL(source.feed_url);
+      if(url.protocol!=="https:" || /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(url.hostname)) throw new Error("Only public HTTPS feed URLs are allowed.");
+      const response=await fetch(url.toString(),{headers:{"Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml"}});
+      if(!response.ok) throw new Error("Feed returned HTTP "+response.status);
+      const xml=(await response.text()).slice(0,1500000);
+      const items=[...xml.matchAll(/<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/gi)].slice(0,20);
+      let created=0;
+      for(const match of items){
+        const block=match[2];
+        const read=(tag)=>{const m=block.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)<\/"+tag+">","i"));return m?m[1].replace(/<!\[CDATA\[|\]\]>/g,"").replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").trim():"";};
+        const title=read("title").slice(0,180);
+        const linkMatch=block.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?\s*>/i);
+        const articleUrl=read("link") || linkMatch?.[1] || "";
+        const summary=(read("description")||read("summary")||read("content")).slice(0,500);
+        if(!title || !articleUrl.startsWith("https://")) continue;
+        const exists=await db.entities.NewsArticle.filter({source_url:articleUrl}, "-created_date",1,0);
+        if(exists.length) continue;
+        const slug=title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,170)+"-"+crypto.randomUUID().slice(0,6);
+        await db.entities.NewsArticle.create({title,slug,summary:summary||"Imported from "+source.name,body:summary||title,source_name:source.name,source_url:articleUrl,source_type:source.source_type,confidence:source.source_type==="official"?"official":"reported",locale:"en",status:"draft",tags:["RSS import"],created_by:context.user.id});
+        created++;
+      }
+      await db.entities.NewsSource.update(source.id,{last_checked_at:new Date().toISOString(),last_status:"OK — "+created+" new drafts"});
+      report.push({source:source.name,created,status:"ok"});
+    }catch(error){
+      await db.entities.NewsSource.update(source.id,{last_checked_at:new Date().toISOString(),last_status:String(error.message||error).slice(0,190)});
+      report.push({source:source.name,created:0,status:"error",error:String(error.message||error)});
+    }
+  }
+  return report;
+});
+
+export const getCommunity = createServerFn({method:"GET"})
+ .validator(z.object({categoryId:z.string().optional()}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const categories=await db.ForumCategory.filter({status:"active"},"sort_order",50,0);
+  const threads=await db.ForumThread.filter({status:"published",...(data.categoryId?{category_id:data.categoryId}:{})},"-last_activity_at",60,0);
+  return {categories,threads};
+ });
+export const createForumThread = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({title:z.string().min(4).max(160),body:z.string().min(4).max(10000),categoryId:z.string().optional(),categoryName:z.string().max(80).optional()}))
+ .handler(async({data,context})=>{
+  const user=context.user,db=context.getBase44().asServiceRole.entities;
+  return db.ForumThread.create({title:data.title,body:data.body,category_id:data.categoryId||"",category_name:data.categoryName||"General",author_id:user.id,author_name:user.full_name||user.email||"Creator",status:"published",pinned:false,reply_count:0,last_activity_at:new Date().toISOString()});
+ });
+export const getForumThread = createServerFn({method:"GET"}).validator(z.object({threadId:z.string().min(1)})).handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const thread=await db.ForumThread.get(data.threadId).catch(()=>null);
+  if(!thread || thread.status!=="published") throw Object.assign(new Error("Discussion not found."),{status:404});
+  const posts=await db.ForumPost.filter({thread_id:data.threadId,status:"published"},"created_date",100,0);
+  return {thread,posts};
+ });
+export const createForumPost = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({threadId:z.string().min(1),body:z.string().min(1).max(5000)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const thread=await db.ForumThread.get(data.threadId).catch(()=>null);
+  if(!thread || thread.status!=="published") throw Object.assign(new Error("This discussion is unavailable."),{status:404});
+  if(thread.status==="locked") throw Object.assign(new Error("This discussion is locked."),{status:403});
+  const user=context.user;
+  const post=await db.ForumPost.create({thread_id:thread.id,body:data.body,author_id:user.id,author_name:user.full_name||user.email||"Creator",status:"published"});
+  await db.ForumThread.update(thread.id,{reply_count:Number(thread.reply_count||0)+1,last_activity_at:new Date().toISOString()});
+  return post;
+ });
+
+export const getMarketplaceListings = createServerFn({method:"GET"}).validator(z.object({category:z.string().optional()})).handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  return db.MarketplaceListing.filter({status:"published",...(data.category?{category:data.category}:{})},"-created_date",60,0);
+});
+export const getMyListings = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  return context.getBase44().asServiceRole.entities.MarketplaceListing.filter({seller_id:context.user.id},"-created_date",100,0);
+});
+export const saveMarketplaceListing = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),title:z.string().min(3).max(160),description:z.string().max(5000),category:z.enum(["Video pack","Editing preset","Template","Creator bundle","Other"]),priceCents:z.number().int().min(0).max(100000000),currency:z.enum(["USD","EUR","GBP"]),licenseTerms:z.string().max(2000),previewUrl:z.string().url().optional()}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const subs=await db.UserSubscription.filter({user_id:context.user.id},"-created_date",1,0);
+  if(subs[0]?.tier_code!=="premium" || subs[0]?.status!=="active") throw Object.assign(new Error("A Premium membership is required to publish creator listings. You can prepare a draft after Premium billing is enabled."),{status:403,code:"PREMIUM_REQUIRED"});
+  const payload={seller_id:context.user.id,seller_name:context.user.full_name||context.user.email||"Creator",title:data.title,description:data.description,category:data.category,price_cents:data.priceCents,currency:data.currency,license_terms:data.licenseTerms,status:"pending_review",created_by:context.user.id,...(data.previewUrl?{preview_url:data.previewUrl}:{})};
+  return data.id?db.MarketplaceListing.update(data.id,payload):db.MarketplaceListing.create(payload);
+ });
+export const createMarketplaceInquiry = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({listingId:z.string().min(1),message:z.string().min(5).max(2000)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities,listing=await db.MarketplaceListing.get(data.listingId).catch(()=>null);
+  if(!listing||listing.status!=="published") throw Object.assign(new Error("Listing not found."),{status:404});
+  if(listing.seller_id===context.user.id) throw Object.assign(new Error("You cannot contact yourself."),{status:400});
+  return db.MarketplaceInquiry.create({listing_id:listing.id,buyer_id:context.user.id,seller_id:listing.seller_id,message:data.message,status:"open"});
+ });
+
+export const getShopProducts = createServerFn({method:"GET"}).handler(async({context})=>{
+ return context.getBase44().asServiceRole.entities.ShopProduct.filter({status:"published"},"-created_date",100,0);
+});
+export const getAdminShopProducts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);return context.getBase44().asServiceRole.entities.ShopProduct.list("-created_date",100,0);
+});
+export const saveShopProduct = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),title:z.string().min(2).max(160),description:z.string().max(5000),productType:z.enum(["physical","digital"]),priceCents:z.number().int().min(0),currency:z.enum(["USD","EUR","GBP"]),stockQuantity:z.number().int().min(0).optional(),imageUrl:z.string().url().optional(),status:z.enum(["draft","published","archived"]),sku:z.string().max(80).optional()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities.ShopProduct;
+  const p={title:data.title,description:data.description,product_type:data.productType,price_cents:data.priceCents,currency:data.currency,stock_quantity:data.stockQuantity||0,status:data.status,...(data.imageUrl?{image_url:data.imageUrl}:{}),sku:data.sku||""};
+  return data.id?db.update(data.id,p):db.create(p);
+ });
+
+export const getSitePage = createServerFn({method:"GET"}).validator(z.object({slug:z.string().min(1),locale:z.enum(["en","fr","es","de","it","pt"]).default("en")})).handler(async({data,context})=>{
+ const rows=await context.getBase44().asServiceRole.entities.SitePage.filter({slug:data.slug,locale:data.locale,status:"published"},"-updated_date",1,0);
+ return rows[0]||null;
+});
+export const getAdminSitePages = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);return context.getBase44().asServiceRole.entities.SitePage.list("-updated_date",100,0);
+});
+export const saveSitePage = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().optional(),slug:z.string().min(2).max(160).regex(/^[a-z0-9-]+$/),title:z.string().min(2).max(180),content:z.string().max(30000),locale:z.enum(["en","fr","es","de","it","pt"]),status:z.enum(["draft","published"]),metaTitle:z.string().max(180).optional(),metaDescription:z.string().max(320).optional()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const db=context.getBase44().asServiceRole.entities.SitePage;
+  const p={slug:data.slug,title:data.title,content:data.content,locale:data.locale,status:data.status,meta_title:data.metaTitle||data.title,meta_description:data.metaDescription||"",updated_by:context.user.id};
+  return data.id?db.update(data.id,p):db.create(p);
+ });
+
+export const getAdminOverview = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);const db=context.getBase44().asServiceRole.entities;
+ const [users,news,threads,listings,products,reports,downloads]=await Promise.all([
+  context.getBase44().asServiceRole.users.list().catch(()=>[]),
+  db.NewsArticle.list("-created_date",200,0),db.ForumThread.list("-created_date",200,0),
+  db.MarketplaceListing.list("-created_date",200,0),db.ShopProduct.list("-created_date",200,0),
+  db.ContentReport.filter({status:"open"},"-created_date",100,0),db.DownloadEvent.list("-created_date",500,0)
+ ]);
+ return {users:users.length,news:news.length,publishedNews:news.filter(x=>x.status==="published").length,threads:threads.length,listings:listings.length,products:products.length,openReports:reports.length,downloads:downloads.length};
+});
+export const getAdminReports = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.list("-created_date",100,0);
+});
+export const updateReportStatus = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string(),status:z.enum(["reviewing","resolved","dismissed"])}))
+ .handler(async({data,context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.update(data.id,{status:data.status});});
+
+export const generateStudioDraft = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({platform:z.enum(["TikTok","Instagram","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
+ .handler(async({data,context})=>{
+  const key=secrets.get("AI_ROUTER_API_KEY");
+  if(!key) throw Object.assign(new Error("AI provider not connected. Configure AI_ROUTER_API_KEY in Base44 secrets to activate generation."),{status:503,code:"AI_PROVIDER_NOT_CONFIGURED"});
+  const base=secrets.get("AI_ROUTER_BASE_URL")||"https://openrouter.ai/api/v1";
+  const model=secrets.get("AI_ROUTER_MODEL")||"openai/gpt-4o-mini";
+  const prompt="You are a professional GTA VI creator marketing assistant. Generate "+data.contentType+" for "+data.platform+". Topic: "+data.topic+". Tone: "+data.tone+". Language: "+data.language+". Keep claims factual, never present leaks or rumours as confirmed, and do not imply affiliation with Rockstar Games. Return only usable content.";
+  const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://gta6-creator-hub-c26cc578.base44.app","X-Title":"VICEHUB Creator Studio"},body:JSON.stringify({model,messages:[{role:"user",content:prompt}],temperature:0.7,max_tokens:1400})});
+  if(!response.ok) throw Object.assign(new Error("AI provider error: HTTP "+response.status),{status:502,code:"AI_PROVIDER_ERROR"});
+  const payload=await response.json();const output=payload.choices?.[0]?.message?.content;
+  if(!output) throw new Error("AI provider returned an empty response.");
+  const saved=await context.getBase44().asServiceRole.entities.AIContentDraft.create({user_id:context.user.id,platform:data.platform,content_type:data.contentType,topic:data.topic,output,status:"draft",provider:model});
+  return {output,id:saved.id,model};
+ });
+export const getMyStudioDrafts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ return context.getBase44().asServiceRole.entities.AIContentDraft.filter({user_id:context.user.id},"-created_date",30,0);
+});
