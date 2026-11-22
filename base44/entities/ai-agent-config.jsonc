@@ -1,0 +1,84 @@
+{
+  "name": "AIAgentConfig",
+  "type": "object",
+  "properties": {
+    "agent_key": {
+      "type": "string",
+      "enum": [
+        "news_editor",
+        "seo_agent",
+        "geo_agent",
+        "social_agent",
+        "platform_analyst"
+      ]
+    },
+    "display_name": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "instructions": {
+      "type": "string",
+      "maxLength": 10000
+    },
+    "provider_model": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "schedule": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "hourly",
+        "daily",
+        "weekly"
+      ],
+      "default": "manual"
+    },
+    "last_run_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_run_status": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "monthly_run_limit": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    }
+  },
+  "required": [
+    "agent_key",
+    "display_name",
+    "instructions",
+    "enabled",
+    "schedule"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
