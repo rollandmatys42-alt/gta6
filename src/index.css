@@ -19,3 +19,6 @@
 
 .social-layout{display:grid;grid-template-columns:.9fr 1.1fr;gap:18px;padding-top:20px}.social-post-row{padding:16px 0;border-bottom:1px solid var(--line)}.social-post-row p{font-size:11px;color:#c6bdca;white-space:pre-wrap;line-height:1.7}.social-post-row small{font-size:9px;color:#9d94a3}
 @media(max-width:850px){.social-layout{grid-template-columns:1fr}}
+
+.admin-head-actions,.admin-shortcut-actions,.market-admin-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.seller-cta{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;margin:18px 0;background:#15111b;border:1px solid #654565}.seller-cta>span{font-size:9px;letter-spacing:1.5px;color:var(--pink);font-weight:800}.seller-cta p{font-size:10px;color:#a9a0ae;max-width:520px;line-height:1.6}.inquiry-card{padding:15px 0;border-bottom:1px solid var(--line)}.inquiry-card p{font-size:10px;color:#c8bfcd;white-space:pre-wrap}.inquiry-card small{font-size:9px;color:var(--cyan)}.inquiry-card form{display:flex;gap:8px;align-items:flex-end}.inquiry-card textarea{flex:1;background:#0c0b11;border:1px solid #403747;color:#eee;padding:10px;font-size:10px}
+@media(max-width:560px){.seller-cta{align-items:flex-start;flex-direction:column}.inquiry-card form{align-items:stretch;flex-direction:column}}
