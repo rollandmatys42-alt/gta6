@@ -361,7 +361,7 @@ export const syncNewsSources = createServerFn({method:"POST"}).middleware([requi
         const linkMatch=block.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?\s*>/i);
         const articleUrl=read("link") || linkMatch?.[1] || "";
         const summary=(read("description")||read("summary")||read("content")).slice(0,500);
-        const gta6Match=/\\bgta\\s*(?:vi|6)\\b|\\bgta6\\b|grand theft auto\\s*vi/i.test(title+" "+summary);
+        const gta6Match=/\bgta\s*(?:vi|6)\b|\bgta6\b|grand theft auto\s*vi/i.test(title+" "+summary);
         if(!title || !articleUrl.startsWith("https://") || !gta6Match) continue;
         const exists=await db.entities.NewsArticle.filter({source_url:articleUrl}, "-created_date",1,0);
         if(exists.length) continue;
