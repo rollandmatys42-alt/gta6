@@ -24,16 +24,17 @@ async function uploadAsset(file, assetVariant) {
 
 async function createWatermarkedRendition(file, onProgress) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
-    throw new Error("This browser cannot create a watermarked MP4. Use an up-to-date Chrome, Edge or Safari browser on a desktop.");
+    throw new Error("This browser cannot create a watermarked MP4. Use an up-to-date Chrome or Edge browser on a desktop.");
   }
   const video = document.createElement("video");
   const sourceUrl = URL.createObjectURL(file);
+  let recorder = null, raf = 0;
+  let videoStream = null, canvasStream = null;
   video.src = sourceUrl;
   video.preload = "auto";
   video.playsInline = true;
   video.muted = false;
   video.volume = 1;
-  video.crossOrigin = "anonymous";
   try {
     await new Promise((resolve, reject) => {
       video.onloadedmetadata = resolve;
@@ -51,17 +52,16 @@ async function createWatermarkedRendition(file, onProgress) {
     canvas.height = height;
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Could not initialise the video watermark renderer.");
-    const videoStream = typeof video.captureStream === "function"
-      ? video.captureStream()
-      : typeof video.mozCaptureStream === "function" ? video.mozCaptureStream() : null;
-    if (!videoStream) throw new Error("This browser cannot capture the source video's audio track.");
-    const canvasStream = canvas.captureStream(30);
-    const tracks = [...canvasStream.getVideoTracks(), ...videoStream.getAudioTracks()];
-    const combined = new MediaStream(tracks);
+    const capture = typeof video.captureStream === "function" ? video.captureStream.bind(video)
+      : typeof video.mozCaptureStream === "function" ? video.mozCaptureStream.bind(video) : null;
+    if (!capture) throw new Error("This browser cannot capture the source video's audio. Use Chrome or Edge on desktop.");
+    videoStream = capture();
+    canvasStream = canvas.captureStream(30);
+    const combined = new MediaStream([...canvasStream.getVideoTracks(), ...videoStream.getAudioTracks()]);
     const mimeType = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4"]
       .find(type => MediaRecorder.isTypeSupported(type));
-    if (!mimeType) throw new Error("MP4/H.264 recording is not supported by this browser. Use a browser with MP4 MediaRecorder support; no unwatermarked file will be published.");
-    const recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 8000000, audioBitsPerSecond: 128000 });
+    if (!mimeType) throw new Error("MP4/H.264 recording is not supported by this browser. No unwatermarked file will be uploaded.");
+    recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 8000000, audioBitsPerSecond: 128000 });
     const chunks = [];
     const result = new Promise((resolve, reject) => {
       recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
@@ -72,16 +72,15 @@ async function createWatermarkedRendition(file, onProgress) {
         else resolve(new File([blob], file.name.replace(/\.[^.]+$/, "") + "-vicehub-watermarked.mp4", { type: "video/mp4" }));
       };
     });
-    let raf = 0;
+    let lastProgress = -1;
     const drawFrame = () => {
       if (video.readyState >= 2) {
         ctx.drawImage(video, 0, 0, width, height);
         const pad = Math.max(16, Math.round(width * 0.018));
         const fontSize = Math.max(18, Math.round(width * 0.027));
-        const label = "VICEHUB";
         ctx.save();
         ctx.font = "900 " + fontSize + "px Arial, sans-serif";
-        const textWidth = ctx.measureText(label).width;
+        const textWidth = ctx.measureText("VICEHUB").width;
         const boxWidth = textWidth + pad * 2;
         const boxHeight = fontSize + pad * 1.25;
         const x = width - boxWidth - pad;
@@ -92,23 +91,32 @@ async function createWatermarkedRendition(file, onProgress) {
         ctx.shadowColor = "rgba(0,0,0,.75)";
         ctx.shadowBlur = 5;
         ctx.textBaseline = "middle";
-        ctx.fillText(label, x + pad, y + boxHeight / 2);
+        ctx.fillText("VICEHUB", x + pad, y + boxHeight / 2);
         ctx.restore();
       }
-      onProgress?.(Math.min(99, Math.round((video.currentTime / video.duration) * 100)));
+      const progress = Math.min(99, Math.round((video.currentTime / video.duration) * 100));
+      if (progress !== lastProgress) { lastProgress = progress; onProgress?.(progress); }
       if (!video.ended && !video.error) raf = requestAnimationFrame(drawFrame);
     };
+    const ended = new Promise(resolve => video.addEventListener("ended", resolve, { once: true }));
     recorder.start(1000);
     await video.play();
     drawFrame();
-    await new Promise(resolve => { video.onended = resolve; });
+    await ended;
+    if (raf) cancelAnimationFrame(raf);
     drawFrame();
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await new Promise(resolve => setTimeout(resolve, 180));
     if (recorder.state !== "inactive") recorder.stop();
     const output = await result;
     onProgress?.(100);
     return output;
+  } catch (error) {
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    throw error;
   } finally {
+    if (raf) cancelAnimationFrame(raf);
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    for (const track of [...(videoStream?.getTracks() || []), ...(canvasStream?.getTracks() || [])]) track.stop();
     video.pause();
     video.removeAttribute("src");
     video.load();
