@@ -628,7 +628,7 @@ export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object(
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
 export const saveAdminPlan = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({id:z.string().optional(),tierCode:z.enum(["starter","pro","premium"]),displayName:z.string().min(2).max(50),monthlyPriceCents:z.number().int().min(0),currency:z.enum(["USD","EUR","GBP"]),monthlyDownloadLimit:z.number().int().min(0),cleanDownloads:z.boolean(),marketplaceEnabled:z.boolean(),status:z.enum(["draft","active","archived"]),loyaltyMonthlyDiscountPercent:z.number().min(0).max(100),loyaltyMaxDiscountPercent:z.number().min(0).max(100),loyaltyFloorPriceCents:z.number().int().min(0),sortOrder:z.number().int()}))
- .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.SubscriptionPlan;const p={tier_code:data.tierCode,display_name:data.displayName,monthly_price_cents:data.monthlyPriceCents,currency:data.currency,monthly_download_limit:data.monthlyDownloadLimit,clean_downloads:data.cleanDownloads,marketplace_enabled:data.marketplaceEnabled,status:data.status,loyalty_monthly_discount_percent:data.loyaltyMonthlyDiscountPercent,loyalty_max_discount_percent:data.loyaltyMaxDiscountPercent,loyalty_floor_price_cents:data.loyaltyFloorPriceCents,sort_order:data.sortOrder};return data.id?db.update(data.id,p):db.create(p);});
+ .handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.SubscriptionPlan;const p={tier_code:data.tierCode,display_name:data.displayName,monthly_price_cents:data.monthlyPriceCents,currency:data.currency,monthly_download_limit:data.monthlyDownloadLimit,clean_downloads:data.cleanDownloads,marketplace_enabled:data.marketplaceEnabled,status:data.status,loyalty_monthly_discount_percent:data.loyaltyMonthlyDiscountPercent,loyalty_max_discount_percent:data.loyaltyMaxDiscountPercent,loyalty_floor_price_cents:data.loyaltyFloorPriceCents,sort_order:data.sortOrder};if(data.id){const existing=await db.get(data.id);if(existing&&(Number(existing.monthly_price_cents)!==data.monthlyPriceCents||existing.currency!==data.currency))p.stripe_price_id=null;return db.update(data.id,p);}return db.create(p);});
 export const getMyPlanQuote = createServerFn({method:"GET"}).middleware([requireUser])
  .validator(z.object({tierCode:z.enum(["starter","pro","premium"]),currency:z.enum(["USD","EUR","GBP"])}))
  .handler(async({data,context})=>{
@@ -681,6 +681,27 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     const discount=Math.min(Number(plan.loyalty_max_discount_percent||0),streak*Number(plan.loyalty_monthly_discount_percent||0));
     const priceCents=Math.max(Number(plan.loyalty_floor_price_cents||0),Math.round(Number(plan.monthly_price_cents)*(1-discount/100)));
     if(priceCents<=0)throw Object.assign(new Error("The calculated membership price is invalid. Check the administrator pricing settings."),{status:409,code:"INVALID_PLAN_PRICE"});
+    let stripeProductId=plan.stripe_product_id;
+    if(!stripeProductId){
+      const productForm=new URLSearchParams();
+      productForm.set("name","VICEHUB "+plan.display_name+" membership");
+      productForm.set("metadata[tier_code]",data.tierCode);
+      productForm.set("metadata[currency]",data.currency);
+      const product=await stripeApi("products","POST",productForm);
+      stripeProductId=product.id;
+      await db.SubscriptionPlan.update(plan.id,{stripe_product_id:stripeProductId});
+    }
+    let stripePriceId=plan.stripe_price_id;
+    if(!stripePriceId){
+      const priceForm=new URLSearchParams();
+      priceForm.set("currency",data.currency.toLowerCase());
+      priceForm.set("product",stripeProductId);
+      priceForm.set("unit_amount",String(Number(plan.monthly_price_cents)));
+      priceForm.set("recurring[interval]","month");
+      const price=await stripeApi("prices","POST",priceForm);
+      stripePriceId=price.id;
+      await db.SubscriptionPlan.update(plan.id,{stripe_price_id:stripePriceId});
+    }
     const form=new URLSearchParams();
     form.set("mode","subscription");
     form.set("success_url",STRIPE_SITE_URL+"/subscription/success?session_id={CHECKOUT_SESSION_ID}");
@@ -696,10 +717,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     form.set("subscription_data[metadata][currency]",data.currency);
     form.set("subscription_data[metadata][monthly_price_cents]",String(priceCents));
     form.set("subscription_data[metadata][discount_percent]",String(discount));
-    form.set("line_items[0][price_data][currency]",data.currency.toLowerCase());
-    form.set("line_items[0][price_data][unit_amount]",String(priceCents));
-    form.set("line_items[0][price_data][recurring][interval]","month");
-    form.set("line_items[0][price_data][product_data][name]","VICEHUB "+plan.display_name+" membership");
+    form.set("line_items[0][price]",stripePriceId);
     form.set("line_items[0][quantity]","1");
     form.set("billing_address_collection","auto");
     if(existing?.stripe_customer_id)form.set("customer",existing.stripe_customer_id);
