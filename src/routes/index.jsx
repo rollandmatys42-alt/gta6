@@ -60,6 +60,7 @@ function HomePage() {
   const [livePlans, setLivePlans] = useState([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [downloadMessage, setDownloadMessage] = useState("");
+  const [faqOpen, setFaqOpen] = useState(0);
   const t = { ...copy.en, ...(copy[language] || {}) };
   useEffect(() => { getPublicPlans({ data: { currency } }).then((rows) => setLivePlans(Array.isArray(rows) ? rows : [])).catch(() => setLivePlans([])); }, [currency]);
   useEffect(() => { getNewsFeed({ data: { locale: language, limit: 3 } }).then((rows) => setLiveNews(Array.isArray(rows) ? rows : [])).catch(() => setLiveNews([])); }, [language]);
@@ -91,6 +92,10 @@ function HomePage() {
     ((v.title || "").toLowerCase().includes(search.toLowerCase()) || (v.category || "").toLowerCase().includes(search.toLowerCase()) || (v.creator_name || "").toLowerCase().includes(search.toLowerCase()) || (Array.isArray(v.tags) && v.tags.some(tag => String(tag).toLowerCase().includes(search.toLowerCase()))))
   ), [liveVideos, category, videoLanguage, search]);
   const featuredVideo = liveVideos.find(v => v.is_featured) || liveVideos[0] || null;
+  const shortVideos = liveVideos.filter(v => ["Shorts","Edit packs"].includes(v.category));
+  const topCreators = Object.values(liveVideos.reduce((acc, video) => { const name = (video.creator_name || "VICEHUB Creator").trim(); acc[name] = acc[name] || {name,count:0,video}; acc[name].count += 1; return acc; }, {})).sort((a,b) => b.count-a.count).slice(0,5);
+  const reactionVideos = liveVideos.slice(0,4);
+  const feedVideos = liveVideos.slice(0,8);
   const startCheckout = async (plan) => {
     if (!isAuthenticated) { navigateToLogin(); return; }
     if (!plan.checkoutReady) { setNotice(t.pricePending); return; }
@@ -169,21 +174,41 @@ function HomePage() {
           <div className="hero-bottom"><span>VICEHUB / THE GTA VI CREATOR NETWORK</span><span>26°07' N · 80°08' W <b>—</b> LEONIDA</span></div>
         </section>
 
-        <section className="city-discovery">
-          <div className="city-discovery-head"><div><div className="eyebrow">EXPLORE THE UNIVERSE</div><h2>FIND YOUR NEXT DROP.</h2><p>Choose a lane. Find footage. Build something worth watching.</p></div><span className="city-discovery-index">VICEHUB / 01—04</span></div>
-          <div className="city-discovery-grid">
-            <button className="city-tile city-tile-cinema" onClick={() => {setCategory("Cinematics");navigate("library");}}><img src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1000&q=85" alt="" loading="lazy"/><span className="city-tile-number">01 / CINEMATICS</span><b>MAKE IT<br/>CINEMATIC</b><i>EXPLORE FOOTAGE ↗</i></button>
-            <button className="city-tile city-tile-night" onClick={() => {setCategory("Gameplay");navigate("library");}}><img src="https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1000&q=85" alt="" loading="lazy"/><span className="city-tile-number">02 / GAMEPLAY</span><b>PLAY IT<br/>YOUR WAY</b><i>EXPLORE GAMEPLAY ↗</i></button>
-            <button className="city-tile city-tile-coast" onClick={() => {setCategory("Locations");navigate("library");}}><img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1000&q=85" alt="" loading="lazy"/><span className="city-tile-number">03 / LOCATIONS</span><b>CHASE THE<br/>HORIZON</b><i>EXPLORE LOCATIONS ↗</i></button>
-            <button className="city-tile city-tile-edit" onClick={() => {setCategory("Shorts");navigate("library");}}><img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1000&q=85" alt="" loading="lazy"/><span className="city-tile-number">04 / SHORTS & REELS</span><b>MAKE THE<br/>FEED YOURS</b><i>EXPLORE SHORTS ↗</i></button>
+
+        <section className="reference-benefits" aria-label="VICEHUB benefits">
+          <div><b>01</b><span>INSTANT VIDEO ACCESS</span><small>Preview and download in one place</small></div>
+          <div><b>02</b><span>CREATOR-READY CONTENT</span><small>Curated clips, shorts and edits</small></div>
+          <div><b>03</b><span>SECURE CHECKOUT</span><small>Membership when plans are activated</small></div>
+          <div><b>04</b><span>MADE FOR THE COMMUNITY</span><small>Creators, fan pages and editors</small></div>
+        </section>
+
+        <section className="reference-section reaction-section">
+          <div className="reference-section-head"><div><span className="eyebrow">THE INTERNET LOST IT</span><h2>FAMOUS REACTIONS</h2><p>Standout moments and community reactions from the VICEHUB video library.</p></div><span className="reference-index">01 / REACTIONS</span></div>
+          <div className="reaction-gallery">
+            {reactionVideos.map((video,i)=><button className={`reaction-card reaction-card-${i+1}`} key={video.id} onClick={()=>openVideoDetails(video)}>
+              <div className="reference-card-image">{video.thumbnail_url?<img src={video.thumbnail_url} alt={video.title} loading="lazy"/>:<div className="reference-image-fallback"><b>VICEHUB</b><span>{(video.category||"GTA VI").toUpperCase()}</span></div>}<span className="reference-play">▶</span><span className="reference-card-tag">{(video.category||"REACTION").toUpperCase()}</span></div>
+              <div className="reference-card-copy"><small>REACTION / 0{i+1}</small><b>{video.title}</b><span>{video.creator_name||"VICEHUB COMMUNITY"} · {(video.language||"en").toUpperCase()}</span></div>
+            </button>)}
+            {!reactionVideos.length&&<div className="reference-empty"><b>THE NEXT BIG REACTION STARTS HERE.</b><span>Featured community videos will appear as soon as the catalogue is populated.</span></div>}
           </div>
         </section>
 
+        <section className="reference-section shorts-section">
+          <div className="reference-section-head"><div><span className="eyebrow">FROM THE SOCIALS</span><h2>SHORTS &amp; REELS</h2><p>Vertical clips, fast edits and moments built for the social feed.</p></div><button className="reference-link" onClick={()=>{setCategory("Shorts");document.getElementById("library")?.scrollIntoView({behavior:"smooth"});}}>EXPLORE SHORTS ↗</button></div>
+          <div className="shorts-rail">
+            {shortVideos.slice(0,6).map((video,i)=><button className="short-card" key={video.id} onClick={()=>openVideoDetails(video)}>
+              <div className="short-poster">{video.thumbnail_url?<img src={video.thumbnail_url} alt={video.title} loading="lazy"/>:<div className="reference-image-fallback"><b>VICEHUB</b><span>SHORT / REEL</span></div>}<span className="short-play">▶</span><small>0{i+1} / SHORT</small></div><b>{video.title}</b><span>{video.creator_name||"VICEHUB CREATOR"}</span>
+            </button>)}
+            {!shortVideos.length&&<div className="shorts-empty"><div className="shorts-empty-mark">▶</div><b>YOUR NEXT VIRAL CLIP BELONGS HERE.</b><p>Shorts and Reels will appear here when short-form videos are published in the VICEHUB library.</p><button className="outline-btn" onClick={()=>{setCategory("Shorts");document.getElementById("library")?.scrollIntoView({behavior:"smooth"});}}>BROWSE SHORT-FORM CONTENT ↗</button></div>}
+          </div>
+        </section>
+
+
         <section className="section library-section" id="library">
-          <div className="section-head"><div><div className="eyebrow">01 / CONTENT LIBRARY</div><h2>{t.featured}</h2><p>{t.featuredSub}</p></div><button className="outline-btn" onClick={() => navigate("library")}>{t.open} <span>↗</span></button></div>
+          <div className="section-head"><div><div className="eyebrow">VICEHUB DROP MARKET · RIGHTS-CHECKED VIDEO CATALOGUE</div><h2>BLACK MARKET DROPS</h2><p>Exclusive creator footage, video packs and featured drops. Preview first, then download with your membership allowance.</p></div><button className="outline-btn" onClick={() => navigate("library")}>{t.open} <span>↗</span></button></div>
           <div className="video-moment-shell">{featuredVideo && <article className="video-moment-card"><div className="video-moment-media">{featuredVideo.thumbnail_url && <img src={featuredVideo.thumbnail_url} alt="" loading="lazy"/>}<span>{t.videoMoment}</span><b>{featuredVideo.title}</b></div><div className="video-moment-info"><div><small>{featuredVideo.category} · {(featuredVideo.language || "en").toUpperCase()}</small><h3>{featuredVideo.description || "The latest featured creator footage."}</h3></div><button className="primary-btn" onClick={() => downloadVideo(featuredVideo)}>{t.download}</button></div></article>}</div>
           <div className="library-tools"><div className="search-box"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.search} /></div><div className="filters">{[{value:"All",label:t.all},{value:"Cinematics",label:t.cinematic},{value:"Gameplay",label:t.gameplay},{value:"Characters",label:t.characters},{value:"Vehicles",label:t.vehicles},{value:"Locations",label:t.locations},{value:"Missions",label:t.missions},{value:"Shorts",label:t.shorts},{value:"Edit packs",label:t.edits}].map(({value,label}) => <button key={value} className={category === value ? "filter active" : "filter"} onClick={() => setCategory(value)}>{label}</button>)}</div><select aria-label="Filter videos by language" className="video-language-filter" value={videoLanguage} onChange={e=>setVideoLanguage(e.target.value)}><option value="All">{t.allLanguages}</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="pt">Português</option><option value="it">Italiano</option><option value="de">Deutsch</option></select></div>
-          <div className="drops-feed-head"><div><span className="eyebrow">VICEHUB / COMMUNITY CATALOGUE</span><h3>{t.latestDrops}</h3></div><span className="drops-count">{filtered.length} {filtered.length === 1 ? "DROP" : "DROPS"}</span></div><div className="video-grid">{filtered.filter(v => v.id !== featuredVideo?.id).map((v, i) => <article className="video-card drop-card" key={v.id}><button className="drop-open" onClick={() => openVideoDetails(v)} aria-label={`View details for ${v.title}`}><div className={`video-art ${["sunset","neon","coast","pink"][i % 4]}`}>{v.thumbnail_url ? <img className="video-thumb" src={v.thumbnail_url} alt={v.title} loading="lazy" /> : <div className="drop-art-fallback"><span>VICEHUB / DROP {String(i + 1).padStart(2,"0")}</span><b>{(v.category || "GTA VI").toUpperCase()}</b></div>}<span className="video-tag">{(v.category || "VIDEO").toUpperCase()}</span>{v.is_featured && <span className="video-featured-tag">FEATURED</span>}<span className="play-mark">↗</span><span className="video-length">{v.duration_seconds ? Math.floor(v.duration_seconds / 60) + ":" + String(v.duration_seconds % 60).padStart(2, "0") : "VIDEO"}</span></div><div className="video-meta"><div><h3>{v.title}</h3><p>{v.category || "GTA VI"} <span>·</span> {(v.language || "en").toUpperCase()} <span>·</span> {v.creator_name || "Creator Hub"}</p></div><span className="drop-view-label">{t.viewDetails} ↗</span></div></button><div className="drop-card-bottom"><div className="drop-tags">{(Array.isArray(v.tags) ? v.tags : []).slice(0,3).map(tag => <span key={tag}>#{tag}</span>)}</div><button aria-label={`Download ${v.title}`} onClick={() => downloadVideo(v)}>↓</button></div></article>)}{!isLoadingVideos && filtered.length === 0 && <div className="empty-library">{t.noVideos}</div>}{isLoadingVideos && <div className="empty-library">{t.loading}</div>}</div>{downloadMessage && <div className="demo-note" role="status">{downloadMessage}</div>}
+          <div className="drops-feed-head"><div><span className="eyebrow">HOT RIGHT NOW · NEW CONTENT</span><h3>FRESH DROPS</h3></div><span className="drops-count">{filtered.length} {filtered.length === 1 ? "DROP" : "DROPS"}</span></div><div className="video-grid">{filtered.filter(v => v.id !== featuredVideo?.id).map((v, i) => <article className="video-card drop-card" key={v.id}><button className="drop-open" onClick={() => openVideoDetails(v)} aria-label={`View details for ${v.title}`}><div className={`video-art ${["sunset","neon","coast","pink"][i % 4]}`}>{v.thumbnail_url ? <img className="video-thumb" src={v.thumbnail_url} alt={v.title} loading="lazy" /> : <div className="drop-art-fallback"><span>VICEHUB / DROP {String(i + 1).padStart(2,"0")}</span><b>{(v.category || "GTA VI").toUpperCase()}</b></div>}<span className="video-tag">{(v.category || "VIDEO").toUpperCase()}</span>{v.is_featured && <span className="video-featured-tag">FEATURED</span>}<span className="play-mark">↗</span><span className="video-length">{v.duration_seconds ? Math.floor(v.duration_seconds / 60) + ":" + String(v.duration_seconds % 60).padStart(2, "0") : "VIDEO"}</span></div><div className="video-meta"><div><h3>{v.title}</h3><p>{v.category || "GTA VI"} <span>·</span> {(v.language || "en").toUpperCase()} <span>·</span> {v.creator_name || "Creator Hub"}</p></div><span className="drop-view-label">{t.viewDetails} ↗</span></div></button><div className="drop-card-bottom"><div className="drop-tags">{(Array.isArray(v.tags) ? v.tags : []).slice(0,3).map(tag => <span key={tag}>#{tag}</span>)}</div><button aria-label={`Download ${v.title}`} onClick={() => downloadVideo(v)}>↓</button></div></article>)}{!isLoadingVideos && filtered.length === 0 && <div className="empty-library">{t.noVideos}</div>}{isLoadingVideos && <div className="empty-library">{t.loading}</div>}</div>{downloadMessage && <div className="demo-note" role="status">{downloadMessage}</div>}
         </section>
 
         <section className="news-section">
@@ -191,11 +216,65 @@ function HomePage() {
           <div className="news-grid">{liveNews.map((story, i) => <article className="news-card" key={story.id} onClick={() => window.location.assign("/news")}><div className="news-index">0{i + 1}<span> / {story.confidence?.toUpperCase()}</span></div><div className="story-type">{story.source_name}</div><h3>{story.title}</h3><p>{story.summary}</p><div className="story-source"><span>↗</span>{story.source_type}</div></article>)}{!liveNews.length && <div className="empty-library">{t.noNews}</div>}</div>
         </section>
 
+
+        <section className="reference-section reaction-feed-section">
+          <div className="reference-section-head"><div><span className="eyebrow">HOT RIGHT NOW</span><h2>REACTION FEED</h2><p>A live-style feed of the newest published VICEHUB drops.</p></div><span className="reference-live">● CATALOGUE LIVE</span></div>
+          <div className="reaction-feed">
+            {feedVideos.map((video,i)=><button className="feed-row" key={video.id} onClick={()=>openVideoDetails(video)}>
+              <span className="feed-number">{String(i+1).padStart(2,"0")}</span>
+              <span className="feed-thumb">{video.thumbnail_url?<img src={video.thumbnail_url} alt="" loading="lazy"/>:<b>V</b>}</span>
+              <span className="feed-title"><b>{video.title}</b><small>{video.creator_name||"VICEHUB CREATOR"} · {(video.category||"GTA VI").toUpperCase()}</small></span>
+              <span className="feed-action">WATCH DROP ↗</span>
+            </button>)}
+            {!feedVideos.length&&<div className="reference-empty"><b>THE FEED IS WAITING FOR ITS FIRST DROP.</b><span>New videos will appear here automatically after publication.</span></div>}
+          </div>
+        </section>
+
+        <section className="reference-section how-section">
+          <div className="reference-section-head"><div><span className="eyebrow">EASY AS A HEIST</span><h2>HOW IT WORKS</h2><p>Find your footage. Preview the drop. Create something worth watching.</p></div><span className="reference-index">3 STEPS · ONE CREATOR HUB</span></div>
+          <div className="how-grid">
+            <article><span className="how-number">01</span><div className="how-symbol">⌕</div><h3>PICK A DROP</h3><p>Explore the video library, filter by category and language, and open the footage that fits your next edit.</p><button onClick={()=>document.getElementById("library")?.scrollIntoView({behavior:"smooth"})}>EXPLORE THE LIBRARY ↗</button></article>
+            <article><span className="how-number">02</span><div className="how-symbol">▶</div><h3>PREVIEW &amp; DOWNLOAD</h3><p>Watch a protected preview, choose your membership and download content within your monthly allowance.</p><button onClick={()=>document.getElementById("plans")?.scrollIntoView({behavior:"smooth"})}>VIEW MEMBERSHIPS ↗</button></article>
+            <article><span className="how-number">03</span><div className="how-symbol">↗</div><h3>MAKE IT YOURS</h3><p>Build your edits, organise your creator workflow and prepare content for your own social channels.</p><button onClick={()=>window.location.assign("/social")}>OPEN CREATOR TOOLS ↗</button></article>
+          </div>
+        </section>
+
+        <section className="reference-section leaderboard-section">
+          <div className="reference-section-head"><div><span className="eyebrow">WHO RUNS LEONIDA?</span><h2>THE LEADERBOARD</h2><p>Discover the creators and fan pages building the VICEHUB community.</p></div><button className="reference-link" onClick={()=>window.location.assign("/creators")}>SEE CREATOR DIRECTORY ↗</button></div>
+          <div className="leaderboard-grid">
+            <article className="leaderboard-panel"><div className="leaderboard-panel-head"><span>01 / VIDEO CREATORS</span><b>TOP CREATORS</b></div>
+              {topCreators.length?topCreators.map((creator,i)=><div className="leaderboard-row" key={creator.name}><span className="leader-rank">{String(i+1).padStart(2,"0")}</span><span className="leader-avatar">{creator.name.slice(0,1).toUpperCase()}</span><span className="leader-name"><b>{creator.name}</b><small>VICEHUB VIDEO CREATOR</small></span><span className="leader-score">{creator.count} {creator.count===1?"DROP":"DROPS"}</span></div>):<div className="leaderboard-empty">Creator rankings will populate automatically as verified creators publish videos.</div>}
+            </article>
+            <article className="leaderboard-panel"><div className="leaderboard-panel-head"><span>02 / COMMUNITY PAGES</span><b>TOP FAN PAGES</b></div>
+              <div className="fanpage-feature"><div className="fanpage-orbit">✦</div><h3>GET SEEN BY GTA FANS.</h3><p>Bring your GTA VI fan page to VICEHUB. Creator and fan-page rankings will be published when verified profiles and ranking data are available.</p><button onClick={()=>window.location.assign("/creators")}>FEATURE YOUR PAGE ↗</button></div>
+            </article>
+          </div>
+        </section>
+
+        <section className="reference-feature-cta">
+          <div><span className="eyebrow">YOUR NAME. YOUR COMMUNITY. YOUR LEONIDA.</span><h2>PUT YOUR PAGE<br/><em>ON THE MAP.</em></h2><p>Create your VICEHUB creator profile, publish your work and grow your presence in the GTA VI creator community.</p></div>
+          <button className="primary-btn" onClick={()=>isAuthenticated?window.location.assign("/dashboard"):navigateToLogin()}>JOIN THE CREATOR NETWORK ↗</button>
+        </section>
+
         <section className="features-section"><div className="section-head"><div><div className="eyebrow">03 / CREATOR WORKSPACE</div><h2>{t.tools}</h2><p>{t.toolsSub}</p></div></div><div className="feature-grid">{sections.map((item, i) => <button className="feature-card" key={item.id} onClick={() => navigate(item.id)}><div className="feature-top"><span className="feature-icon">{item.icon}</span><span>0{i + 1} / 04</span></div><h3>{t[item.titleKey] || t.studio}</h3><p>{t[item.descKey] || t.latestSub}</p><span className="feature-link">{t.open} ↗</span></button>)}</div></section>
 
         <section id="plans" className="pricing-section"><div className="pricing-intro"><div className="eyebrow">04 / MEMBERSHIP</div><h2>{t.plans}</h2><p>{t.plansSub}</p><div className="currency-note">{t.currencyLabel} <b>{currency}</b><small>{t.checkoutDisabled}</small></div></div><div className="plans-grid">
           {planCards.map((plan,i)=><article className={i===2?"plan-card highlighted":"plan-card"} key={plan.name}><div className="plan-name">{plan.name}{i===2&&<span>{t.popular}</span>}</div><div className="plan-price">{plan.priceText}<small>{plan.tier==="free"?"":t.month}</small></div><p>{plan.desc}</p><ul>{plan.features.map(f=><li key={f}><span>✓</span>{f}</li>)}</ul><button className={i===2?"primary-btn full":"outline-btn full"} disabled={plan.tier!=="free"&&(!plan.checkoutReady||!!checkoutBusy)} onClick={() => plan.tier==="free" ? (isAuthenticated?window.location.assign("/dashboard"):navigateToLogin()) : startCheckout(plan)}>{checkoutBusy===plan.tier?"OPENING SECURE CHECKOUT…":plan.tier==="free"?plan.cta:plan.checkoutReady?plan.cta:t.pricePending} <span>↗</span></button></article>)}
         </div><p className="loyalty-note"><span>✳</span> {t.loyaltyNote}</p></section>
+
+        <section className="reference-section faq-section">
+          <div className="reference-section-head"><div><span className="eyebrow">GOT QUESTIONS?</span><h2>FAQ</h2><p>Everything you need to know before your first drop.</p></div><span className="reference-index">HELP / 01—06</span></div>
+          <div className="faq-list">
+            {[
+              ["What is VICEHUB?","VICEHUB is an independent creator platform for discovering GTA VI-related video content, managing downloads and building a creator workflow. It is not affiliated with Rockstar Games or Take-Two Interactive."],
+              ["Can I preview a video before downloading it?","Yes. Published videos with verified distribution rights can be opened in the secure preview player. Download access is subject to your account and monthly allowance."],
+              ["How do download allowances work?","Each membership tier has a monthly download allowance. The free tier currently includes five downloads per month. Paid tiers remain unavailable until pricing and checkout are configured."],
+              ["Can I publish content on my own social networks?","VICEHUB includes social planning tools. Direct publishing depends on the relevant social platform permissions and connected accounts; it is not represented as active until those connections are configured."],
+              ["Can I become a featured creator?","Create an account and build your creator profile. Public rankings and fan-page features will use verified profile and activity data rather than invented rankings."],
+              ["Is VICEHUB an official Rockstar website?","No. VICEHUB is independent and unofficial. All trademarks, game assets and intellectual property belong to their respective rights holders."]
+            ].map(([question,answer],i)=><article className={faqOpen===i?"faq-item open":"faq-item"} key={question}><button onClick={()=>setFaqOpen(faqOpen===i?-1:i)} aria-expanded={faqOpen===i}><span>{String(i+1).padStart(2,"0")}</span><b>{question}</b><i>{faqOpen===i?"−":"+"}</i></button>{faqOpen===i&&<p>{answer}</p>}</article>)}
+          </div>
+        </section>
       </main>
 
 {selectedVideo && <div className="drop-modal-backdrop" role="presentation" onClick={closeVideoDetails}><section className="drop-modal" role="dialog" aria-modal="true" aria-label={selectedVideo.title} onClick={e => e.stopPropagation()}><button className="drop-modal-close" onClick={closeVideoDetails} aria-label={t.closeDetails}>×</button><div className="drop-modal-media">{previewUrl ? <video className="drop-preview-player" controls playsInline preload="metadata" poster={selectedVideo.thumbnail_url || undefined} src={previewUrl}>Your browser does not support video playback.</video> : selectedVideo.thumbnail_url ? <img src={selectedVideo.thumbnail_url} alt={selectedVideo.title}/> : <div className="drop-art-fallback"><b>{(selectedVideo.category || "GTA VI").toUpperCase()}</b></div>}<span>{(selectedVideo.category || "VIDEO").toUpperCase()} · {(selectedVideo.language || "en").toUpperCase()}</span></div><div className="drop-modal-copy"><div className="eyebrow">VICEHUB / VERIFIED CATALOGUE</div>{previewMessage && <div className="drop-preview-status" role="status">{previewMessage}</div>}<h2>{selectedVideo.title}</h2><p>{selectedVideo.description || "Creator footage selected for the VICEHUB catalogue."}</p><div className="drop-modal-meta"><span>{t.creatorLabel}: <b>{selectedVideo.creator_name || "VICEHUB CREATOR"}</b></span><span>{selectedVideo.duration_seconds ? Math.floor(selectedVideo.duration_seconds / 60) + ":" + String(selectedVideo.duration_seconds % 60).padStart(2,"0") : "VIDEO"}</span><span>{t.licensedLabel}</span></div>{Array.isArray(selectedVideo.tags) && selectedVideo.tags.length > 0 && <div className="drop-tags">{selectedVideo.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}<div className="drop-modal-actions"><button className="primary-btn" onClick={() => downloadVideo(selectedVideo)}>{t.download} ↗</button>{selectedVideo.source_reference && <a href={selectedVideo.source_reference} target="_blank" rel="noreferrer">SOURCE ↗</a>}</div></div></section></div>}
