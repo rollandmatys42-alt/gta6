@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { getMarketplaceListings,createMarketplaceInquiry,createContentReport,getMyListings,saveMarketplaceListing,getMyMarketplaceInquiries,replyMarketplaceInquiry } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
-export const Route=createFileRoute("/marketplace")({head:()=>({meta:[{title:"Creator Marketplace — VICEHUB"}]}),component:MarketplacePage});
+export const Route=createFileRoute("/marketplace")({head:()=>({meta:[{title:"Creator Marketplace — VICEHUB"},{name:"description",content:"Discover creator-made GTA VI editing packs and contact independent sellers on VICEHUB."},{property:"og:title",content:"Creator Marketplace — VICEHUB"},{property:"og:description",content:"Discover creator-made GTA VI editing packs and contact independent sellers on VICEHUB."}]}),component:MarketplacePage});
 function MarketplacePage(){
  const {isAuthenticated,navigateToLogin}=useAuth();const [items,setItems]=useState([]),[myItems,setMyItems]=useState([]),[inquiries,setInquiries]=useState({buyer:[],seller:[]}),[selected,setSelected]=useState(null),[message,setMessage]=useState(""),[notice,setNotice]=useState(""),[error,setError]=useState(""),[showSeller,setShowSeller]=useState(false),[replyDrafts,setReplyDrafts]=useState({}),[listing,setListing]=useState({title:"",description:"",category:"Video pack",price:"0",currency:"USD",licenseTerms:"",previewUrl:""});
  useEffect(()=>{getMarketplaceListings({data:{}}).then(setItems).catch(e=>setError(e.message));if(isAuthenticated){getMyListings().then(setMyItems).catch(()=>{});getMyMarketplaceInquiries().then(setInquiries).catch(()=>{});}},[isAuthenticated]);
