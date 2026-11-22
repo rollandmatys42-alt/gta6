@@ -122,3 +122,9 @@
 .install-help-backdrop{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.75);display:grid;place-items:center;padding:18px}.install-help-panel{max-width:430px;width:100%;padding:25px;background:#15111b;border:1px solid #8a4b7c;box-shadow:0 25px 80px #000}.install-help-panel h2{font-family:'Barlow Condensed';font-size:32px}.install-help-panel p{font-size:13px;line-height:1.7;color:#c8bdcb}
 @media(max-width:900px){.hero{grid-template-columns:1fr;min-height:0;padding-top:50px}.hero-art-rebuilt{height:400px}.video-moment-card{grid-template-columns:1fr}}
 @media(max-width:650px){.hero{padding:38px 5% 28px}.hero h1{font-size:clamp(48px,13vw,72px);letter-spacing:-2px}.hero-art-rebuilt{height:300px}.top-actions .install-app-btn{display:inline-flex}.video-language-filter{width:100%}.video-moment-info{padding:17px}.video-moment-media{min-height:180px}}
+
+.watermark-progress-panel{padding:15px;margin:14px 0;background:#100e15;border:1px solid rgba(86,224,208,.35);display:flex;flex-direction:column;gap:10px}
+.watermark-progress-panel>div:first-child{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.watermark-progress-panel b{font-size:9px;letter-spacing:1.2px;color:#8cf4e5}
+.watermark-progress-panel span,.watermark-progress-panel small{font-size:10px;color:#aaa0b0}
+.watermark-progress-panel small{line-height:1.6}
