@@ -182,3 +182,6 @@
 .account-module-card>small{color:#b2a8b7;line-height:1.6}.account-module-card>i{color:#ff8fba}
 @media(max-width:900px){.vice-dashboard-hero{grid-template-columns:1fr}.vice-dashboard-side{max-width:360px;width:100%;margin-bottom:26px}.vice-dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.vice-dashboard-hero{padding:24px 18px 45px;min-height:0}.vice-dashboard-copy h1{font-size:clamp(43px,13vw,62px)}.vice-dashboard-side{max-width:none}.vice-dashboard-coordinate{left:18px;right:18px;font-size:6px}.vice-dashboard-stats{gap:7px}.vice-stat-card{padding:13px;min-height:130px}.vice-stat-card>strong{font-size:34px}.vice-stat-card>span{font-size:7px;letter-spacing:.8px}.vice-dashboard-actions a{width:100%;justify-content:center}}
+
+.site-language-select{background:#111019;border:1px solid rgba(255,255,255,.2);color:#fff;padding:8px 9px;font-size:9px;font-weight:800;letter-spacing:1px;min-width:55px}
+@media(max-width:760px){.site-language-select{padding:7px 5px;min-width:48px}}
