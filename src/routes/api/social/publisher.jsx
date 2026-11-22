@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/social/publisher")({
           return Response.json({ error: "Forbidden" }, { status: 403 });
         }
         try {
-          const result = await context.getBase44().asServiceRole.functions.invoke("social-publisher", {});
+          const result = await context.getBase44().functions.invoke("social-publisher", {});
           return Response.json(result ?? { success: true });
         } catch (error) {
           return Response.json(
