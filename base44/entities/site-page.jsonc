@@ -1,0 +1,85 @@
+{
+  "name": "SitePage",
+  "type": "object",
+  "properties": {
+    "slug": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 180
+    },
+    "content": {
+      "type": "string",
+      "maxLength": 30000
+    },
+    "locale": {
+      "type": "string",
+      "enum": [
+        "en",
+        "fr",
+        "es",
+        "de",
+        "it",
+        "pt"
+      ],
+      "default": "en"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published"
+      ],
+      "default": "draft"
+    },
+    "meta_title": {
+      "type": "string",
+      "maxLength": 180
+    },
+    "meta_description": {
+      "type": "string",
+      "maxLength": 320
+    },
+    "updated_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "slug",
+    "title",
+    "content",
+    "locale",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.status": "published"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

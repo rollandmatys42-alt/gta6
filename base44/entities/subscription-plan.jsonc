@@ -46,6 +46,27 @@
         "archived"
       ],
       "default": "draft"
+    },
+    "loyalty_monthly_discount_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0
+    },
+    "loyalty_max_discount_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0
+    },
+    "loyalty_floor_price_cents": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "sort_order": {
+      "type": "integer",
+      "default": 0
     }
   },
   "required": [

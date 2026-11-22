@@ -1,0 +1,128 @@
+{
+  "name": "NewsArticle",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 180
+    },
+    "slug": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 20000
+    },
+    "source_name": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "official",
+        "media",
+        "community",
+        "social"
+      ],
+      "default": "media"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "official",
+        "confirmed",
+        "reported",
+        "rumour",
+        "theory",
+        "opinion"
+      ],
+      "default": "reported"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "archived"
+      ],
+      "default": "draft"
+    },
+    "locale": {
+      "type": "string",
+      "enum": [
+        "en",
+        "fr",
+        "es",
+        "de",
+        "it",
+        "pt"
+      ],
+      "default": "en"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "slug",
+    "summary",
+    "body",
+    "source_name",
+    "source_url",
+    "source_type",
+    "confidence",
+    "status",
+    "locale"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.status": "published"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

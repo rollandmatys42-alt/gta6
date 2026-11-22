@@ -1,0 +1,97 @@
+{
+  "name": "ForumThread",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 160
+    },
+    "body": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 10000
+    },
+    "category_id": {
+      "type": "string"
+    },
+    "category_name": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "author_id": {
+      "type": "string"
+    },
+    "author_name": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "published",
+        "hidden",
+        "locked"
+      ],
+      "default": "published"
+    },
+    "pinned": {
+      "type": "boolean",
+      "default": false
+    },
+    "reply_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "last_activity_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "title",
+    "body",
+    "author_id",
+    "author_name",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.status": "published"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "data.author_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.author_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
