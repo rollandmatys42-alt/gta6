@@ -75,7 +75,7 @@ function DashboardPage() {
       <div className="vice-dashboard-side">
         <div className="vice-dashboard-membership"><span>{tx("dashboard.access")}</span><b>{account?.tier === "free" ? "FREE MEMBER" : (account?.planName || "MEMBERSHIP").toUpperCase()}</b><small>{account?.subscriptionStatus || "ACCOUNT ACTIVE"}</small></div>
         <div className="vice-dashboard-download-count"><strong>{account?.downloadsRemaining ?? 0}</strong><span>{tx("dashboard.downloads")}<br/>{tx("dashboard.thisMonth")}</span></div>
-        <button className="vice-dashboard-refresh" onClick={load} disabled={loading}>{loading ? "SYNCING YOUR HQ…" : "↻ SYNC YOUR HQ"}</button>
+        <button className="vice-dashboard-refresh" onClick={load} disabled={loading}>{loading ? tx("dashboard.sync") : "↻ " + tx("dashboard.sync")}</button>
         <button className="vice-dashboard-signout" onClick={logout}>{tx("dashboard.signout")} ↗</button>
       </div>
       <div className="vice-dashboard-coordinate">VICEHUB // PERSONAL CREATOR NETWORK <span>26°07' N · 80°08' W</span></div>
@@ -88,7 +88,7 @@ function DashboardPage() {
         <a className="vice-stat-card stat-downloads" href="/"><span>01 / {tx("dashboard.allowance")}</span><strong>{used}<i> / {limit}</i></strong><small>{account?.downloadsRemaining ?? 0} {tx("dashboard.allowanceNote")}</small><div className="vice-stat-track"><i style={{width:percent+"%"}} /></div></a>
         <a className="vice-stat-card" href="/social"><span>02 / {tx("dashboard.socialStat")}</span><strong>{data.posts.length.toString().padStart(2,"0")}</strong><small>{tx("dashboard.socialStatNote")}</small><b className="vice-stat-arrow">↗</b></a>
         <a className="vice-stat-card" href="/studio"><span>03 / {tx("dashboard.studioStat")}</span><strong>{data.drafts.length.toString().padStart(2,"0")}</strong><small>{tx("dashboard.studioStatNote")}</small><b className="vice-stat-arrow">↗</b></a>
-        <a className="vice-stat-card" href="/messages"><span>04 / {tx("dashboard.inboxStat")}</span><strong>{(unreadMessages+unreadAlerts).toString().padStart(2,"0")}</strong><small>{unreadMessages} {tx("dashboard.inboxStatNote")}{unreadAlerts} alerts</small><b className="vice-stat-arrow">↗</b></a>
+        <a className="vice-stat-card" href="/messages"><span>04 / {tx("dashboard.inboxStat")}</span><strong>{(unreadMessages+unreadAlerts).toString().padStart(2,"0")}</strong><small>{unreadMessages} {tx("dashboard.messages")} · {unreadAlerts} {tx("dashboard.alerts")}</small><b className="vice-stat-arrow">↗</b></a>
       </section>
       <div className="account-dashboard-columns">
         <section className="account-panel account-plan-panel">
@@ -126,8 +126,8 @@ function DashboardPage() {
         </section>
       </div>
       <section className="account-panel history-panel">
-        <div className="section-head"><div><div className="eyebrow">YOUR DOWNLOADS</div><h2>{tx("dashboard.history")}</h2></div><a className="text-btn" href="/">{tx("dashboard.browse")} ↗</a></div>
-        {account?.history?.length ? <div className="history-list">{account.history.map(item => <div className="history-row" key={item.id}><div><b>{item.video_title || "Video download"}</b><small>Reference: {item.video_id}</small></div><span>{item.watermark_applied ? "{tx("dashboard.watermarked")}" : "{tx("dashboard.clean")}"} · {item.status}</span><time>{new Date(item.created_date).toLocaleDateString("en-GB")}</time></div>)}</div> : <div className="account-empty">{tx("dashboard.noDownloads")}</div>}
+        <div className="section-head"><div><div className="eyebrow">{tx("dashboard.history")}</div><h2>{tx("dashboard.history")}</h2></div><a className="text-btn" href="/">{tx("dashboard.browse")} ↗</a></div>
+        {account?.history?.length ? <div className="history-list">{account.history.map(item => <div className="history-row" key={item.id}><div><b>{item.video_title || "Video download"}</b><small>Reference: {item.video_id}</small></div><span>{item.watermark_applied ? tx("dashboard.watermarked") : tx("dashboard.clean")} · {item.status}</span><time>{new Date(item.created_date).toLocaleDateString("en-GB")}</time></div>)}</div> : <div className="account-empty">{tx("dashboard.noDownloads")}</div>}
       </section>
       {user?.role === "admin" && <div className="admin-shortcut"><div><b>{tx("dashboard.admin")}</b><small>Manage video ingestion, rights review, subscriptions, users and platform settings.</small></div><div className="admin-shortcut-actions"><button className="primary-btn" onClick={() => window.location.assign("/admin")}>{tx("dashboard.openAdmin")} ↗</button><button className="outline-btn" onClick={() => window.location.assign("/admin/videos")}>MANAGE VIDEOS</button></div></div>}
     </>}
