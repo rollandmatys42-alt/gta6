@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listPublishedVideos, requestVideoDownload, getNewsFeed, getPublicPlans, createStripeCheckoutSession } from "@/lib/server-fns";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/AuthContext";
+import { setSiteLocale } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -65,7 +66,7 @@ function HomePage() {
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
-  useEffect(() => { window.localStorage.setItem("vicehub-language", language); document.documentElement.lang = language; }, [language]);
+  useEffect(() => { setSiteLocale(language); }, [language]);
   const installApp = async () => {
     if (installPrompt) { installPrompt.prompt(); const choice = await installPrompt.userChoice; if (choice?.outcome === "accepted") setIsInstalled(true); setInstallPrompt(null); }
     else setInstallHelp(true);
