@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { createVideoRecord, createVideoUploadUrl, publishVideo, testVideoStorage } from "@/lib/server-fns";
+import { createVideoRecord, createVideoUploadUrl, publishVideo, testVideoStorage, getAdminVideoLibrary, updateAdminVideo, archiveAdminVideo } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/_authed/admin/videos")({
   ssr: false,
@@ -144,6 +144,10 @@ function AdminVideosPage() {
   const [storageState, setStorageState] = useState("unchecked");
   const [storageDetails, setStorageDetails] = useState("");
   const [storageBusy, setStorageBusy] = useState(false);
+  const [videos, setVideos] = useState([]);
+  const [libraryBusy, setLibraryBusy] = useState(false);
+  const refreshLibrary = async () => { setLibraryBusy(true); try { setVideos(await getAdminVideoLibrary()); } catch (err) { setError(err?.message || "Could not load the video library."); } finally { setLibraryBusy(false); } };
+  useEffect(() => { if (user?.role === "admin") refreshLibrary(); }, [user?.id]);
 
   if (user?.role !== "admin") return <main className="account-page"><section className="account-content"><h1>ACCESS DENIED.</h1><p className="account-intro">Administrator permissions are required to manage video content.</p><button className="outline-btn" onClick={() => window.location.assign("/dashboard")}>Back to account</button></section></main>;
 
@@ -206,6 +210,7 @@ function AdminVideosPage() {
       setTitle(""); setDescription(""); setCreatorName(""); setSourceReference(""); setThumbnailUrl(""); setLanguage("en"); setIsFeatured(false);
       setDurationSeconds(""); setLicenseVerified(false); setOriginalFile(null); setWatermarkProgress(0);
       event.target.reset();
+      await refreshLibrary();
     } catch (err) {
       setError(err?.message || "Video upload failed.");
       setMessage("");
@@ -253,6 +258,10 @@ function AdminVideosPage() {
           {message && <div className="admin-status" role="status">{message}</div>}
           <div className="admin-form-actions"><button className="outline-btn" type="button" onClick={() => window.location.assign("/dashboard")}>Cancel</button><button className="primary-btn" type="submit" disabled={busy || storageState !== "ready"}>{busy ? "Uploading…" : "Upload video ↗"}</button></div>
         </form>
+        <section className="admin-video-library">
+          <div className="admin-video-library-head"><div><div className="eyebrow">CONTENT LIBRARY / INVENTORY</div><h2>VIDEO LIBRARY ({videos.length})</h2><p>Manage metadata, rights verification, featured status and publication state.</p></div><button className="outline-btn" type="button" onClick={refreshLibrary} disabled={libraryBusy}>{libraryBusy?"Refreshing…":"Refresh library"}</button></div>
+          {videos.length ? <div className="admin-video-library-table-wrap"><table className="admin-video-library-table"><thead><tr><th>VIDEO</th><th>CATEGORY</th><th>RIGHTS</th><th>STATUS</th><th>FEATURED</th><th>ACTIONS</th></tr></thead><tbody>{videos.map(video=><tr key={video.id}><td><b>{video.title}</b><small>{video.language?.toUpperCase()} · {video.creator_name||"Creator not set"}</small></td><td>{video.category}</td><td>{video.license_status}{video.source_reference&&<small><a href={video.source_reference} target="_blank" rel="noreferrer">Rights reference ↗</a></small>}</td><td>{video.status}</td><td>{video.is_featured?"Yes":"No"}</td><td><div className="admin-video-actions"><button type="button" className="text-btn" onClick={async()=>{try{await updateAdminVideo({data:{videoId:video.id,isFeatured:!video.is_featured}});await refreshLibrary();}catch(err){setError(err?.message||"Update failed.");}}}>{video.is_featured?"Unfeature":"Feature"}</button>{video.license_status!=="verified"&&video.source_reference&&<button type="button" className="text-btn" onClick={async()=>{if(!window.confirm("Confirm that you have verified the rights and permission to distribute this video?"))return;try{await updateAdminVideo({data:{videoId:video.id,licenseStatus:"verified"}});await refreshLibrary();}catch(err){setError(err?.message||"Rights update failed.");}}}>Verify rights</button>}{video.status==="draft"&&video.license_status==="verified"&&video.storage_key&&video.watermarked_storage_key&&<button type="button" className="text-btn" onClick={async()=>{try{await publishVideo({data:{videoId:video.id}});await refreshLibrary();}catch(err){setError(err?.message||"Publish failed.");}}}>Publish</button>}<button type="button" className="text-btn" onClick={async()=>{try{await archiveAdminVideo({data:{videoId:video.id,archived:video.status!=="archived"}});await refreshLibrary();}catch(err){setError(err?.message||"Archive failed.");}}}>{video.status==="archived"?"Restore draft":"Archive"}</button></div></td></tr>)}</tbody></table></div> : <div className="platform-empty">{libraryBusy?"Loading video records…":"No videos have been added yet. The catalogue remains empty until real licensed footage is uploaded."}</div>}
+        </section>
       </section>
     </main>
   );
