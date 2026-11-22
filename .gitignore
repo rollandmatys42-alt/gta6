@@ -1,0 +1,24 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Logs and dependencies
+*.log
+npm-debug.log*
+node_modules
+*.local
+dist
+.wrangler
+.tanstack
+.dev.vars*
+
+# Editor files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.sw?
+
+# Base44 local app link
+base44/.app.jsonc

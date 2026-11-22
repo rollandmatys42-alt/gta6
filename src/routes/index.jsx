@@ -38,11 +38,13 @@ function HomePage() {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
   const [liveVideos, setLiveVideos] = useState([]);
-  const [liveNews, setLiveNews] = useState([]);\n  const [livePlans, setLivePlans] = useState([]);
+  const [liveNews, setLiveNews] = useState([]);
+  const [livePlans, setLivePlans] = useState([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [downloadMessage, setDownloadMessage] = useState("");
   const t = copy[language];
-  useEffect(() => { getPublicPlans({ data: { currency } }).then((rows) => setLivePlans(Array.isArray(rows) ? rows : [])).catch(() => setLivePlans([])); }, [currency]);\n  useEffect(() => { getNewsFeed({ data: { locale: language, limit: 3 } }).then((rows) => setLiveNews(Array.isArray(rows) ? rows : [])).catch(() => setLiveNews([])); }, [language]);
+  useEffect(() => { getPublicPlans({ data: { currency } }).then((rows) => setLivePlans(Array.isArray(rows) ? rows : [])).catch(() => setLivePlans([])); }, [currency]);
+  useEffect(() => { getNewsFeed({ data: { locale: language, limit: 3 } }).then((rows) => setLiveNews(Array.isArray(rows) ? rows : [])).catch(() => setLiveNews([])); }, [language]);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); }, []);
 
