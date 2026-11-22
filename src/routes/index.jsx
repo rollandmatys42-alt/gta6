@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listPublishedVideos, requestVideoDownload } from "@/lib/server-fns";
 import { createFileRoute } from "@tanstack/react-router";
+import { useAuth } from "@/lib/AuthContext";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,6 +33,7 @@ const stories = [
 ];
 
 function HomePage() {
+  const { isAuthenticated, navigateToLogin, logout } = useAuth();
   const [language, setLanguage] = useState("en");
   const [currency, setCurrency] = useState("USD");
   const [active, setActive] = useState("explore");
@@ -76,8 +78,8 @@ function HomePage() {
         <div className="top-actions">
           <select aria-label="Language" value={language} onChange={(e) => setLanguage(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option></select>
           <select aria-label="Currency" value={currency} onChange={(e) => setCurrency(e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select>
-          <button className="sign-in" onClick={() => setNotice("Account sign-in will be enabled when authentication is configured.")}>{t.signIn}</button>
-          <button className="join-btn" onClick={() => setNotice("Registration will open when the account and subscription modules are connected.")}>{t.join}<span>↗</span></button>
+          <button className="sign-in" onClick={() => isAuthenticated ? logout() : navigateToLogin()}>{isAuthenticated ? "Sign out" : t.signIn}</button>
+          <button className="join-btn" onClick={() => isAuthenticated ? window.location.assign("/dashboard") : navigateToLogin()}>{isAuthenticated ? "My account" : t.join}<span>↗</span></button>
         </div>
       </header>
 
