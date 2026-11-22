@@ -669,7 +669,7 @@ async function omniRouteChat({messages, model, temperature = 0.4, maxTokens = 18
  const key=secrets.get("OMNIROUTE_API_KEY"),base=secrets.get("OMNIROUTE_BASE_URL");
  if(!key||!base)throw Object.assign(new Error("OmniRoute is not configured. Add OMNIROUTE_API_KEY and OMNIROUTE_BASE_URL (OpenAI-compatible /v1 base URL) to Base44 secrets."),{status:503,code:"OMNIROUTE_NOT_CONFIGURED"});
  const selectedModel=model||secrets.get("OMNIROUTE_MODEL")||"auto";
- const response=await fetch(base.replace(/\\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","X-Title":title},body:JSON.stringify({model:selectedModel,messages,temperature,max_tokens:maxTokens})});
+ const response=await fetch(base.replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","X-Title":title},body:JSON.stringify({model:selectedModel,messages,temperature,max_tokens:maxTokens})});
  const payload=await response.json().catch(()=>({}));
  if(!response.ok)throw Object.assign(new Error(payload.error?.message||"OmniRoute returned HTTP "+response.status),{status:502,code:"OMNIROUTE_REQUEST_FAILED"});
  const output=payload.choices?.[0]?.message?.content;
