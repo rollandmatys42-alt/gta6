@@ -86,6 +86,14 @@
           }
         }
       }
+    },
+    "grace_period_ends_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "voluntary_cancelled": {
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [
