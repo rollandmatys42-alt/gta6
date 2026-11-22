@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { createVideoRecord, createVideoUploadUrl, publishVideo } from "@/lib/server-fns";
+import { createVideoRecord, createVideoUploadUrl, publishVideo, testVideoStorage } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/_authed/admin/videos")({
   ssr: false,
@@ -141,12 +141,37 @@ function AdminVideosPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [storageState, setStorageState] = useState("unchecked");
+  const [storageDetails, setStorageDetails] = useState("");
+  const [storageBusy, setStorageBusy] = useState(false);
 
   if (user?.role !== "admin") return <main className="account-page"><section className="account-content"><h1>ACCESS DENIED.</h1><p className="account-intro">Administrator permissions are required to manage video content.</p><button className="outline-btn" onClick={() => window.location.assign("/dashboard")}>Back to account</button></section></main>;
+
+  const checkStorage = async () => {
+    setStorageBusy(true);
+    setStorageState("checking");
+    setStorageDetails("");
+    setError("");
+    try {
+      const result = await testVideoStorage();
+      if (!result?.ok || result.testObjectRemoved !== true) throw new Error("Storage test did not confirm write, read-back and cleanup.");
+      setStorageState("ready");
+      setStorageDetails("Private storage verified · write, read-back and cleanup passed · " + result.latencyMs + " ms.");
+    } catch (err) {
+      setStorageState("failed");
+      setStorageDetails(err?.message || "Private storage could not be verified.");
+    } finally {
+      setStorageBusy(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
     setError(""); setMessage("");
+    if (storageState !== "ready") {
+      setError("Run and pass the private storage check before uploading. No file has been sent.");
+      return;
+    }
     if (!originalFile) {
       setError("Choose the original video. VICEHUB will generate the watermarked MP4 automatically in your browser.");
       return;
@@ -199,7 +224,12 @@ function AdminVideosPage() {
         <div className="eyebrow">CONTENT CONTROL / VIDEO INGESTION</div>
         <h1>ADD FOOTAGE.</h1>
         <p className="account-intro">Upload licensed content into private storage. Videos remain drafts until rights and both renditions are ready.</p>
-        <div className="admin-warning"><b>Automatic watermark protection</b><span>VICEHUB generates a permanent MP4 watermark in your browser. The clean master and watermarked copy are stored separately in private storage. Free downloads receive the branded copy; paid access follows the active plan entitlement.</span></div>
+        <div className="admin-warning"><b>Automatic watermark protection</b><span>VICEHUB generates a permanent MP4 watermark in your browser. The clean master and watermarked copy are stored separately in private storage. Free downloads receive the branded copy; paid access follows the active plan entitlement. Browser-side rendering is not a server-side transcoding pipeline: keep this tab open and use a desktop browser for ingestion.</span></div>
+        <section className="admin-warning" aria-live="polite">
+          <b>PRIVATE STORAGE READINESS</b>
+          <span>{storageState === "ready" ? storageDetails : storageState === "checking" ? "Testing private storage permissions…" : storageState === "failed" ? storageDetails : "Storage has not yet been tested in this session. Uploads are locked until a real write, read-back and cleanup test succeeds."}</span>
+          <div className="admin-form-actions"><button className="outline-btn" type="button" onClick={checkStorage} disabled={storageBusy || busy}>{storageBusy ? "Checking…" : storageState === "ready" ? "Recheck storage" : "Test private storage"}</button><span>{storageState === "ready" ? "READY" : storageState === "failed" ? "NOT READY" : "NOT CHECKED"}</span></div>
+        </section>
         <form className="admin-video-form" onSubmit={submit}>
           <label>Video title<input required minLength={2} maxLength={140} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Vice City night drive" /></label>
           <label>Description<textarea maxLength={3000} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe the footage and permitted use." /></label>
@@ -221,7 +251,7 @@ function AdminVideosPage() {
           <label className="license-check"><input type="checkbox" checked={licenseVerified} onChange={(e) => setLicenseVerified(e.target.checked)} /> I have checked and documented the rights needed to distribute this footage.</label>
           {error && <div className="account-error" role="alert">{error}</div>}
           {message && <div className="admin-status" role="status">{message}</div>}
-          <div className="admin-form-actions"><button className="outline-btn" type="button" onClick={() => window.location.assign("/dashboard")}>Cancel</button><button className="primary-btn" type="submit" disabled={busy}>{busy ? "Uploading…" : "Upload video ↗"}</button></div>
+          <div className="admin-form-actions"><button className="outline-btn" type="button" onClick={() => window.location.assign("/dashboard")}>Cancel</button><button className="primary-btn" type="submit" disabled={busy || storageState !== "ready"}>{busy ? "Uploading…" : "Upload video ↗"}</button></div>
         </form>
       </section>
     </main>
