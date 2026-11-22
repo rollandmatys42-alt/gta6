@@ -62,6 +62,114 @@ async function presignR2({ method, objectKey, contentType, expiresIn = DOWNLOAD_
   return base.origin + canonicalUri + "?" + params + "&X-Amz-Signature=" + signature;
 }
 
+
+const SOCIAL_CALLBACK_URL = "https://gta6-creator-hub-c26cc578.base44.app/social/callback";
+function fromHex(value) {
+  if (!/^(?:[a-f0-9]{2})+$/i.test(value || "")) throw new Error("Invalid encrypted social credential.");
+  return new Uint8Array(value.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+}
+function safeEqualText(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+async function socialEncryptionKey() {
+  const secret = secrets.get("SOCIAL_TOKEN_ENCRYPTION_KEY");
+  if (!secret || secret.length < 32) throw Object.assign(new Error("Social token encryption is not configured. Add SOCIAL_TOKEN_ENCRYPTION_KEY in the secure app secrets."), { status: 503, code: "SOCIAL_ENCRYPTION_NOT_CONFIGURED" });
+  const raw = await crypto.subtle.digest("SHA-256", encoder.encode(secret));
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+async function encryptSocialToken(value) {
+  const key = await socialEncryptionKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(value));
+  return hex(iv) + "." + hex(new Uint8Array(encrypted));
+}
+async function decryptSocialToken(value) {
+  const [ivHex, cipherHex] = String(value || "").split(".");
+  const key = await socialEncryptionKey();
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromHex(ivHex) }, key, fromHex(cipherHex));
+  return new TextDecoder().decode(decrypted);
+}
+async function createSocialState(userId, provider) {
+  const secret = secrets.get("SOCIAL_OAUTH_STATE_SECRET");
+  if (!secret || secret.length < 32) throw Object.assign(new Error("Social OAuth state signing is not configured. Add SOCIAL_OAUTH_STATE_SECRET in the secure app secrets."), { status: 503, code: "SOCIAL_STATE_NOT_CONFIGURED" });
+  const payload = hex(encoder.encode(JSON.stringify({ userId, provider, expiresAt: Date.now() + 10 * 60 * 1000, nonce: hex(crypto.getRandomValues(new Uint8Array(16))) })));
+  return payload + "." + hex(await hmac(encoder.encode(secret), payload));
+}
+async function verifySocialState(state, userId, provider) {
+  const secret = secrets.get("SOCIAL_OAUTH_STATE_SECRET");
+  if (!secret) throw new Error("Social OAuth state signing is not configured.");
+  const [payloadHex, signature] = String(state || "").split(".");
+  if (!payloadHex || !signature) throw Object.assign(new Error("The social authorisation state is invalid."), { status: 400, code: "INVALID_OAUTH_STATE" });
+  const expected = hex(await hmac(encoder.encode(secret), payloadHex));
+  if (!safeEqualText(expected, signature)) throw Object.assign(new Error("The social authorisation state signature is invalid."), { status: 400, code: "INVALID_OAUTH_STATE" });
+  const payload = JSON.parse(new TextDecoder().decode(fromHex(payloadHex)));
+  if (payload.userId !== userId || payload.provider !== provider || payload.expiresAt < Date.now()) throw Object.assign(new Error("This social authorisation request expired or belongs to another account."), { status: 403, code: "OAUTH_STATE_MISMATCH" });
+}
+async function socialFetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.error || payload.data?.error) {
+    const message = payload.error_description || payload.error?.message || payload.message || payload.data?.error?.message || "The social platform API rejected the request.";
+    throw Object.assign(new Error(message), { status: response.status || 502, code: payload.error?.code || payload.data?.error?.code || "SOCIAL_API_ERROR" });
+  }
+  return payload;
+}
+async function getSocialConnectionRow(db, userId, provider) {
+  const rows = await db.SocialConnection.filter({ user_id: userId, provider }, "-created_date", 1, 0);
+  return rows[0] || null;
+}
+async function saveSocialConnection(db, userId, data) {
+  const existing = await getSocialConnectionRow(db, userId, data.provider);
+  const payload = {
+    user_id: userId, provider: data.provider, provider_user_id: data.providerUserId,
+    account_name: data.accountName, access_token_ciphertext: await encryptSocialToken(data.accessToken),
+    ...(data.refreshToken ? { refresh_token_ciphertext: await encryptSocialToken(data.refreshToken) } : {}),
+    ...(data.expiresAt ? { expires_at: data.expiresAt } : {}),
+    ...(data.refreshExpiresAt ? { refresh_expires_at: data.refreshExpiresAt } : {}),
+    scopes: data.scopes || [], status: "connected", connected_at: new Date().toISOString(), last_error: "",
+  };
+  if (existing) return db.SocialConnection.update(existing.id, payload);
+  return db.SocialConnection.create(payload);
+}
+async function getValidSocialToken(db, userId, provider) {
+  const connection = await getSocialConnectionRow(db, userId, provider);
+  if (!connection || connection.status !== "connected") throw Object.assign(new Error("Connect your " + provider + " account before publishing."), { status: 404, code: "SOCIAL_ACCOUNT_NOT_CONNECTED" });
+  let accessToken = await decryptSocialToken(connection.access_token_ciphertext);
+  if (connection.expires_at && new Date(connection.expires_at).getTime() < Date.now() + 5 * 60 * 1000) {
+    if (provider === "TikTok" && connection.refresh_token_ciphertext) {
+      const form = new URLSearchParams();
+      form.set("client_key", secrets.get("TIKTOK_CLIENT_KEY") || "");
+      form.set("client_secret", secrets.get("TIKTOK_CLIENT_SECRET") || "");
+      form.set("grant_type", "refresh_token");
+      form.set("refresh_token", await decryptSocialToken(connection.refresh_token_ciphertext));
+      const refreshed = await socialFetchJson("https://open.tiktokapis.com/v2/oauth/token/", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+      const d = refreshed.data || refreshed;
+      accessToken = d.access_token;
+      await db.SocialConnection.update(connection.id, {
+        access_token_ciphertext: await encryptSocialToken(d.access_token),
+        ...(d.refresh_token ? { refresh_token_ciphertext: await encryptSocialToken(d.refresh_token) } : {}),
+        ...(d.expires_in ? { expires_at: new Date(Date.now() + d.expires_in * 1000).toISOString() } : {}),
+        ...(d.refresh_expires_in ? { refresh_expires_at: new Date(Date.now() + d.refresh_expires_in * 1000).toISOString() } : {}),
+      });
+    } else if (provider === "Instagram") {
+      const url = "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=" + encodeURIComponent(accessToken);
+      const refreshed = await socialFetchJson(url);
+      accessToken = refreshed.access_token;
+      await db.SocialConnection.update(connection.id, {
+        access_token_ciphertext: await encryptSocialToken(accessToken),
+        ...(refreshed.expires_in ? { expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString() } : {}),
+      });
+    } else {
+      await db.SocialConnection.update(connection.id, { status: "expired" });
+      throw Object.assign(new Error("Your " + provider + " connection has expired. Reconnect the account."), { status: 401, code: "SOCIAL_TOKEN_EXPIRED" });
+    }
+  }
+  return { connection, accessToken };
+}
+
 export const testVideoStorage = createServerFn({ method: "POST" }).middleware([requireUser]).handler(async ({ context }) => {
   requireAdmin(context);
   const objectKey = "system/health-check-" + Date.now() + ".txt";
