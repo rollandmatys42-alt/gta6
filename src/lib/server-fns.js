@@ -569,3 +569,12 @@ export const setMarketplaceListingStatus = createServerFn({method:"POST"}).middl
   }
   return db.MarketplaceListing.update(listing.id,{status:data.status});
  });
+
+export const replyMarketplaceInquiry = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({inquiryId:z.string().min(1),reply:z.string().min(2).max(2000)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const inquiry=await db.MarketplaceInquiry.get(data.inquiryId).catch(()=>null);
+  if(!inquiry||inquiry.seller_id!==context.user.id)throw Object.assign(new Error("Only the listing creator can reply to this enquiry."),{status:403});
+  return db.MarketplaceInquiry.update(inquiry.id,{seller_reply:data.reply,status:"replied",replied_at:new Date().toISOString()});
+ });
