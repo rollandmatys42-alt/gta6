@@ -1,0 +1,126 @@
+{
+  "name": "UserSubscription",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "tier_code": {
+      "type": "string",
+      "enum": [
+        "free",
+        "starter",
+        "pro",
+        "premium"
+      ],
+      "default": "free"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "inactive",
+        "active",
+        "past_due",
+        "cancelled",
+        "trialing"
+      ],
+      "default": "inactive"
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP"
+      ],
+      "default": "USD"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "streak_months": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "loyalty_discount_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "current_monthly_price_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stripe_customer_id": {
+      "type": "string",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "stripe_subscription_id": {
+      "type": "string",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "user_id",
+    "tier_code",
+    "status",
+    "currency"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

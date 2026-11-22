@@ -85,8 +85,12 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
       throw Object.assign(new Error("This video is not available for download."), { status: 404, code: "VIDEO_NOT_AVAILABLE" });
     }
 
-    let tier = user.subscription_tier || "free";
-    if (tier !== "free" && user.subscription_status !== "active") tier = "free";
+    const subscriptions = await base44.asServiceRole.entities.UserSubscription.filter(
+      { user_id: user.id }, "-created_date", 1, 0,
+    );
+    const subscription = subscriptions[0];
+    let tier = subscription?.tier_code || "free";
+    if (tier !== "free" && subscription?.status !== "active") tier = "free";
     let limit = MONTHLY_FREE_LIMIT;
     let cleanDownloads = false;
     if (tier !== "free") {
