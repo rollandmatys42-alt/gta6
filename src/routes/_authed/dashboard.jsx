@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import SiteFrame from "@/components/SiteFrame";
 import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile, refreshMySubscription, createStripePortalSession } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
