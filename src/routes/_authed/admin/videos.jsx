@@ -262,7 +262,7 @@ function AdminVideosPage() {
             <label>Thumbnail URL<input type="url" value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} placeholder="https://…" /></label>
           </div>
           <label>Creator / source name<input maxLength={80} value={creatorName} onChange={(e) => setCreatorName(e.target.value)} placeholder="Creator name" /></label>
-          <label>Rights / source reference<input type="url" value={sourceReference} onChange={(e) => setSourceReference(e.target.value)} placeholder="https://…" /></label>
+          <label>Rights / licence evidence reference<input type="url" value={sourceReference} onChange={(e) => setSourceReference(e.target.value)} placeholder="URL to written permission or licence evidence" /><small>Use a reference to actual written rights evidence. A public source URL or a checkbox alone does not grant commercial rights.</small></label>
           <label className="license-check"><input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} /> Feature as “Video of the Moment”</label>
           <div className="admin-form-row upload-pair">
             <label>Original video (.mp4 / .mov)<input required type="file" accept="video/mp4,video/quicktime" onChange={(e) => { setOriginalFile(e.target.files?.[0] || null); setWatermarkProgress(0); }} /><small>{originalFile?.name || "Choose the clean master video"}</small></label>
