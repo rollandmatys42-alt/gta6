@@ -63,6 +63,8 @@ function HomePage() {
   const [loadingVideos, setLoadingVideos] = useState(true);
   const [news, setNews] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [currency, setCurrency] = useState("USD");
+  const [plansLoading, setPlansLoading] = useState(true);
   const [creators, setCreators] = useState([]);
   const [products, setProducts] = useState([]);
   const [notice, setNotice] = useState("");
@@ -79,11 +81,20 @@ function HomePage() {
   useEffect(() => {
     listPublishedVideos().then(r => setVideos(Array.isArray(r) ? r : [])).catch(() => setVideos([])).finally(() => setLoadingVideos(false));
     getNewsFeed({ data: { locale: "en", limit: 8 } }).then(r => setNews(Array.isArray(r) ? r : [])).catch(() => setNews([]));
-    getPublicPlans({ data: { currency: "USD" } }).then(r => setPlans(Array.isArray(r) ? r : [])).catch(() => setPlans([]));
     getCreatorDirectory({ data: {} }).then(r => setCreators(Array.isArray(r) ? r : [])).catch(() => setCreators([]));
     getShopProducts().then(r => setProducts(Array.isArray(r) ? r : [])).catch(() => setProducts([]));
     getPublicCommunityReviews().then(r => setReviews(Array.isArray(r) ? r : [])).catch(() => setReviews([]));
   }, []);
+  useEffect(() => {
+    let active = true;
+    setPlansLoading(true);
+    getPublicPlans({ data: { currency } })
+      .then(r => { if (active) setPlans(Array.isArray(r) ? r : []); })
+      .catch(() => { if (active) setPlans([]); })
+      .finally(() => { if (active) setPlansLoading(false); });
+    return () => { active = false; };
+  }, [currency]);
+
   useEffect(() => {
     if (!preview) return;
     const onKey = e => { if (e.key === "Escape") setPreview(null); };
@@ -107,9 +118,7 @@ function HomePage() {
     { id: "VQRLujxTm3c", title: "Trailer 2", url: "https://www.youtube.com/watch?v=VQRLujxTm3c" },
     { id: "tJbzMqJGH4k", title: "An Extended Look", url: "https://www.youtube.com/watch?v=tJbzMqJGH4k" },
   ];
-  const plan = plans[0];
-  const steps = ladderSchedule(plan || {});
-  const firstPrice = formatMoney(steps[0].priceCents);
+  const firstPlan = plans[0] || null;
 
   const openPreview = async video => {
     setPreview({ video, url: "", msg: "Loading preview…" });
@@ -122,12 +131,17 @@ function HomePage() {
     try { const r = await requestVideoDownload({ data: { videoId: video.id } }); window.location.assign(r.downloadUrl); setNotice(`Download started — ${r.downloadsRemaining} left this month.`); }
     catch (e) { setNotice(e?.message || "Download unavailable."); }
   };
-  const subscribe = async () => {
+  const subscribe = async selectedPlan => {
     if (!isAuthenticated) { navigateToLogin(); return; }
-    if (!plan) { setNotice("Membership opens soon."); return; }
+    if (!selectedPlan) { setNotice("No paid membership is currently available in this currency."); return; }
     setBusy(true);
-    try { const r = await createStripeCheckoutSession({ data: { tierCode: plan.tier_code, currency: "USD" } }); window.location.assign(r.url); }
-    catch (e) { setNotice(e?.message || "Checkout could not be opened."); setBusy(false); }
+    try {
+      const r = await createStripeCheckoutSession({ data: { tierCode: selectedPlan.tier_code, currency: selectedPlan.currency } });
+      window.location.assign(r.url);
+    } catch (e) {
+      setNotice(e?.message || "Checkout could not be opened.");
+      setBusy(false);
+    }
   };
 
   return <SiteFrame eyebrow="WELCOME TO VICE CITY">
@@ -138,7 +152,7 @@ function HomePage() {
         <div className="fh-kicker">WELCOME TO VICE CITY</div>
         <h1>Post GTA VI videos.<br /><em>Grow your page.</em></h1>
         <p>Your independent home for GTA VI culture: cinematic video drops, official media, verified news and a community built for creators.</p>
-        <div className="fh-hero-cta"><button type="button" className="fh-btn solid big" onClick={subscribe} disabled={busy}>{busy ? "Opening checkout…" : `Start at ${firstPrice}/month`}</button><a href="#drops" className="fh-btn ghost big">Watch the drops</a></div>
+        <div className="fh-hero-cta"><a href="#plans" className="fh-btn solid big">Explore memberships</a><a href="#drops" className="fh-btn ghost big">Watch the drops</a></div>
         <ul className="fh-stats">
           <li><b>{videos.length}</b><span>videos ready</span></li>
           <li><b>{creators.length}</b><span>creators</span></li>
@@ -188,7 +202,7 @@ function HomePage() {
     <section className="fh-section">
       <header className="fh-section-head"><div><h2>How it works</h2><p>Easy as a heist</p></div></header>
       <div className="fh-steps">
-        {[["1", "Pick a drop", "Browse the weekly vertical videos and preview them."], ["2", "Download", "One tap, full quality. Members get clean files with no watermark."], ["3", "Post it", "Publish on your own TikTok, Instagram or YouTube and grow your page."], ["4", "Pay less over time", "Your price follows the loyalty schedule shown below."]].map(([n, t, d]) => <div className="fh-step" key={n}><span>{n}</span><h3>{t}</h3><p>{d}</p></div>)}
+        {[["1", "Pick a drop", "Browse the weekly vertical videos and preview them."], ["2", "Download", "Your monthly allowance and file quality depend on the membership you choose."], ["3", "Post it", "Publish on your own TikTok, Instagram or YouTube and grow your page."], ["4", "Pay less over time", "Your price follows the loyalty schedule shown below."]].map(([n, t, d]) => <div className="fh-step" key={n}><span>{n}</span><h3>{t}</h3><p>{d}</p></div>)}
       </div>
     </section>
 
@@ -228,20 +242,77 @@ function HomePage() {
       </div>
     </section>
 
-    <section className="fh-section" id="plans">
-      <div className="ladder-wrap fh-plan">
-        <div className="eyebrow">LOYALTY PRICING</div>
-        <h2>The longer you stay, the less you pay</h2>
-        <div className="ladder">{steps.map((s, i) => <div className={"ladder-step" + (i === 0 ? " now" : "")} key={s.fromMonth}><small>{s.toMonth ? `Months ${s.fromMonth}–${s.toMonth}` : `Month ${s.fromMonth}+`}</small><b>{formatMoney(s.priceCents)}</b><small>/month</small></div>)}</div>
-        <ul className="fh-features">
-          <li>{plan?.monthly_download_limit ? `${plan.monthly_download_limit} downloads every month` : "Monthly downloads included"}</li>
-          <li>{plan?.clean_downloads === false ? "Watermarked previews" : "Clean files, no watermark"}</li>
-          <li>Post on your own TikTok, Instagram & YouTube</li>
-          <li>AI caption studio & social planner</li>
-          <li>Cancel any time — pricing restarts at step 1 if you return</li>
-        </ul>
-        <button type="button" className="fh-btn solid big" onClick={subscribe} disabled={busy}>{busy ? "Opening checkout…" : `Start at ${firstPrice}/month`}</button>
+    <section className="fh-section fh-memberships" id="plans">
+      <header className="fh-section-head fh-membership-heading">
+        <div>
+          <span className="fh-section-kicker">VICEHUB MEMBERSHIPS</span>
+          <h2>Choose your level of access</h2>
+          <p>Clear monthly allowances. No invented prices. Your selected currency is applied to every plan.</p>
+        </div>
+        <label className="fh-currency-picker">DISPLAY CURRENCY
+          <select value={currency} onChange={e => setCurrency(e.target.value)} aria-label="Display currency">
+            <option value="USD">USD — US Dollar</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="EUR">EUR — Euro</option>
+          </select>
+        </label>
+      </header>
+
+      <div className="fh-membership-grid">
+        <article className="fh-membership-card fh-free-card">
+          <div className="fh-membership-top"><span className="fh-membership-label">START HERE</span><span className="fh-membership-tier">FREE</span></div>
+          <h3>Free access</h3>
+          <p className="fh-membership-description">Explore VICEHUB and try the video library before upgrading.</p>
+          <div className="fh-membership-price"><strong>{formatMoney(0, currency)}</strong><span>no monthly charge</span></div>
+          <ul className="fh-membership-features">
+            <li>5 downloads per UTC calendar month</li>
+            <li>Watermarked video downloads</li>
+            <li>Browse the published video library</li>
+            <li>Access public GTA VI news and community pages</li>
+          </ul>
+          <button type="button" className="fh-btn ghost big" onClick={navigateToLogin}>Create a free account</button>
+          <small className="fh-membership-foot">Free allowance resets each UTC calendar month.</small>
+        </article>
+
+        {plansLoading
+          ? [0, 1, 2].map(i => <div className="fh-membership-card fh-membership-skeleton" key={i} aria-label="Loading membership plan" />)
+          : plans.map(p => {
+            const schedule = ladderSchedule(p);
+            const startingPrice = schedule[0]?.priceCents ?? Number(p.monthly_price_cents || 0);
+            return <article className={"fh-membership-card" + (p.tier_code === "pro" ? " fh-membership-featured" : "")} key={p.id}>
+              <div className="fh-membership-top">
+                <span className="fh-membership-label">{p.tier_code === "pro" ? "CREATOR PLAN" : "MEMBERSHIP"}</span>
+                <span className="fh-membership-tier">{p.display_name || p.tier_code}</span>
+              </div>
+              <h3>{p.display_name || p.tier_code}</h3>
+              <p className="fh-membership-description">A monthly membership with a clearly defined download allowance.</p>
+              <div className="fh-membership-price"><strong>{formatMoney(startingPrice, currency)}</strong><span>per month · first billing step</span></div>
+              <div className="fh-membership-allowance"><b>{Number(p.monthly_download_limit || 0).toLocaleString("en")}</b><span>downloads included each month</span></div>
+              <ul className="fh-membership-features">
+                <li>{p.clean_downloads ? "Clean downloads without a VICEHUB watermark" : "Watermarked downloads"}</li>
+                <li>Access to videos published in the VICEHUB library</li>
+                <li>Monthly recurring billing</li>
+              </ul>
+              {schedule.length > 1 && <div className="fh-loyalty-schedule">
+                <div className="fh-loyalty-title">YOUR LOYALTY PRICE</div>
+                {schedule.map(s => <div className="fh-loyalty-row" key={s.fromMonth}>
+                  <span>{s.toMonth ? `Months ${s.fromMonth}–${s.toMonth}` : `Month ${s.fromMonth} onward`}</span>
+                  <b>{formatMoney(s.priceCents, currency)}<small>/mo</small></b>
+                </div>)}
+              </div>}
+              <button type="button" className="fh-btn solid big fh-membership-select" onClick={() => subscribe(p)} disabled={busy}>
+                {busy ? "Opening checkout…" : `Choose ${p.display_name || p.tier_code}`}
+              </button>
+              <small className="fh-membership-foot">Cancel any time. If you cancel and subscribe again later, loyalty pricing restarts at step one.</small>
+            </article>;
+          })}
       </div>
+
+      {!plansLoading && plans.length === 0 && <div className="fh-membership-empty">
+        <b>No paid plans are currently available in {currency}.</b>
+        <span>Free access remains available. Choose another currency or check back after paid plans have been configured.</span>
+      </div>}
+      <p className="fh-membership-legal">VICEHUB is an independent fan platform, not affiliated with Rockstar Games or Take-Two Interactive. Game intellectual property remains with its owners. Paid access is limited to content for which VICEHUB has documented the required publication and distribution permissions.</p>
     </section>
 
     {products.length > 0 && <Row title="Shop" sub="Creator tools and digital products" to="/shop">
@@ -253,7 +324,7 @@ function HomePage() {
       {FAQ.map(([q, a], i) => <div className={"fh-faq-item" + (faq === i ? " open" : "")} key={q}><button type="button" aria-expanded={faq === i} onClick={() => setFaq(faq === i ? -1 : i)}>{q}<span>{faq === i ? "–" : "+"}</span></button>{faq === i && <p>{a}</p>}</div>)}
     </section>
 
-    <section className="fh-final"><h2>Ready for day one?</h2><p>Join the fans posting GTA VI content every week.</p><button type="button" className="fh-btn solid big" onClick={subscribe} disabled={busy}>Claim your spot</button></section>
+    <section className="fh-final"><h2>Ready for day one?</h2><p>Join the fans posting GTA VI content every week.</p><a href="#plans" className="fh-btn solid big">Explore memberships</a></section>
     <p className="fan-disclaimer">VICEHUB is an independent fan community. Not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive.</p>
 
     {preview && <div className="fh-modal" role="dialog" aria-modal="true" aria-label={preview.video.title} onClick={() => setPreview(null)}>
