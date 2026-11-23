@@ -72,7 +72,8 @@ async function applyLoyaltyRenewal(db, stripeSub) {
 async function saveInvoiceLedger(db, invoice, status, eventId) {
   const invoiceId = invoice.id;
   if (!invoiceId) return;
-  const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id || "";
+  const subscriptionRef = invoice.subscription || invoice.parent?.subscription_details?.subscription;
+  const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id || "";
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id || "";
   const subscriptions = subscriptionId ? await db.UserSubscription.filter({ stripe_subscription_id: subscriptionId }, "-created_date", 1, 0) : [];
   const linePeriod = invoice.lines?.data?.[0]?.period || {};
