@@ -124,7 +124,7 @@ function VideoLibraryPage() {
   const languageLabel = value => value === "All" ? t.all : ({en:"English",fr:"Français",es:"Español",pt:"Português",it:"Italiano",de:"Deutsch"}[value] || value);
   const formatDuration = seconds => seconds ? Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0") : "VIDEO";
 
-  return <SiteFrame eyebrow="VICEHUB / THE DROP ZONE">
+  return <SiteFrame eyebrow="VICEHUB / THE DROP ZONE" workspace={isAuthenticated} activeKey="library">
     <div className="vh-library-page">
       <section className="vh-library-hero">
         <div className="vh-library-hero-art" aria-hidden="true"><span className="vh-library-sun" /><span className="vh-library-skyline" /><span className="vh-library-palm">✦</span></div>
