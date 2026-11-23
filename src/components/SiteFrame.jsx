@@ -45,5 +45,6 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
       </div>
       <div className="fh-footer-bottom"><span>{translate(locale, "footer.independent")}</span><small>{translate(locale, "footer.disclaimer")}</small></div>
     </footer>
+    <CookieConsent />
   </div>;
 }
