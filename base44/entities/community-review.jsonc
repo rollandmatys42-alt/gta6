@@ -1,0 +1,21 @@
+{
+  "name": "CommunityReview",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string", "maxLength": 128 },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "title": { "type": "string", "minLength": 3, "maxLength": 90 },
+    "review_text": { "type": "string", "minLength": 20, "maxLength": 800 },
+    "status": { "type": "string", "enum": ["pending", "published", "rejected"], "default": "pending" },
+    "moderated_by": { "type": "string", "maxLength": 128 },
+    "moderated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["user_id", "display_name", "rating", "title", "review_text", "status"],
+  "rls": {
+    "read": { "$or": [{ "data.status": "published" }, { "user_condition": { "role": "admin" } }] },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
