@@ -306,12 +306,26 @@ function HomePage() {
               <small className="fh-membership-foot">Cancel any time. If you cancel and subscribe again later, loyalty pricing restarts at step one.</small>
             </article>;
           })}
+        {!plansLoading && ["starter", "pro", "premium"].filter(tier => !plans.some(p => p.tier_code === tier)).map(tier => {
+          const name = tier.charAt(0).toUpperCase() + tier.slice(1);
+          return <article className="fh-membership-card fh-pending-card" key={"pending-" + tier}>
+            <div className="fh-membership-top">
+              <span className="fh-membership-label">IN PREPARATION</span>
+              <span className="fh-membership-tier">{name}</span>
+            </div>
+            <h3>{name}</h3>
+            <p className="fh-membership-description">This membership is being configured for the selected currency.</p>
+            <div className="fh-membership-price"><strong>—</strong><span>price not published</span></div>
+            <div className="fh-membership-allowance"><b>—</b><span>monthly allowance not set</span></div>
+            <ul className="fh-membership-features">
+              <li>Full plan details will appear when configuration is complete.</li>
+              <li>No payment can be taken while this plan is in preparation.</li>
+            </ul>
+            <button type="button" className="fh-btn ghost big" disabled>Not available yet</button>
+            <small className="fh-membership-foot">This plan is not active and cannot be purchased.</small>
+          </article>;
+        })}
       </div>
-
-      {!plansLoading && plans.length === 0 && <div className="fh-membership-empty">
-        <b>No paid plans are currently available in {currency}.</b>
-        <span>Free access remains available. Choose another currency or check back after paid plans have been configured.</span>
-      </div>}
       <p className="fh-membership-legal">VICEHUB is an independent fan platform, not affiliated with Rockstar Games or Take-Two Interactive. Game intellectual property remains with its owners. Paid access is limited to content for which VICEHUB has documented the required publication and distribution permissions.</p>
     </section>
 
