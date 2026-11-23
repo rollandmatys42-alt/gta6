@@ -54,20 +54,26 @@ async function applyLoyaltyRenewal(db, stripeSub) {
   if (nextPrice <= 0) return;
   const item = stripeSub.items?.data?.[0];
   if (item?.id && item?.price?.product && Number(item.price.unit_amount) !== nextPrice) {
-    const form = new URLSearchParams();
-    form.set("price_data[currency]", String(local.currency || "USD").toLowerCase());
-    form.set("price_data[product]", typeof item.price.product === "string" ? item.price.product : item.price.product.id);
-    form.set("price_data[recurring][interval]", item.price.recurring?.interval || "month");
-    form.set("price_data[unit_amount]", String(nextPrice));
-    form.set("proration_behavior", "none");
-    await stripeRequest("subscription_items/" + encodeURIComponent(item.id), "POST", form);
+    // Stripe subscription item updates require a Price ID, not inline price_data.
+    const productId = typeof item.price.product === "string" ? item.price.product : item.price.product.id;
+    const priceForm = new URLSearchParams();
+    priceForm.set("currency", String(local.currency || "USD").toLowerCase());
+    priceForm.set("product", productId);
+    priceForm.set("unit_amount", String(nextPrice));
+    priceForm.set("recurring[interval]", item.price.recurring?.interval || "month");
+    const nextStripePrice = await stripeRequest("prices", "POST", priceForm);
+    const updateForm = new URLSearchParams();
+    updateForm.set("price", nextStripePrice.id);
+    updateForm.set("proration_behavior", "none");
+    await stripeRequest("subscription_items/" + encodeURIComponent(item.id), "POST", updateForm);
   }
   await db.UserSubscription.update(local.id, { streak_months: streakMonths, loyalty_discount_percent: discount, current_monthly_price_cents: nextPrice });
 }
 async function saveInvoiceLedger(db, invoice, status, eventId) {
   const invoiceId = invoice.id;
   if (!invoiceId) return;
-  const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id || "";
+  const subscriptionRef = invoice.subscription || invoice.parent?.subscription_details?.subscription;
+  const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id || "";
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id || "";
   const subscriptions = subscriptionId ? await db.UserSubscription.filter({ stripe_subscription_id: subscriptionId }, "-created_date", 1, 0) : [];
   const linePeriod = invoice.lines?.data?.[0]?.period || {};
