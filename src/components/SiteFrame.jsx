@@ -6,7 +6,6 @@ import "@/styles/fan-admin.css";
 import "@/styles/fan-admin-fix.css";
 import "@/styles/fan-home.css";
 import { useAuth } from "@/lib/AuthContext";
-import CookieConsent from "@/components/CookieConsent";
 import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
 
 const links = [["/", "nav.home"], ["/library", "nav.library"], ["/news", "nav.news"], ["/creators", "nav.creators"], ["/shop", "nav.shop"], ["/studio", "nav.studio"]];
@@ -45,6 +44,5 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
       </div>
       <div className="fh-footer-bottom"><span>{translate(locale, "footer.independent")}</span><small>{translate(locale, "footer.disclaimer")}</small></div>
     </footer>
-    <CookieConsent />
   </div>;
 }
