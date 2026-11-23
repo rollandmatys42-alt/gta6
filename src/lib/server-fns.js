@@ -1463,3 +1463,28 @@ export const processMyDueSocialPosts = createServerFn({ method: "POST" }).middle
   }
   return { processed: results.length, results };
 });
+
+export const getPublicCommunityReviews = createServerFn({method:"GET"}).handler(async({context})=>{
+ const rows=await context.getBase44().asServiceRole.entities.CommunityReview.filter({status:"published"},"-created_date",18,0);
+ return rows.map(({user_id,moderation_note,...review})=>review);
+});
+export const submitCommunityReview = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({rating:z.number().int().min(1).max(5),title:z.string().trim().min(3).max(90),reviewText:z.string().trim().min(20).max(800)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities.CommunityReview;
+  const recent=await db.filter({user_id:context.user.id},"-created_date",10,0);
+  const cutoff=Date.now()-30*86400000;
+  if(recent.some(row=>new Date(row.created_date||row.created_at||0).getTime()>cutoff))throw Object.assign(new Error("You can submit one review every 30 days. Your previous review is already in the moderation queue."),{status:429,code:"REVIEW_RATE_LIMIT"});
+  const displayName=String(context.user.full_name||context.user.name||context.user.email||"VICEHUB member").split("@")[0].slice(0,60);
+  await db.create({user_id:context.user.id,display_name:displayName,rating:data.rating,title:data.title,review_text:data.reviewText,status:"pending"});
+  return {ok:true,message:"Review received. It will appear after moderation."};
+ });
+export const getAdminCommunityReviews = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);return context.getBase44().asServiceRole.entities.CommunityReview.list("-created_date",200,0);
+});
+export const setCommunityReviewStatus = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({reviewId:z.string().min(1),status:z.enum(["published","rejected"])}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  return context.getBase44().asServiceRole.entities.CommunityReview.update(data.reviewId,{status:data.status,moderated_by:context.user.id,moderated_at:new Date().toISOString()});
+ });
