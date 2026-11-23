@@ -628,6 +628,44 @@ export const getAdminOverview = createServerFn({method:"GET"}).middleware([requi
  ]);
  return {users:users.length,news:news.length,publishedNews:news.filter(x=>x.status==="published").length,products:products.length,openReports:reports.length,downloads:downloads.length,videos:videos.length,publishedVideos:videos.filter(x=>x.status==="published"&&x.license_status==="verified").length,activeSubscriptions:subscriptions.filter(x=>x.status==="active"||x.status==="trialing").length};
 });
+
+export const getAdminAnalytics = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);
+ const db=context.getBase44().asServiceRole.entities;
+ const [users,downloads,subscriptions,payments,videos,sources,articles,videoMetrics]=await Promise.all([
+  db.User.list("-created_date",5000,0),
+  db.DownloadEvent.list("-created_date",5000,0),
+  db.UserSubscription.list("-created_date",5000,0),
+  db.PaymentLedgerEntry.list("-created_date",5000,0),
+  db.Video.list("-created_date",3000,0),
+  db.NewsSource.list("-created_date",200,0),
+  db.NewsArticle.list("-created_date",3000,0),
+  db.VideoPerformanceMetric.list("-created_date",5000,0)
+ ]);
+ const now=Date.now(),cutoff=now-30*86400000,dayMs=86400000;
+ const dateOf=(x)=>{const d=new Date(x?.created_date||x?.created_at||x?.paid_at||x?.period_start||0);return Number.isFinite(d.getTime())?d.getTime():0;};
+ const recent=(rows)=>rows.filter(x=>dateOf(x)>=cutoff);
+ const active=subscriptions.filter(x=>x.status==="active"||x.status==="trialing"||(x.status==="past_due"&&x.grace_period_ends_at&&new Date(x.grace_period_ends_at).getTime()>now));
+ const byTier=["free","starter","pro","premium"].map(tier=>({tier,count:subscriptions.filter(x=>x.tier_code===tier&&x.status!=="cancelled").length,active:active.filter(x=>x.tier_code===tier).length}));
+ const revenueByCurrency=["GBP","EUR","USD"].map(currency=>{const rows=payments.filter(x=>x.currency===currency&&(x.status==="paid"||x.status==="refunded"));return {currency,transactions:rows.length,grossCents:rows.reduce((n,x)=>n+Number(x.amount_paid_cents||0),0),refundCents:rows.reduce((n,x)=>n+Number(x.refund_amount_cents||0),0),netCents:rows.reduce((n,x)=>n+Math.max(0,Number(x.amount_paid_cents||0)-Number(x.refund_amount_cents||0)),0)};});
+ const daily=Array.from({length:30},(_,i)=>{const d=new Date(now-(29-i)*dayMs);return {date:d.toISOString().slice(0,10),registrations:0,downloads:0,paidTransactions:0};});
+ const dayIndex=(value)=>{const t=dateOf(value);if(!t)return -1;const i=Math.floor((new Date(t).setUTCHours(0,0,0,0)-new Date(cutoff).setUTCHours(0,0,0,0))/dayMs);return i>=0&&i<30?i:-1;};
+ for(const x of users){const i=dayIndex(x);if(i>=0)daily[i].registrations++;}
+ for(const x of downloads){const i=dayIndex(x);if(i>=0&&x.status==="signed")daily[i].downloads++;}
+ for(const x of payments){const i=dayIndex(x);if(i>=0&&x.status==="paid")daily[i].paidTransactions++;}
+ const metricPlatforms=["TikTok","Instagram","YouTube","Other"].map(platform=>{const rows=videoMetrics.filter(x=>x.platform===platform);const views=rows.reduce((n,x)=>n+Number(x.views||0),0);const likes=rows.reduce((n,x)=>n+Number(x.likes||0),0);const comments=rows.reduce((n,x)=>n+Number(x.comments||0),0);const shares=rows.reduce((n,x)=>n+Number(x.shares||0),0);const saves=rows.reduce((n,x)=>n+Number(x.saves||0),0);const watched=rows.reduce((n,x)=>n+Number(x.average_watch_seconds||0)*Number(x.views||0),0);return {platform,records:rows.length,views,likes,comments,shares,saves,engagementRate:views?((likes+comments+shares+saves)/views)*100:0,averageWatchSeconds:views?watched/views:0,sourceApi:rows.filter(x=>x.source==="api").length,sourceManual:rows.filter(x=>x.source==="manual").length};});
+ const videoMap=new Map(videos.map(v=>[v.id,v.title]));
+ const topVideos=videoMetrics.reduce((acc,x)=>{const id=x.video_id||"unknown";const row=acc.get(id)||{videoId:id,title:videoMap.get(id)||"Video removed",views:0,likes:0,comments:0,shares:0,records:0};row.views+=Number(x.views||0);row.likes+=Number(x.likes||0);row.comments+=Number(x.comments||0);row.shares+=Number(x.shares||0);row.records++;acc.set(id,row);return acc;},new Map());
+ const sourceStatus=sources.map(x=>({name:x.name,enabled:Boolean(x.enabled),lastCheckedAt:x.last_checked_at||null,lastStatus:x.last_status||"Not checked"}));
+ return {
+  generatedAt:new Date(now).toISOString(),coverage:{users:users.length,downloads:downloads.length,subscriptions:subscriptions.length,paymentRecords:payments.length,videos:videos.length,videoMetricRecords:videoMetrics.length,apiMetricRecords:videoMetrics.filter(x=>x.source==="api").length,manualMetricRecords:videoMetrics.filter(x=>x.source==="manual").length,newsArticles:articles.length,publishedArticles:articles.filter(x=>x.status==="published").length},
+  growth:{newUsers30d:recent(users).length,downloads30d:recent(downloads).filter(x=>x.status==="signed").length,paidTransactions30d:recent(payments).filter(x=>x.status==="paid").length,daily},
+  subscriptions:{active:active.length,trialing:subscriptions.filter(x=>x.status==="trialing").length,pastDue:subscriptions.filter(x=>x.status==="past_due").length,cancelled:subscriptions.filter(x=>x.status==="cancelled").length,byTier},
+  revenueByCurrency,
+  videoPerformance:{records:videoMetrics.length,totals:metricPlatforms.reduce((a,x)=>({views:a.views+x.views,likes:a.likes+x.likes,comments:a.comments+x.comments,shares:a.shares+x.shares,saves:a.saves+x.saves}),{views:0,likes:0,comments:0,shares:0,saves:0}),byPlatform:metricPlatforms,topVideos:[...topVideos.values()].sort((a,b)=>b.views-a.views).slice(0,10)},
+  editorial:{sourcesEnabled:sources.filter(x=>x.enabled).length,sourcesNeverChecked:sources.filter(x=>x.enabled&&!x.last_checked_at).length,sourcesWithErrors:sources.filter(x=>x.enabled&&/error|failed|http [45]\d\d/i.test(x.last_status||"")).length,sourceStatus,publishedArticles:articles.filter(x=>x.status==="published").length,draftArticles:articles.filter(x=>x.status==="draft").length}
+ };
+});
 export const getAdminReports = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);return context.getBase44().asServiceRole.entities.ContentReport.list("-created_date",100,0);
 });
