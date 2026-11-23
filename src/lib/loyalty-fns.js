@@ -33,6 +33,9 @@ export const saveAdminPlanLadder = createServerFn({ method: "POST" }).middleware
     requireAdmin(context);
     const db = context.getBase44().asServiceRole.entities.SubscriptionPlan;
     const existing = await db.get(data.id);
+    if (data.priceLadderCents.some((price, index) => index > 0 && price > data.priceLadderCents[index - 1])) {
+      throw Object.assign(new Error("Each loyalty step must be equal to or cheaper than the previous step."), { status: 400, code: "INVALID_PRICE_LADDER" });
+    }
     const first = data.priceLadderCents[0];
     return db.update(data.id, { price_ladder_cents: data.priceLadderCents, ladder_step_months: data.ladderStepMonths, monthly_price_cents: first, ...(existing && Number(existing.monthly_price_cents) !== first ? { stripe_price_id: null } : {}) });
   });
