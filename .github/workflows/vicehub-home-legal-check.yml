@@ -1,0 +1,18 @@
+name: VICEHUB homepage and legal checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend-syntax:
+    name: Frontend syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Parse modified JSX and JavaScript
+        run: |
+          npx --yes esbuild src/routes/index.jsx src/routes/admin.jsx src/components/SiteFrame.jsx src/components/CookieConsent.jsx --bundle --external:* --outdir=/tmp/vicehub-syntax-check --log-level=warning
