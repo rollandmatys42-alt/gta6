@@ -3,7 +3,7 @@
   "type": "object",
   "properties": {
     "user_id": { "type": "string" },
-    "provider": { "type": "string", "enum": ["TikTok", "Instagram", "Facebook", "YouTube", "X"] },
+    "provider": { "type": "string", "enum": ["TikTok", "Instagram", "Facebook", "YouTube", "X", "LinkedIn"] },
     "provider_account_id": { "type": "string", "maxLength": 200 },
     "account_name": { "type": "string", "maxLength": 160 },
     "account_type": { "type": "string", "enum": ["profile", "page", "channel", "business"], "default": "profile" },

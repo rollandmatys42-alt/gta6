@@ -3,7 +3,7 @@
   "type": "object",
   "properties": {
     "user_id": { "type": "string" },
-    "provider": { "type": "string", "enum": ["TikTok", "Instagram", "YouTube", "X"] },
+    "provider": { "type": "string", "enum": ["TikTok", "Instagram", "YouTube", "X", "LinkedIn"] },
     "state_hash": { "type": "string", "maxLength": 128 },
     "code_verifier": { "type": "string", "maxLength": 256 },
     "expires_at": { "type": "string", "format": "date-time" },

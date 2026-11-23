@@ -63,6 +63,7 @@ Required Base44 secrets:
 - Instagram and Facebook Pages (Meta): META_APP_ID, META_APP_SECRET
 - YouTube: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 - X: X_CLIENT_ID, X_CLIENT_SECRET
+- LinkedIn: LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET (member OAuth; request openid, profile and w_member_social)
 - Token security: SOCIAL_TOKEN_ENCRYPTION_KEY, SOCIAL_OAUTH_STATE_SECRET (each at least 32 characters)
 
 The app stores encrypted access/refresh tokens in the SocialAccount entity. Client-side entity reads are denied; server functions return only account names, scopes and connection status. OAuth state is short-lived, single-use and tied to the signed-in user. Disconnecting an account erases its stored credentials.
@@ -73,6 +74,7 @@ Supported initial publishing paths:
 - TikTok: video publishing through Content Posting API; TikTok must approve the app and verify the source domain for PULL_FROM_URL.
 - YouTube: video upload to the selected channel (initial upload size limit 250 MB).
 - X: text posts only; X video upload is not enabled.
+- LinkedIn: text posts to the authorised member profile through the Posts API; media publishing is not enabled in this release. The LinkedIn app must have the relevant Community Management API access and the member must grant w_member_social.
 
 A free GitHub Actions workflow (`.github/workflows/social-publisher-cron.yml`) calls the protected publisher endpoint every five minutes. Because this repository is public, the workflow uses GitHub's public-repository Actions allowance and does not depend on Base44 workflow execution credits. To activate it, generate one random secret of at least 32 characters and save the exact same value in Base44 secrets and GitHub repository Settings → Secrets and variables → Actions as `SOCIAL_PUBLISHER_CRON_SECRET`. The endpoint and backend function both validate this secret; the worker also accepts authenticated admin invocations. If the secret is missing, the GitHub job skips safely. The Base44 five-minute workflow remains inactive because its test run was rejected with `insufficient_credits`. Until the GitHub secret is configured, users can publish immediately or manually process due posts from the Social Planner. A scheduled post is only considered published after the provider confirms publication. TikTok requests remain in a processing state after the API accepts them.
 

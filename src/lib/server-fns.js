@@ -646,6 +646,7 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
  const instagramConfigured=Boolean(secrets.get("META_APP_ID")&&secrets.get("META_APP_SECRET"));
  const youtubeConfigured=Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET"));
  const xOauthConfigured=Boolean(secrets.get("X_CLIENT_ID")&&secrets.get("X_CLIENT_SECRET"));
+ const linkedinConfigured=Boolean(secrets.get("LINKEDIN_CLIENT_ID")&&secrets.get("LINKEDIN_CLIENT_SECRET"));
  const socialEncryptionConfigured=Boolean(secrets.get("SOCIAL_TOKEN_ENCRYPTION_KEY")&&secrets.get("SOCIAL_OAUTH_STATE_SECRET"));
  return {
   aiProviderConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL")),
@@ -661,7 +662,7 @@ export const getPlatformReadiness = createServerFn({method:"GET"}).middleware([r
   stripeWebhookConfigured:stripeWebhook,
   payments:stripeSecret&&stripeWebhook?"configured":stripeSecret?"webhook_secret_missing":"missing_credentials",
   socialEncryptionConfigured,
-  socialPublishing:{tiktokConfigured,instagramConfigured,facebookConfigured:instagramConfigured,youtubeConfigured,xOauthConfigured},
+  socialPublishing:{tiktokConfigured,instagramConfigured,facebookConfigured:instagramConfigured,youtubeConfigured,xOauthConfigured,linkedinConfigured},
   recurringAgentScheduler:"manual_only"
  };
 });
@@ -695,7 +696,7 @@ export const testOmniRouteConnection = createServerFn({method:"POST"}).middlewar
 });
 
 export const generateStudioDraft = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
+ .validator(z.object({platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X","LinkedIn","General"]),contentType:z.enum(["Title","Hook","Caption","Description","Hashtags","Script","SEO","GEO"]),topic:z.string().min(5).max(1000),tone:z.enum(["Cinematic","Energetic","Informative","Professional"]).default("Energetic"),language:z.enum(["English","French","Spanish","German","Italian","Portuguese"]).default("English")}))
  .handler(async({data,context})=>{
   const prompt="You are a professional GTA VI creator marketing assistant. Generate "+data.contentType+" for "+data.platform+". Topic: "+data.topic+". Tone: "+data.tone+". Language: "+data.language+". Keep claims factual, never present leaks or rumours as confirmed, and do not imply affiliation with Rockstar Games. Return only usable content.";
   const generated=await omniRouteChat({messages:[{role:"user",content:prompt}],temperature:0.7,maxTokens:1400,title:"VICEHUB Creator Studio"});
@@ -720,14 +721,15 @@ export const getSocialProviderAvailability = createServerFn({method:"GET"}).midd
   Facebook:meta,
   YouTube:Boolean(secrets.get("GOOGLE_CLIENT_ID")&&secrets.get("GOOGLE_CLIENT_SECRET")),
   X:Boolean(secrets.get("X_CLIENT_ID")&&secrets.get("X_CLIENT_SECRET")),
+  LinkedIn:Boolean(secrets.get("LINKEDIN_CLIENT_ID")&&secrets.get("LINKEDIN_CLIENT_SECRET")),
   omniRouteConfigured:Boolean(secrets.get("OMNIROUTE_API_KEY")&&secrets.get("OMNIROUTE_BASE_URL"))
  };
 });
 
 export const getMySocialPosts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.SocialPost.filter({user_id:context.user.id},"-created_date",100,0));
 export const saveSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X"]),caption:z.string().min(1).max(5000),accountId:z.string().optional(),mediaUrl:z.string().url().max(500).optional(),mediaObjectKey:z.string().max(500).optional(),scheduledAt:z.string().datetime().optional()}))
- .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities; if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for scheduled publication."),{status:400}); if(data.mediaUrl&&data.mediaObjectKey)throw Object.assign(new Error("Choose either an uploaded video or a public video URL, not both."),{status:400}); if(data.mediaObjectKey&&!data.mediaObjectKey.startsWith("social/"+context.user.id+"/"))throw Object.assign(new Error("The uploaded media file does not belong to your account."),{status:403}); if(data.accountId){const account=await db.SocialAccount.get(data.accountId).catch(()=>null);if(!account||account.user_id!==context.user.id||account.provider!==data.platform||account.status!=="connected")throw Object.assign(new Error("Select a connected account belonging to your user and matching the chosen network."),{status:403});} const mediaReference=data.mediaObjectKey||data.mediaUrl||""; const p={user_id:context.user.id,platform:data.platform,caption:data.caption,account_id:data.accountId||"",media_type:mediaReference?"video":"none",media_reference:mediaReference,status:data.scheduledAt?"scheduled":"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})}; const posts=db.SocialPost;if(data.id){const existing=await posts.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id||existing.status==="published"||existing.status==="publishing")throw Object.assign(new Error("Only your own unpublished drafts can be edited."),{status:403});return posts.update(existing.id,p);}return posts.create(p);});
+ .validator(z.object({id:z.string().optional(),platform:z.enum(["TikTok","Instagram","Facebook","YouTube","X","LinkedIn"]),caption:z.string().min(1).max(5000),accountId:z.string().optional(),mediaUrl:z.string().url().max(500).optional(),mediaObjectKey:z.string().max(500).optional(),scheduledAt:z.string().datetime().optional()}))
+ .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities; if(data.scheduledAt&&new Date(data.scheduledAt)<=new Date())throw Object.assign(new Error("Choose a future date for scheduled publication."),{status:400}); if(data.mediaUrl&&data.mediaObjectKey)throw Object.assign(new Error("Choose either an uploaded video or a public video URL, not both."),{status:400}); if(data.mediaObjectKey&&!data.mediaObjectKey.startsWith("social/"+context.user.id+"/"))throw Object.assign(new Error("The uploaded media file does not belong to your account."),{status:403}); if(data.platform==="LinkedIn"&&(data.mediaUrl||data.mediaObjectKey))throw Object.assign(new Error("LinkedIn text publishing is enabled in this release; video and image uploads are not enabled yet."),{status:400}); if(data.accountId){const account=await db.SocialAccount.get(data.accountId).catch(()=>null);if(!account||account.user_id!==context.user.id||account.provider!==data.platform||account.status!=="connected")throw Object.assign(new Error("Select a connected account belonging to your user and matching the chosen network."),{status:403});} const mediaReference=data.mediaObjectKey||data.mediaUrl||""; const p={user_id:context.user.id,platform:data.platform,caption:data.caption,account_id:data.accountId||"",media_type:mediaReference?"video":"none",media_reference:mediaReference,status:data.scheduledAt?"scheduled":"draft",...(data.scheduledAt?{scheduled_at:data.scheduledAt}:{})}; const posts=db.SocialPost;if(data.id){const existing=await posts.get(data.id).catch(()=>null);if(!existing||existing.user_id!==context.user.id||existing.status==="published"||existing.status==="publishing")throw Object.assign(new Error("Only your own unpublished drafts can be edited."),{status:403});return posts.update(existing.id,p);}return posts.create(p);});
 export const deleteSocialPost = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({postId:z.string().min(1)}))
  .handler(async({data,context})=>{const db=context.getBase44().asServiceRole.entities.SocialPost;const post=await db.get(data.postId).catch(()=>null);if(!post||post.user_id!==context.user.id)throw Object.assign(new Error("You can only delete your own social posts."),{status:403});if(["published","publishing"].includes(post.status))throw Object.assign(new Error("Published or processing posts cannot be deleted from the publication history."),{status:409});if(post.media_reference?.startsWith("social/"+context.user.id+"/")){try{const deleteUrl=await presignR2({method:"DELETE",objectKey:post.media_reference,expiresIn:60});await fetch(deleteUrl,{method:"DELETE"});}catch{}}await db.delete(post.id);return {success:true};});
@@ -1237,7 +1239,7 @@ export const createSocialMediaUploadUrl = createServerFn({ method: "POST" }).mid
   });
 
 export const beginSocialOAuth = createServerFn({ method: "POST" }).middleware([requireUser])
-  .validator(z.object({ provider: z.enum(["TikTok", "Instagram", "YouTube", "X"]) }))
+  .validator(z.object({ provider: z.enum(["TikTok", "Instagram", "YouTube", "X", "LinkedIn"]) }))
   .handler(async ({ data, context }) => {
     const provider = data.provider;
     const state = randomVerifier();
@@ -1265,6 +1267,11 @@ export const beginSocialOAuth = createServerFn({ method: "POST" }).middleware([r
       if (!clientId || !secrets.get("GOOGLE_CLIENT_SECRET")) throw Object.assign(new Error("Google app credentials are missing. Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."), { status: 503 });
       const params = new URLSearchParams({ client_id: clientId, redirect_uri: SOCIAL_CALLBACK_URL, response_type: "code", scope: "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly", access_type: "offline", prompt: "consent", include_granted_scopes: "true", state, code_challenge: challenge, code_challenge_method: "S256" });
       url = "https://accounts.google.com/o/oauth2/v2/auth?" + params;
+    } else if (provider === "LinkedIn") {
+      const clientId = secrets.get("LINKEDIN_CLIENT_ID");
+      if (!clientId || !secrets.get("LINKEDIN_CLIENT_SECRET")) throw Object.assign(new Error("LinkedIn app credentials are missing. Configure LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET."), { status: 503 });
+      const params = new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: SOCIAL_CALLBACK_URL, state, scope: "openid profile w_member_social" });
+      url = "https://www.linkedin.com/oauth/v2/authorization?" + params;
     } else {
       const clientId = secrets.get("X_CLIENT_ID");
       if (!clientId || !secrets.get("X_CLIENT_SECRET")) throw Object.assign(new Error("X developer app credentials are missing. Configure X_CLIENT_ID and X_CLIENT_SECRET."), { status: 503 });
@@ -1320,6 +1327,13 @@ export const completeSocialOAuth = createServerFn({ method: "POST" }).middleware
       const userInfo = profile.data || {};
       if (!userInfo.id) throw new Error("X did not return the authorised profile.");
       saved.push(await saveSocialAccount(db, context.user.id, { provider: "X", accountId: userInfo.id, accountName: userInfo.name || userInfo.username || "X account", accountType: "profile", accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: new Date(Date.now() + Number(token.expires_in || 7200) * 1000).toISOString(), scopes: String(token.scope || "").split(" ").filter(Boolean), metadata: { username: userInfo.username || "" } }));
+    } else if (provider === "LinkedIn") {
+      const body = new URLSearchParams({ grant_type: "authorization_code", code: data.code, redirect_uri: SOCIAL_CALLBACK_URL, client_id: secrets.get("LINKEDIN_CLIENT_ID"), client_secret: secrets.get("LINKEDIN_CLIENT_SECRET") });
+      const token = await socialTokenRequest("https://www.linkedin.com/oauth/v2/accessToken", body);
+      const profile = await providerJson("https://api.linkedin.com/v2/userinfo", token.access_token);
+      if (!profile.sub) throw new Error("LinkedIn did not return the authorised member profile.");
+      const displayName = profile.name || [profile.given_name, profile.family_name].filter(Boolean).join(" ") || "LinkedIn member";
+      saved.push(await saveSocialAccount(db, context.user.id, { provider: "LinkedIn", accountId: "urn:li:person:" + profile.sub, accountName: displayName, accountType: "profile", accessToken: token.access_token, expiresAt: new Date(Date.now() + Number(token.expires_in || 5184000) * 1000).toISOString(), scopes: ["openid", "profile", "w_member_social"], metadata: { subject: profile.sub, picture: profile.picture || "" } }));
     }
     for (const row of states) await db.SocialOAuthState.delete(row.id).catch(() => null);
     return { provider, connectedAccounts: saved.map(x => ({ id: x.id, provider: x.provider, accountName: x.account_name })), count: saved.length };
@@ -1435,6 +1449,12 @@ async function publishSocialPostForUser(context, postId) {
       if (post.media_type === "video") throw new Error("X video upload is not enabled in this release. Publish text posts on X; use Instagram, Facebook, TikTok or YouTube for video.");
       const published = await providerJson("https://api.x.com/2/tweets", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: post.caption }) });
       externalId = published.data?.id || "";
+    } else if (post.platform === "LinkedIn") {
+      if (post.media_type === "video") throw new Error("LinkedIn media publishing is not enabled in this release. Publish a text post on LinkedIn.");
+      const response = await fetch("https://api.linkedin.com/rest/posts", { method: "POST", headers: { Authorization: "Bearer " + token, "LinkedIn-Version": "202609", "X-Restli-Protocol-Version": "2.0.0", "Content-Type": "application/json" }, body: JSON.stringify({ author: account.provider_account_id, commentary: post.caption, visibility: "PUBLIC", distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: "PUBLISHED", isReshareDisabledByAuthor: false }) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || payload.serviceErrorCode || "LinkedIn publication failed (HTTP " + response.status + ").");
+      externalId = response.headers.get("x-restli-id") || payload.id || "";
     }
     const finalStatus = post.platform === "TikTok" ? "publishing" : "published";
     const postPatch = { status: finalStatus, external_post_id: externalId, error_message: "" };

@@ -15,12 +15,13 @@ export const Route = createFileRoute("/social")({
   component: SocialPublishingPage,
 });
 
-const platforms = ["TikTok", "Instagram", "Facebook", "YouTube", "X"];
+const platforms = ["Instagram", "Facebook", "TikTok", "YouTube", "LinkedIn", "X"];
 const platformNotes = {
   TikTok: "Video publishing. Public posting depends on TikTok app review and account permissions.",
   Instagram: "Instagram Reels publishing requires an Instagram professional account linked to a Facebook Page.",
   Facebook: "Video publishing to Facebook Pages. Personal profile publishing is not supported.",
   YouTube: "Video upload to your selected YouTube channel. Google may require app verification.",
+  LinkedIn: "Text publishing to your own LinkedIn member profile. Media publishing is not included in this release.",
   X: "Text publishing is enabled. Video upload is not included in this release.",
 };
 
@@ -147,7 +148,7 @@ function SocialPublishingPage() {
     event.preventDefault();
     if (!isAuthenticated) { navigateToLogin(); return; }
     if (!accountId) { setError("Connect and select the destination account before saving a publishable post."); return; }
-    if (platform !== "X" && !mediaUrl.trim() && !mediaFile && !existingMediaObjectKey) { setError("Choose a video file or provide a publicly reachable HTTPS video URL."); return; }
+    if (!["X", "LinkedIn"].includes(platform) && !mediaUrl.trim() && !mediaFile && !existingMediaObjectKey) { setError("Choose a video file or provide a publicly reachable HTTPS video URL."); return; }
     if (mediaFile && (mediaFile.size > 250 * 1024 * 1024 || !["video/mp4","video/quicktime"].includes(mediaFile.type))) { setError("Choose an MP4 or MOV video smaller than 250 MB."); return; }
     if (mediaUrl.trim() && !/^https:\/\//i.test(mediaUrl.trim())) { setError("Media URL must use HTTPS."); return; }
     setBusy(true); setError(""); setNotice("");
@@ -212,7 +213,7 @@ function SocialPublishingPage() {
     <main className="social-shell">
       <header className="social-hero">
         <div><span className="social-kicker">VICEHUB / CREATOR DISTRIBUTION</span><h1>YOUR SOCIAL<br/><em>CONTROL ROOM.</em></h1><p>Connect your own channels. Prepare platform-specific content. Publish to the account you select — never to another member's profile.</p></div>
-        <div className="social-hero-stamp"><b>05</b><span>NETWORKS</span><small>YOUR ACCOUNTS / YOUR TOKENS</small></div>
+        <div className="social-hero-stamp"><b>06</b><span>NETWORKS</span><small>YOUR ACCOUNTS / YOUR TOKENS</small></div>
       </header>
 
       {error && <div className="social-alert" role="alert">{error}</div>}
@@ -241,15 +242,15 @@ function SocialPublishingPage() {
         <div className="social-section-head"><div><span className="social-kicker">02 / CONTENT DISTRIBUTION</span><h2>CREATE A PUBLICATION</h2></div><span className="social-count">PRIVATE PLANNER</span></div>
         <form className="social-composer" onSubmit={save}>
           <div className="social-form-grid">
-            <label>NETWORK<select value={platform} onChange={event => { setPlatform(event.target.value); setAccountId(""); setMediaUrl(""); setMediaFile(null); setExistingMediaObjectKey(""); }}><option value="TikTok">TikTok</option><option value="Instagram">Instagram</option><option value="Facebook">Facebook Page</option><option value="YouTube">YouTube</option><option value="X">X</option></select></label>
+            <label>NETWORK<select value={platform} onChange={event => { setPlatform(event.target.value); setAccountId(""); setMediaUrl(""); setMediaFile(null); setExistingMediaObjectKey(""); }}><option value="TikTok">TikTok</option><option value="Instagram">Instagram</option><option value="Facebook">Facebook Page</option><option value="YouTube">YouTube</option><option value="LinkedIn">LinkedIn</option><option value="X">X</option></select></label>
             <label>DESTINATION ACCOUNT<select required value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">Select your connected account…</option>{accountOptions.map(account => <option value={account.id} key={account.id}>{account.accountName}</option>)}</select></label>
           </div>
           <div className="social-platform-hint">{platformNotes[platform]}</div>
           <label>CAPTION / DESCRIPTION<textarea required minLength={1} maxLength={5000} rows={5} value={caption} onChange={event => setCaption(event.target.value)} placeholder="Write a short brief, then use OmniRoute to generate a platform-ready caption…" /></label><div className="social-ai-row"><button type="button" className="social-secondary" onClick={generateCaption} disabled={aiBusy || busy || !availability.omniRouteConfigured}>{aiBusy ? "OMNIROUTE IS WRITING…" : "GENERATE / REWRITE WITH OMNIROUTE ✦"}</button><small>{availability.omniRouteConfigured ? "AI output is a draft only. Review factual claims and rights before publication." : "OmniRoute API credentials are not configured yet. Ask the VICEHUB administrator to add OMNIROUTE_API_KEY and OMNIROUTE_BASE_URL."}</small></div>
-          {platform !== "X" && <><label>UPLOAD VIDEO FILE (MP4 / MOV)<input type="file" accept="video/mp4,video/quicktime" onChange={event => { setMediaFile(event.target.files?.[0] || null); setMediaUrl(""); }} /><small>{mediaFile?.name || (existingMediaObjectKey ? "Previously uploaded video retained" : "Up to 250 MB. The file is uploaded directly to private VICEHUB storage.")}</small></label><label>OR USE A PUBLIC VIDEO URL (HTTPS)<input type="url" value={mediaUrl} onChange={event => { setMediaUrl(event.target.value); if(event.target.value) { setMediaFile(null); setExistingMediaObjectKey(""); } }} placeholder="https://your-public-video-host/video.mp4" /><small>Use this instead of uploading a file. The destination network must be able to fetch the URL.</small></label></>}
+          {!["X", "LinkedIn"].includes(platform) && <><label>UPLOAD VIDEO FILE (MP4 / MOV)<input type="file" accept="video/mp4,video/quicktime" onChange={event => { setMediaFile(event.target.files?.[0] || null); setMediaUrl(""); }} /><small>{mediaFile?.name || (existingMediaObjectKey ? "Previously uploaded video retained" : "Up to 250 MB. The file is uploaded directly to private VICEHUB storage.")}</small></label><label>OR USE A PUBLIC VIDEO URL (HTTPS)<input type="url" value={mediaUrl} onChange={event => { setMediaUrl(event.target.value); if(event.target.value) { setMediaFile(null); setExistingMediaObjectKey(""); } }} placeholder="https://your-public-video-host/video.mp4" /><small>Use this instead of uploading a file. The destination network must be able to fetch the URL.</small></label></>}
           <div className="social-form-grid">
             <label>SCHEDULE FOR (OPTIONAL)<input type="datetime-local" min={localDate(new Date(Date.now() + 60000).toISOString())} value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} /><small>Scheduled posts are queued. Run the due queue from this page, or connect a server scheduler before relying on unattended posting.</small></label>
-            <div className="social-composer-side"><span>CONTENT CHECK</span><b>{platform === "X" ? "TEXT POST" : "VIDEO POST"}</b><small>Always review the final caption and destination account before publication.</small></div>
+            <div className="social-composer-side"><span>CONTENT CHECK</span><b>{["X", "LinkedIn"].includes(platform) ? "TEXT POST" : "VIDEO POST"}</b><small>Always review the final caption and destination account before publication.</small></div>
           </div>
           <div className="social-form-actions"><button className="social-primary" disabled={busy}>{busy ? "SAVING…" : editingId ? "UPDATE POST" : scheduledAt ? "SCHEDULE POST" : "SAVE DRAFT"}</button>{editingId && <button className="social-secondary" type="button" onClick={resetForm}>CANCEL EDIT</button>}</div>
         </form>
