@@ -867,7 +867,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
       const priceForm=new URLSearchParams();
       priceForm.set("currency",data.currency.toLowerCase());
       priceForm.set("product",stripeProductId);
-      priceForm.set("unit_amount",String(Number(plan.monthly_price_cents)));
+      priceForm.set("unit_amount",String(priceCents));
       priceForm.set("recurring[interval]","month");
       const price=await stripeApi("prices","POST",priceForm);
       stripePriceId=price.id;
