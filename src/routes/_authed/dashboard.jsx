@@ -26,8 +26,9 @@ const navItems = [
 ];
 
 const money = (cents, currency) => formatMoney(Number(cents || 0), currency || "USD");
-const dateTime = value => value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
-const dateOnly = value => value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
+const localeTags = { en: "en-GB", fr: "fr-FR", es: "es-ES", pt: "pt-PT", it: "it-IT", de: "de-DE" };
+const dateTime = (value, locale) => value ? new Date(value).toLocaleString(localeTags[locale] || "en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—";
+const dateOnly = (value, locale) => value ? new Date(value).toLocaleDateString(localeTags[locale] || "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 function DashboardPage() {
   const { user } = Route.useRouteContext();
@@ -124,7 +125,7 @@ function DashboardPage() {
           <div><b>{firstName}</b><small>{(account?.tier || "free").toUpperCase()} ACCOUNT</small></div>
           <span className="cd-online-dot" />
         </div>
-        <div className="cd-nav-caption">YOUR WORKSPACE</div>
+        <div className="cd-nav-caption">{tx("dashboard.workspace")}</div>
         <nav className="cd-side-nav" aria-label="Creator workspace navigation">
           {navItems.map(item => <a key={item.href} href={item.href} className={item.href === "/dashboard" ? "active" : ""}>
             <span className="cd-nav-icon">{item.icon}</span><span>{item.label}</span>
@@ -133,50 +134,50 @@ function DashboardPage() {
           </a>)}
         </nav>
         <div className="cd-sidebar-bottom">
-          <div className="cd-side-plan"><span>YOUR MEMBERSHIP</span><b>{planName}</b><small>{account?.subscriptionStatus || "Account active"}</small><a href="/#plans">View membership ↗</a></div>
+          <div className="cd-side-plan"><span>{tx("dashboard.membership")}</span><b>{planName}</b><small>{account?.subscriptionStatus || "Account active"}</small><a href="/#plans">View membership ↗</a></div>
           <button type="button" onClick={logout} className="cd-logout">↪ <span>Sign out</span></button>
         </div>
       </aside>
 
       <main className="cd-main">
         <header className="cd-topbar">
-          <div><span className="cd-overline">MONDAY · VICE CITY, LEONIDA</span><h1>Your creator space<span>.</span></h1><p>Everything you need to manage your GTA VI content, in one place.</p></div>
-          <div className="cd-top-actions"><a href="/library" className="cd-primary-action">Browse videos <span>↗</span></a><button type="button" className="cd-refresh" onClick={load} disabled={loading}>{loading ? "SYNCING…" : "↻ REFRESH"}</button></div>
+          <div><span className="cd-overline">{new Intl.DateTimeFormat(localeTags[locale] || "en-GB", { weekday: "long", day: "numeric", month: "long" }).format(new Date()).toUpperCase()} · VICE CITY, LEONIDA</span><h1>{tx("dashboard.title")}<span>.</span></h1><p>{tx("dashboard.intro")}</p></div>
+          <div className="cd-top-actions"><a href="/library" className="cd-primary-action">{tx("dashboard.browse")} <span>↗</span></a><button type="button" className="cd-refresh" onClick={load} disabled={loading}>{loading ? tx("dashboard.sync") : "↻ " + tx("dashboard.refresh")}</button></div>
         </header>
 
         {error && <div className="cd-alert" role="alert">{error}</div>}
-        {loading && !data && <div className="cd-loading"><span className="cd-spinner" /> Loading your private creator workspace…</div>}
+        {loading && !data && <div className="cd-loading"><span className="cd-spinner" /> {tx("dashboard.loading")}</div>}
         {data && <>
           {data.secondaryErrors > 0 && <div className="cd-note">{data.secondaryErrors} secondary section(s) could not be refreshed. Your account information is still available.</div>}
 
           <section className="cd-welcome">
             <div className="cd-welcome-image" />
             <div className="cd-welcome-content">
-              <span className="cd-eyebrow"><i /> YOUR VICEHUB SESSION IS ACTIVE</span>
-              <h2>Welcome back,<br /><em>{firstName}.</em></h2>
-              <p>Your next post starts here. Find a new drop, prepare your content and publish it on your own channels.</p>
-              <div className="cd-welcome-actions"><a href="/library">Explore the video library ↗</a><a href="/social">Open social planner →</a></div>
+              <span className="cd-eyebrow"><i /> {tx("dashboard.welcome")}</span>
+              <h2>{tx("dashboard.welcomeTitle")}<br /><em>{firstName}.</em></h2>
+              <p>{tx("dashboard.welcomeCopy")}</p>
+              <div className="cd-welcome-actions"><a href="/library">{tx("dashboard.explore")}</a><a href="/social">{tx("dashboard.planner")}</a></div>
             </div>
             <div className="cd-welcome-stamp"><b>VICE</b><span>CITY</span><small>LEONIDA · USA</small></div>
           </section>
 
-          <section className="cd-metrics" aria-label="Account overview">
+          <section className="cd-metrics" aria-label={tx("dashboard.overview")}>
             <a href="/library" className="cd-metric cd-metric-downloads">
-              <span className="cd-metric-icon">⇩</span><small>MONTHLY DOWNLOADS</small>
+              <span className="cd-metric-icon">⇩</span><small>{tx("dashboard.downloads")}</small>
               <strong>{remaining}<i> / {limit || "—"}</i></strong>
               <span className="cd-progress"><i style={{ width: percent + "%" }} /></span>
               <em>{used} used this month</em>
             </a>
-            <a href="/social" className="cd-metric"><span className="cd-metric-icon">↗</span><small>SOCIAL PUBLICATIONS</small><strong>{posts.length.toString().padStart(2, "0")}</strong><em>Drafts, scheduled and published</em></a>
+            <a href="/social" className="cd-metric"><span className="cd-metric-icon">↗</span><small>{tx("dashboard.publications")}</small><strong>{posts.length.toString().padStart(2, "0")}</strong><em>Drafts, scheduled and published</em></a>
             <a href="/studio" className="cd-metric"><span className="cd-metric-icon">✦</span><small>STUDIO DRAFTS</small><strong>{drafts.length.toString().padStart(2, "0")}</strong><em>Saved creative work</em></a>
-            <a href="/messages" className="cd-metric"><span className="cd-metric-icon">✉</span><small>UNREAD ACTIVITY</small><strong>{(unreadMessages + unreadAlerts).toString().padStart(2, "0")}</strong><em>{unreadMessages} messages · {unreadAlerts} alerts</em></a>
+            <a href="/messages" className="cd-metric"><span className="cd-metric-icon">✉</span><small>{tx("dashboard.unread")}</small><strong>{(unreadMessages + unreadAlerts).toString().padStart(2, "0")}</strong><em>{unreadMessages} messages · {unreadAlerts} alerts</em></a>
           </section>
 
           <section className="cd-section">
-            <div className="cd-section-heading"><div><span className="cd-eyebrow">01 / YOUR ACCOUNT</span><h2>Membership &amp; downloads</h2></div><span className="cd-live-pill">● ACCOUNT STATUS: {account?.subscriptionStatus || "ACTIVE"}</span></div>
+            <div className="cd-section-heading"><div><span className="cd-eyebrow">{tx("dashboard.account")}</span><h2>{tx("dashboard.membershipDownloads")}</h2></div><span className="cd-live-pill">● ACCOUNT STATUS: {account?.subscriptionStatus || "ACTIVE"}</span></div>
             <div className="cd-membership-grid">
               <article className="cd-panel cd-plan-panel">
-                <div className="cd-panel-top"><span>YOUR CURRENT PLAN</span><b>{(account?.tier || "free").toUpperCase()}</b></div>
+                <div className="cd-panel-top"><span>{tx("dashboard.currentPlan")}</span><b>{(account?.tier || "free").toUpperCase()}</b></div>
                 <h3>{planName}</h3>
                 <p>{account?.tier === "free" ? "Your free access includes five downloads per UTC calendar month." : "Your monthly allowance and download rights are controlled by your active membership."}</p>
                 <div className="cd-plan-stats"><div><b>{remaining}</b><small>Downloads left</small></div><div><b>{limit}</b><small>Monthly allowance</small></div><div><b>{used}</b><small>Already used</small></div></div>
@@ -189,7 +190,7 @@ function DashboardPage() {
               </article>
 
               <article className="cd-panel cd-loyalty-panel">
-                <div className="cd-panel-top"><span>LOYALTY REWARD</span><b>STAY LONGER · PAY LESS</b></div>
+                <div className="cd-panel-top"><span>{tx("dashboard.loyalty")}</span><b>{tx("dashboard.stay")}</b></div>
                 {quote ? <>
                   <h3>Your price goes down as you stay.</h3>
                   <p>{quote.streakMonths > 0 ? "You have completed " + quote.streakMonths + " paid month(s). Your next charge is " + money(quote.currentPriceCents, quote.currency) + "." : "Your first loyalty step starts at " + money(quote.currentPriceCents, quote.currency) + " per month."}</p>
@@ -206,7 +207,7 @@ function DashboardPage() {
           </section>
 
           <section className="cd-section">
-            <div className="cd-section-heading"><div><span className="cd-eyebrow">02 / QUICK ACCESS</span><h2>Your creator tools</h2></div><span className="cd-muted">Choose a workspace to continue</span></div>
+            <div className="cd-section-heading"><div><span className="cd-eyebrow">{tx("dashboard.quick")}</span><h2>{tx("dashboard.tools")}</h2></div><span className="cd-muted">{tx("dashboard.choose")}</span></div>
             <div className="cd-tool-grid">
               <a href="/library" className="cd-tool-card cd-tool-library"><span className="cd-tool-number">01</span><div className="cd-tool-icon">▤</div><h3>Video library</h3><p>Discover vertical videos, preview your next drop and download within your allowance.</p><b>OPEN LIBRARY ↗</b></a>
               <a href="/social" className="cd-tool-card cd-tool-social"><span className="cd-tool-number">02</span><div className="cd-tool-icon">↗</div><h3>Social planner</h3><p>Connect your own accounts, prepare captions and manage scheduled publications.</p><b>OPEN PLANNER ↗</b></a>
@@ -219,11 +220,11 @@ function DashboardPage() {
 
           <section className="cd-section cd-activity-grid">
             <article className="cd-panel">
-              <div className="cd-section-heading compact"><div><span className="cd-eyebrow">03 / PUBLISHING</span><h2>Coming up next</h2></div><a href="/social">OPEN PLANNER ↗</a></div>
-              {upcoming.length ? <div className="cd-list">{upcoming.map(post => <div className="cd-list-row" key={post.id}><span className="cd-list-icon">↗</span><div><b>{post.platform}</b><small>{(post.caption || "Scheduled publication").slice(0, 105)}</small></div><time>{dateTime(post.scheduled_at)}</time></div>)}</div> : <div className="cd-empty"><span>◷</span><b>No scheduled posts</b><p>Your scheduled publications will appear here.</p><a href="/social">Plan your next post ↗</a></div>}
+              <div className="cd-section-heading compact"><div><span className="cd-eyebrow">{tx("dashboard.publishing")}</span><h2>{tx("dashboard.coming")}</h2></div><a href="/social">OPEN PLANNER ↗</a></div>
+              {upcoming.length ? <div className="cd-list">{upcoming.map(post => <div className="cd-list-row" key={post.id}><span className="cd-list-icon">↗</span><div><b>{post.platform}</b><small>{(post.caption || "Scheduled publication").slice(0, 105)}</small></div><time>{dateTime(post.scheduled_at, locale)}</time></div>)}</div> : <div className="cd-empty"><span>◷</span><b>No scheduled posts</b><p>Your scheduled publications will appear here.</p><a href="/social">Plan your next post ↗</a></div>}
             </article>
             <article className="cd-panel">
-              <div className="cd-section-heading compact"><div><span className="cd-eyebrow">04 / CREATIVE WORK</span><h2>Studio &amp; profile</h2></div><a href="/studio">OPEN STUDIO ↗</a></div>
+              <div className="cd-section-heading compact"><div><span className="cd-eyebrow">{tx("dashboard.creative")}</span><h2>{tx("dashboard.studioProfile")}</h2></div><a href="/studio">OPEN STUDIO ↗</a></div>
               <div className="cd-summary-line"><span>Saved studio drafts</span><b>{drafts.length}</b></div>
               <div className="cd-summary-line"><span>Profile completion</span><b>{profilePercent}%</b></div>
               <div className="cd-progress"><i style={{ width: profilePercent + "%" }} /></div>
@@ -233,10 +234,10 @@ function DashboardPage() {
           </section>
 
           <section className="cd-section">
-            <div className="cd-section-heading"><div><span className="cd-eyebrow">05 / DOWNLOAD HISTORY</span><h2>Your recent downloads</h2></div><a href="/library">BROWSE MORE VIDEOS ↗</a></div>
+            <div className="cd-section-heading"><div><span className="cd-eyebrow">{tx("dashboard.history")}</span><h2>{tx("dashboard.recent")}</h2></div><a href="/library">BROWSE MORE VIDEOS ↗</a></div>
             {history.length ? <div className="cd-history">
               {history.slice(0, 5).map(item => <div className="cd-history-row" key={item.id}>
-                <span className="cd-history-icon">⇩</span><div><b>{item.video_title || "Video download"}</b><small>{item.watermark_applied ? "Watermarked file" : "Clean file"} · {item.status || "Processed"}</small></div><time>{dateOnly(item.created_date)}</time>
+                <span className="cd-history-icon">⇩</span><div><b>{item.video_title || "Video download"}</b><small>{item.watermark_applied ? "Watermarked file" : "Clean file"} · {item.status || "Processed"}</small></div><time>{dateOnly(item.created_date, locale)}</time>
               </div>)}
             </div> : <div className="cd-empty cd-history-empty"><span>▤</span><b>Your download history is ready</b><p>Every successful download will be recorded here. Your files are downloaded to your device, not stored in this dashboard.</p><a href="/library">Explore the video library ↗</a></div>}
           </section>
