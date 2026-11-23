@@ -124,7 +124,7 @@ function VideoLibraryPage() {
   const languageLabel = value => value === "All" ? t.all : ({en:"English",fr:"Français",es:"Español",pt:"Português",it:"Italiano",de:"Deutsch"}[value] || value);
   const formatDuration = seconds => seconds ? Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0") : "VIDEO";
 
-  return <SiteFrame eyebrow="VICEHUB / THE DROP ZONE" workspace={isAuthenticated} activeKey="library">
+  return <SiteFrame eyebrow="VICEHUB / THE DROP ZONE">
     <div className="vh-library-page">
       <section className="vh-library-hero">
         <div className="vh-library-hero-art" aria-hidden="true"><span className="vh-library-sun" /><span className="vh-library-skyline" /><span className="vh-library-palm">✦</span></div>
@@ -132,6 +132,7 @@ function VideoLibraryPage() {
           <span className="vh-library-eyebrow"><i />{t.kicker}</span>
           <h1>{t.title}<br/><em>{t.titleAccent}</em></h1>
           <p>{t.intro}</p>
+          <div className="vh-library-hero-cta"><a href="#library-results">EXPLORE THE LIBRARY <span>↘</span></a><span>CURATED FOR GTA VI CREATORS</span></div>
           <div className="vh-library-hero-meta"><span>VICE CITY · LEONIDA</span><span>CURATED / RIGHTS-CHECKED</span><span>6 LANGUAGES</span></div>
         </div>
         <div className="vh-library-hero-index"><b>VICEHUB</b><span>THE DROP ZONE</span><small>EST. 2026</small></div>
@@ -159,7 +160,7 @@ function VideoLibraryPage() {
 
       {error && <div className="vh-library-alert" role="alert">{error}</div>}
       {downloadMessage && <div className="vh-library-alert" role="status">{downloadMessage}</div>}
-      <section className="vh-library-results">
+      <section className="vh-library-results" id="library-results">
         {loading && videos.length === 0 ? <div className="vh-library-empty">{t.loading}</div> :
           filtered.length === 0 ? <div className="vh-library-empty">{t.empty}</div> :
           <div className="vh-library-grid">{gridVideos.map((video, index) => <article className="vh-library-card" key={video.id}>
