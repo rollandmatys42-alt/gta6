@@ -241,6 +241,9 @@ export const createVideoRecord = createServerFn({ method: "POST" })
     if (!data.originalStorageKey.startsWith("videos/original/") || !data.watermarkedStorageKey.startsWith("videos/watermarked/")) {
       throw Object.assign(new Error("Video assets must use the private original and watermarked storage paths."), { status: 400, code: "INVALID_ASSET_PATH" });
     }
+    if (data.licenseVerified && !data.sourceReference) {
+      throw Object.assign(new Error("A rights or licence evidence reference is required before a video can be marked verified."), { status: 400, code: "RIGHTS_EVIDENCE_REQUIRED" });
+    }
     const base44 = context.getBase44();
     return base44.asServiceRole.entities.Video.create({
       title: data.title, description: data.description || "", category: data.category,
@@ -274,8 +277,8 @@ export const publishVideo = createServerFn({ method: "POST" })
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
     const base44 = context.getBase44();
     const video = await base44.asServiceRole.entities.Video.get(data.videoId);
-    if (video.license_status !== "verified" || !video.storage_key || !video.watermarked_storage_key) {
-      throw Object.assign(new Error("Verify the content licence and upload both private renditions before publishing."), { status: 409, code: "PUBLISH_REQUIREMENTS_NOT_MET" });
+    if (video.license_status !== "verified" || !video.source_reference || !video.storage_key || !video.watermarked_storage_key) {
+      throw Object.assign(new Error("Record a rights/licence evidence reference, verify the content licence and upload both private renditions before publishing."), { status: 409, code: "PUBLISH_REQUIREMENTS_NOT_MET" });
     }
     return base44.asServiceRole.entities.Video.update(video.id, {
       status: "published", published_at: new Date().toISOString(),
