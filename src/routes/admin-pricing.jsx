@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { requireSignedIn, AuthGateError } from "@/components/auth/AuthGate";
 import { getAdminLadderPlans, saveAdminPlanLadder } from "@/lib/loyalty-fns";
-import { DEFAULT_LADDER_CENTS, DEFAULT_STEP_MONTHS, getLadder, getStepMonths } from "@/lib/loyalty";
+import { DEFAULT_STEP_MONTHS, getLadder, getStepMonths } from "@/lib/loyalty";
 
 export const Route = createFileRoute("/admin-pricing")({
   ssr: false, beforeLoad: requireSignedIn, errorComponent: AuthGateError,
@@ -35,7 +35,10 @@ function PlanLadder({ plan, onSaved, onError }) {
     <label>Months per step<input type="number" min="1" max="12" value={step} onChange={e => setStep(Math.max(1, Number(e.target.value) || DEFAULT_STEP_MONTHS))} /></label>
     <div className="ladder-grid">{ladder.map((c, i) => <label key={i}>{i === ladder.length - 1 ? `Month ${i * step + 1}+` : `Months ${i * step + 1}–${(i + 1) * step}`}
       <input type="number" min="0.01" step="0.01" value={(c / 100).toFixed(2)} onChange={e => setLadder(ladder.map((x, j) => j === i ? Math.max(1, Math.round(Number(e.target.value) * 100)) : x))} /></label>)}</div>
-    <button className="fan-btn" onClick={save}>Save</button>{" "}
-    <button className="fan-btn ghost" onClick={() => setLadder(DEFAULT_LADDER_CENTS)}>Apply sample ladder</button>
+    <div className="fan-actions">
+      <button className="fan-btn" onClick={save}>Save</button>
+      <button className="fan-btn ghost" type="button" disabled={ladder.length >= 8} onClick={() => setLadder([...ladder, ladder[ladder.length - 1]])}>Add price step</button>
+      <button className="fan-btn ghost" type="button" disabled={ladder.length <= 1} onClick={() => setLadder(ladder.slice(0, -1))}>Remove last step</button>
+    </div>
   </div>;
 }
