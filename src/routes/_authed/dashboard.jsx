@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import SiteFrame from "@/components/SiteFrame";
 import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile, refreshMySubscription, createStripePortalSession } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
-import { useLocale, translate } from "@/lib/i18n";
+import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
 import { getMyLadderQuote as getMyPlanQuote } from "@/lib/loyalty-fns";
 import { formatMoney } from "@/lib/loyalty";
 import "@/styles/client-dashboard.css";
@@ -15,14 +14,14 @@ export const Route = createFileRoute("/_authed/dashboard")({
 });
 
 const navItems = [
-  { href: "/dashboard", icon: "⌂", label: "Overview" },
-  { href: "/library", icon: "▤", label: "Video library" },
-  { href: "/social", icon: "↗", label: "Social planner" },
-  { href: "/studio", icon: "✦", label: "Creator studio" },
+  { href: "/dashboard", icon: "⌂", label: "Overview", key: "overview" },
+  { href: "/library", icon: "▤", label: "Video library", key: "library" },
+  { href: "/social", icon: "↗", label: "Social planner", key: "social" },
+  { href: "/studio", icon: "✦", label: "Creator studio", key: "studio" },
   { href: "/messages", icon: "✉", label: "Messages", key: "messages" },
   { href: "/notifications", icon: "◉", label: "Notifications", key: "notifications" },
-  { href: "/creators", icon: "◎", label: "My creator profile" },
-  { href: "/news", icon: "▧", label: "GTA VI news" },
+  { href: "/creators", icon: "◎", label: "My creator profile", key: "profile" },
+  { href: "/news", icon: "▧", label: "GTA VI news", key: "news" },
 ];
 
 const money = (cents, currency) => formatMoney(Number(cents || 0), currency || "USD");
@@ -116,10 +115,10 @@ function DashboardPage() {
     }
   };
 
-  return <SiteFrame eyebrow="VICEHUB / CREATOR CONTROL ROOM">
+  return <div className="cd-app-shell">
     <div className="cd-layout">
       <aside className="cd-sidebar">
-        <div className="cd-side-brand"><span className="cd-brand-mark">V</span><div><b>VICEHUB</b><small>CREATOR CONTROL ROOM</small></div></div>
+        <a className="cd-side-brand" href="/dashboard"><span className="cd-brand-mark">V</span><div><b>VICEHUB</b><small>CREATOR HQ / LEONIDA</small></div></a>
         <div className="cd-side-user">
           <div className="cd-avatar">{firstName.slice(0, 1).toUpperCase()}</div>
           <div><b>{firstName}</b><small>{(account?.tier || "free").toUpperCase()} ACCOUNT</small></div>
@@ -127,22 +126,22 @@ function DashboardPage() {
         </div>
         <div className="cd-nav-caption">{tx("dashboard.workspace")}</div>
         <nav className="cd-side-nav" aria-label="Creator workspace navigation">
-          {navItems.map(item => <a key={item.href} href={item.href} className={item.href === "/dashboard" ? "active" : ""}>
-            <span className="cd-nav-icon">{item.icon}</span><span>{item.label}</span>
+          {navItems.map(item => <a key={item.href} href={item.href} className={item.href === "/dashboard" ? "active" : ""} aria-current={item.href === "/dashboard" ? "page" : undefined}>
+            <span className="cd-nav-icon">{item.icon}</span><span>{tx("dashboard.nav." + (item.key || item.href.slice(1)))}</span>
             {item.key === "messages" && unreadMessages > 0 && <i>{unreadMessages}</i>}
             {item.key === "notifications" && unreadAlerts > 0 && <i>{unreadAlerts}</i>}
           </a>)}
         </nav>
         <div className="cd-sidebar-bottom">
           <div className="cd-side-plan"><span>{tx("dashboard.membership")}</span><b>{planName}</b><small>{account?.subscriptionStatus || "Account active"}</small><a href="/#plans">View membership ↗</a></div>
-          <button type="button" onClick={logout} className="cd-logout">↪ <span>Sign out</span></button>
+          <button type="button" onClick={logout} className="cd-logout">↪ <span>{tx("dashboard.signout")}</span></button>
         </div>
       </aside>
 
       <main className="cd-main">
         <header className="cd-topbar">
           <div><span className="cd-overline">{new Intl.DateTimeFormat(localeTags[locale] || "en-GB", { weekday: "long", day: "numeric", month: "long" }).format(new Date()).toUpperCase()} · VICE CITY, LEONIDA</span><h1>{tx("dashboard.title")}<span>.</span></h1><p>{tx("dashboard.intro")}</p></div>
-          <div className="cd-top-actions"><a href="/library" className="cd-primary-action">{tx("dashboard.browse")} <span>↗</span></a><button type="button" className="cd-refresh" onClick={load} disabled={loading}>{loading ? tx("dashboard.sync") : "↻ " + tx("dashboard.refresh")}</button></div>
+          <div className="cd-top-actions"><label className="cd-language-control"><span className="sr-only">Language</span><select aria-label="Language" value={locale} onChange={event => setSiteLocale(event.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select></label><a href="/library" className="cd-primary-action">{tx("dashboard.browse")} <span>↗</span></a><button type="button" className="cd-refresh" onClick={load} disabled={loading}>{loading ? tx("dashboard.sync") : "↻ " + tx("dashboard.refresh")}</button></div>
         </header>
 
         {error && <div className="cd-alert" role="alert">{error}</div>}
@@ -153,7 +152,7 @@ function DashboardPage() {
           <section className="cd-welcome">
             <div className="cd-welcome-image" />
             <div className="cd-welcome-content">
-              <span className="cd-eyebrow"><i /> {tx("dashboard.welcome")}</span>
+              <span className="cd-eyebrow"><i /> {tx("dashboard.welcome")}</span><span className="cd-location-chip">VICE CITY <b>·</b> LEONIDA, USA</span>
               <h2>{tx("dashboard.welcomeTitle")}<br /><em>{firstName}.</em></h2>
               <p>{tx("dashboard.welcomeCopy")}</p>
               <div className="cd-welcome-actions"><a href="/library">{tx("dashboard.explore")}</a><a href="/social">{tx("dashboard.planner")}</a></div>
@@ -247,5 +246,5 @@ function DashboardPage() {
         <footer className="cd-footer">VICEHUB IS AN INDEPENDENT GTA VI FAN PLATFORM · YOUR ACCOUNT DATA IS PRIVATE · YOUR CHANNELS, YOUR CONTENT.</footer>
       </main>
     </div>
-  </SiteFrame>;
+  </div>;
 }
