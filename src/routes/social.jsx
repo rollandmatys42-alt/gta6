@@ -209,7 +209,7 @@ function SocialPublishingPage() {
 
   if (!isAuthenticated) return <SiteFrame eyebrow="VICEHUB / SOCIAL PUBLISHING"><section className="social-shell"><h1>YOUR SOCIAL DESK.</h1><p>Sign in to connect your own accounts and manage your publications.</p><button className="social-primary" onClick={navigateToLogin}>SIGN IN TO CONTINUE ↗</button></section></SiteFrame>;
 
-  return <SiteFrame eyebrow="VICEHUB / SOCIAL PUBLISHING">
+  return <SiteFrame eyebrow="VICEHUB / SOCIAL PUBLISHING" workspace={isAuthenticated} activeKey="social">
     <main className="social-shell">
       <header className="social-hero">
         <div><span className="social-kicker">VICEHUB / CREATOR DISTRIBUTION</span><h1>YOUR SOCIAL<br/><em>CONTROL ROOM.</em></h1><p>Connect your own channels. Prepare platform-specific content. Publish to the account you select — never to another member's profile.</p></div>
