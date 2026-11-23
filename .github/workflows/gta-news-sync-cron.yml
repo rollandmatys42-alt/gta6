@@ -1,0 +1,35 @@
+name: VICEHUB GTA news and source ingestion
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vicehub-gta-news-sync
+  cancel-in-progress: false
+
+jobs:
+  sync-public-sources:
+    name: Ingest public GTA VI sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call the protected VICEHUB source collector
+        env:
+          CRON_SECRET: ${{ secrets.GTA_NEWS_SYNC_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::GTA_NEWS_SYNC_CRON_SECRET is not configured in GitHub Actions. Skipping safely."
+            exit 0
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-delay 5 --retry-connrefused --max-time 50 \
+            -X POST "https://gta6-creator-hub-c26cc578.base44.app/api/news/sources/cron" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{}'
