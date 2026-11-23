@@ -1,0 +1,12 @@
+/* Neutralise the legacy light admin theme (src/index.css) so the neon dark theme is readable everywhere. */
+html body .admin-console{--adm-ink:#f7f2ff;--adm-muted:#a89cc0;--adm-line:rgba(255,255,255,.1);--adm-blue:#ff2d95;--adm-cyan:#2de2e6;background:var(--vc-bg);color:#f7f2ff}
+html body .admin-console .admin-main,html body .admin-console .admin-workspace{background:transparent;color:#f7f2ff}
+html body .admin-console .admin-topbar{background:rgba(10,6,18,.88);border-bottom:1px solid var(--vc-line);color:#f7f2ff}
+html body .admin-console .admin-sidebar{background:rgba(10,6,18,.95);border-right:1px solid var(--vc-line)}
+html body .admin-console :is(h1,h2,h3,h4,p,span,small,b,strong,td,th,li,dt,dd){color:inherit}
+html body .admin-console :is(section,article,form,aside,details,fieldset,table,tr,td,th,div)[class*="admin-"]:not(.admin-sidebar):not(.admin-nav-group):not(.admin-nav-item):not(.admin-console):not(.admin-main):not(.admin-topbar){background-color:transparent}
+html body .admin-console :is(.admin-data-card,.admin-panel,.admin-crm-card,.admin-subscriber-detail,.admin-coming,.admin-social-readiness,.admin-social-preview,.platform-form){background:linear-gradient(160deg,var(--vc-card2),var(--vc-card))}
+html body .admin-console :is(.admin-kpi-row article,.admin-stat-grid>*){background:linear-gradient(160deg,var(--vc-card2),var(--vc-card));color:#f7f2ff;border-color:var(--vc-line)}
+html body .admin-console :is(input,select,textarea){background:#0e0819;color:#f7f2ff;border-color:var(--vc-line)}
+html body .admin-console :is(.admin-crm-table th){background:rgba(255,255,255,.04);color:var(--vc-cyan)}
+html body .admin-console :is(.admin-crm-table td,.admin-list-row,.admin-finance-row,.admin-bar-row){border-color:var(--vc-line);color:#f7f2ff}
