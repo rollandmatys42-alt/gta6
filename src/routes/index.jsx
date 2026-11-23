@@ -42,6 +42,14 @@ function VideoCard({ video, onOpen, rank }) {
   </button>;
 }
 
+function OfficialVideoCard({ video }) {
+  return <a className="fh-official-video" role="listitem" href={video.url} target="_blank" rel="noreferrer" aria-label={"Watch " + video.title + " on YouTube"}>
+    <img src={"https://img.youtube.com/vi/" + video.id + "/maxresdefault.jpg"} alt="" loading="lazy" />
+    <span className="fh-official-video-play">▶</span><span className="fh-official-video-tag">ROCKSTAR GAMES · OFFICIAL</span>
+    <span className="fh-official-video-caption"><b>{video.title}</b><small>WATCH TRAILER ↗</small></span>
+  </a>;
+}
+
 function Row({ title, sub, to, children, auto }) {
   return <section className="fh-section">
     <header className="fh-section-head"><div><h2>{title}</h2>{sub && <p>{sub}</p>}</div>{to && <Link to={to} className="fh-more">See all →</Link>}</header>
@@ -93,6 +101,11 @@ function HomePage() {
     { title: "Neon nights", label: "NIGHTLIFE", src: "https://www.rockstargames.com/VI/_next/static/media/VINTAGE_VICE_CITY_PACK_01.05zaof7o1uz.3.jpg?akim=1&imdensity=1&imwidth=3840" },
     { title: "Leonida supercars", label: "VEHICLES", src: "https://www.rockstargames.com/VI/_next/static/media/ULTIMATE_EDITION_GROTTI_CHEETAH_01.0a.wy3s_ogjey.jpg?akim=1&imdensity=1&imwidth=3840" },
     { title: "Leonida stories", label: "OFFICIAL ART", src: "https://www.rockstargames.com/VI/_next/static/media/ULTIMATE_EDITION_02.0q-6.nrtf~jj0.jpg?akim=1&imdensity=1&imwidth=3840" },
+  ];
+  const officialVideos = [
+    { id: "QdBZY2fkU-0", title: "Trailer 1", url: "https://www.youtube.com/watch?v=QdBZY2fkU-0" },
+    { id: "VQRLujxTm3c", title: "Trailer 2", url: "https://www.youtube.com/watch?v=VQRLujxTm3c" },
+    { id: "tJbzMqJGH4k", title: "An Extended Look", url: "https://www.youtube.com/watch?v=tJbzMqJGH4k" },
   ];
   const plan = plans[0];
   const steps = ladderSchedule(plan || {});
@@ -154,6 +167,11 @@ function HomePage() {
         </a>)}
       </div>
       <p className="fh-gallery-credit">Official Grand Theft Auto VI promotional images © Rockstar Games. Images are displayed from Rockstar's media CDN and link to its official media page.</p>
+    </section>
+
+    <section className="fh-section fh-official-videos">
+      <header className="fh-section-head"><div><span className="fh-section-kicker">ROCKSTAR GAMES · OFFICIAL</span><h2>Watch the trailers</h2><p>The official GTA VI trailers and extended look, in one place.</p></div><a className="fh-more" href="https://www.rockstargames.com/VI/media" target="_blank" rel="noreferrer">All official videos ↗</a></header>
+      <Carousel label="Official GTA VI trailers">{officialVideos.map(video => <OfficialVideoCard key={video.id} video={video}/>)}</Carousel>
     </section>
 
     <div id="drops" />
