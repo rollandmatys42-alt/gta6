@@ -161,6 +161,12 @@ async function publish(post: any, account: any, token: string, mediaUrl: string)
   } else if (post.platform === "X") {
     const result = await apiJson("https://api.x.com/2/tweets", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: post.caption }) });
     externalId = result.data?.id || "";
+  } else if (post.platform === "LinkedIn") {
+    if (post.media_type === "video") throw new Error("LinkedIn media publishing is not enabled in this release. Publish a text post on LinkedIn.");
+    const response = await fetch("https://api.linkedin.com/rest/posts", { method: "POST", headers: { Authorization: "Bearer " + token, "LinkedIn-Version": "202609", "X-Restli-Protocol-Version": "2.0.0", "Content-Type": "application/json" }, body: JSON.stringify({ author: account.provider_account_id, commentary: post.caption, visibility: "PUBLIC", distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: "PUBLISHED", isReshareDisabledByAuthor: false }) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || payload.serviceErrorCode || "LinkedIn publication failed (HTTP " + response.status + ").");
+    externalId = response.headers.get("x-restli-id") || payload.id || "";
   }
   return { status: "published", externalId };
 }
