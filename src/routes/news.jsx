@@ -3,13 +3,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { getNewsFeed,createContentReport } from "@/lib/server-fns";
 import {useLocale,translate} from "@/lib/i18n";
+import {useAuth} from "@/lib/AuthContext";
 export const Route=createFileRoute("/news")({head:()=>({meta:[{title:"GTA VI News — VICEHUB"},{name:"description",content:"Source-labelled GTA VI news, official updates and community coverage."}]}),component:NewsPage});
 function NewsPage(){
+ const {isAuthenticated}=useAuth();
  const locale=useLocale(),tx=key=>translate(locale,key);
  const [articles,setArticles]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[filter,setFilter]=useState("all"),[selected,setSelected]=useState(null);
  useEffect(()=>{setLoading(true);getNewsFeed({data:{locale,limit:50}}).then(setArticles).catch(e=>setError(e.message||"News could not be loaded.")).finally(()=>setLoading(false));},[locale]);
  const filtered=articles.filter(a=>filter==="all"||a.confidence===filter||a.source_type===filter);
- return <SiteFrame eyebrow="VICEHUB / NEWS DESK">
+ return <SiteFrame eyebrow="VICEHUB / NEWS DESK" workspace={isAuthenticated} activeKey="news">
   <div className="platform-hero"><div><div className="eyebrow">{tx("news.kicker")}</div><h1>{tx("news.title")}</h1><p>{tx("news.desc")}</p></div><div className="hero-stamp">LIVE<br/>DESK <b>06</b></div></div>
   <div className="platform-toolbar"><div className="eyebrow">NEWSROOM / {articles.length} STORIES</div><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">{tx("news.all")}</option><option value="official">{tx("news.official")}</option><option value="confirmed">{tx("news.confirmed")}</option><option value="reported">{tx("news.reported")}</option><option value="rumour">{tx("news.rumours")}</option><option value="theory">{tx("news.theories")}</option><option value="community">{tx("news.community")}</option></select></div>
   {error&&<div className="platform-alert">{error}</div>}
