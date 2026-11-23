@@ -246,8 +246,8 @@ function HomePage() {
       <header className="fh-section-head fh-membership-heading">
         <div>
           <span className="fh-section-kicker">VICEHUB MEMBERSHIPS</span>
-          <h2>Choose your level of access</h2>
-          <p>Clear monthly allowances. No invented prices. Your selected currency is applied to every plan.</p>
+          <h2>The longer you stay, the less you pay.</h2>
+          <p>Choose your membership and keep it active. Your monthly price steps down as your loyalty grows. Every paid plan displays its own price schedule before checkout.</p>
         </div>
         <label className="fh-currency-picker">DISPLAY CURRENCY
           <select value={currency} onChange={e => setCurrency(e.target.value)} aria-label="Display currency">
