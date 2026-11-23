@@ -850,7 +850,6 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
     if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
-    const streak=existing?.status==="active"&&!existing?.voluntary_cancelled?Number(existing.streak_months||0):0;
     // The first ladder step is the actual Stripe checkout amount. Legacy percentage discounts are not mixed with the explicit ladder.
     const priceCents=priceForMonth(plan,1);
     const discount=0;
@@ -870,7 +869,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
       const priceForm=new URLSearchParams();
       priceForm.set("currency",data.currency.toLowerCase());
       priceForm.set("product",stripeProductId);
-      priceForm.set("unit_amount",String(Number(plan.monthly_price_cents)));
+      priceForm.set("unit_amount",String(priceCents));
       priceForm.set("recurring[interval]","month");
       const price=await stripeApi("prices","POST",priceForm);
       stripePriceId=price.id;
