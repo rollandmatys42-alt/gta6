@@ -6,6 +6,7 @@ import "@/styles/fan-admin.css";
 import "@/styles/fan-admin-fix.css";
 import "@/styles/fan-home.css";
 import { useAuth } from "@/lib/AuthContext";
+import CookieConsent from "@/components/CookieConsent";
 import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
 
 const links = [["/", "nav.home"], ["/library", "nav.library"], ["/news", "nav.news"], ["/creators", "nav.creators"], ["/shop", "nav.shop"], ["/studio", "nav.studio"]];
@@ -40,9 +41,10 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
         <div><div className="fh-brand-text">VICE<b>HUB</b></div><p>Weekly vertical GTA VI videos for TikTok, Instagram and YouTube Shorts. Download, post on your own channels, grow your page.</p></div>
         <div><h4>Explore</h4><Link to="/library">Video library</Link><Link to="/news">GTA VI news</Link><Link to="/creators">Creators</Link><Link to="/shop">Shop</Link></div>
         <div><h4>Account</h4><Link to="/dashboard">My account</Link><a href="/#plans">Pricing</a><Link to="/studio">AI studio</Link><Link to="/social">Social planner</Link></div>
-        <div><h4>Legal</h4><Link to="/terms">{translate(locale, "footer.terms")}</Link><Link to="/privacy">{translate(locale, "footer.privacy")}</Link><Link to="/copyright">{translate(locale, "footer.copyright")}</Link><Link to="/refunds">Refunds</Link><Link to="/contact">Contact</Link></div>
+        <div><h4>Legal</h4><Link to="/terms">{translate(locale, "footer.terms")}</Link><Link to="/privacy">{translate(locale, "footer.privacy")}</Link><Link to="/copyright">{translate(locale, "footer.copyright")}</Link><Link to="/cookies">Cookies</Link><Link to="/refunds">Refunds</Link><Link to="/contact">Contact</Link></div>
       </div>
       <div className="fh-footer-bottom"><span>{translate(locale, "footer.independent")}</span><small>{translate(locale, "footer.disclaimer")}</small></div>
     </footer>
+    <CookieConsent />
   </div>;
 }

@@ -206,10 +206,10 @@ function HomePage() {
       </div>
     </section>
 
-    <section className="fh-section">
-      <header className="fh-section-head"><div><h2>Latest GTA VI news</h2><p>Every story labelled and sourced</p></div><Link to="/news" className="fh-more">All news →</Link></header>
-      {news.length === 0 ? <div className="fh-empty-card">News is being curated — check back shortly.</div> :
-        <div className="fh-news">{news.slice(0, 6).map((n, i) => <Link to="/news" key={n.id} className={"fh-news-card" + (i === 0 ? " lead" : "")}><span className={"source-pill " + n.confidence}>{n.confidence}</span><h3>{n.title}</h3><p>{n.summary}</p><small>{n.source_name}</small></Link>)}</div>}
+    <section className="fh-section fh-newsroom-section">
+      <header className="fh-section-head"><div><span className="fh-section-kicker">THE VICE CITY DISPATCH</span><h2>GTA VI Newsroom</h2><p>Official updates, verified reporting and clearly labelled community coverage.</p></div><Link to="/news" className="fh-more">Explore the newsroom →</Link></header>
+      {news.length === 0 ? <div className="fh-news-empty"><div><span className="fh-news-empty-kicker">NEWS DESK / STANDBY</span><h3>We only publish stories we can source.</h3><p>The newsroom is being updated. Every published story will show its source and whether it is official, confirmed, reported or unverified.</p><Link to="/news" className="fh-more">Open news desk →</Link></div><span className="fh-news-empty-mark">VH<br/>NEWS</span></div> :
+        <div className="fh-news">{news.slice(0, 6).map((n, i) => <Link to="/news" key={n.id} className={"fh-news-card" + (i === 0 ? " lead" : "")}><span className="fh-news-card-top"><span className={"source-pill " + n.confidence}>{n.confidence}</span><small>{n.source_name || "VICEHUB newsroom"}</small></span><h3>{n.title}</h3><p>{n.summary}</p><span className="fh-news-card-bottom"><small>{n.published_at ? timeAgo(n.published_at) : "Source checked"}</small><b>READ STORY ↗</b></span></Link>)}</div>}
     </section>
 
     {creators.length > 0 && <Row title="Creators" sub="Fans building the GTA VI community" to="/creators">
