@@ -125,70 +125,70 @@ function VideoLibraryPage() {
   const formatDuration = seconds => seconds ? Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0") : "VIDEO";
 
   return <SiteFrame eyebrow="VICEHUB / THE DROP ZONE">
-    <div className="vh-library-page">
-      <section className="vh-library-hero">
-        <div className="vh-library-hero-art" aria-hidden="true"><span className="vh-library-sun" /><span className="vh-library-skyline" /><span className="vh-library-palm">✦</span></div>
-        <div className="vh-library-hero-copy">
-          <span className="vh-library-eyebrow"><i />{t.kicker}</span>
+    <div className="vh-catalog-page">
+      <section className="vh-catalog-hero">
+        <div className="vh-catalog-hero-art" aria-hidden="true"><span className="vh-catalog-sun" /><span className="vh-catalog-skyline" /><span className="vh-catalog-palm">✦</span></div>
+        <div className="vh-catalog-hero-copy">
+          <span className="vh-catalog-eyebrow"><i />{t.kicker}</span>
           <h1>{t.title}<br/><em>{t.titleAccent}</em></h1>
           <p>{t.intro}</p>
-          <div className="vh-library-hero-cta"><a href="#library-results">EXPLORE THE LIBRARY <span>↘</span></a><span>CURATED FOR GTA VI CREATORS</span></div>
-          <div className="vh-library-hero-meta"><span>VICE CITY · LEONIDA</span><span>CURATED / RIGHTS-CHECKED</span><span>6 LANGUAGES</span></div>
+          <div className="vh-catalog-hero-cta"><a href="#library-results">EXPLORE THE LIBRARY <span>↘</span></a><span>CURATED FOR GTA VI CREATORS</span></div>
+          <div className="vh-catalog-hero-meta"><span>VICE CITY · LEONIDA</span><span>CURATED / RIGHTS-CHECKED</span><span>6 LANGUAGES</span></div>
         </div>
-        <div className="vh-library-hero-index"><b>VICEHUB</b><span>THE DROP ZONE</span><small>EST. 2026</small></div>
+        <div className="vh-catalog-hero-index"><b>VICEHUB</b><span>THE DROP ZONE</span><small>EST. 2026</small></div>
       </section>
 
-      {featured && <section className="vh-featured-video">
-        <div className="vh-featured-heading"><span>{t.featured}</span><b>01 / EDITOR'S PICK</b></div>
-        <button className="vh-featured-art" onClick={() => openPreview(featured)}>
-          {featured.thumbnail_url ? <img src={featured.thumbnail_url} alt={featured.title} /> : <div className="vh-library-placeholder"><b>VICEHUB</b><span>{featured.category?.toUpperCase()}</span></div>}
-          <span className="vh-featured-play">▶</span><span className="vh-featured-overlay"><small>{featured.category} · {(featured.language || "en").toUpperCase()}</small><strong>{featured.title}</strong><i>{t.preview} ↗</i></span>
+      {featured && <section className="vh-catalog-featured-video">
+        <div className="vh-catalog-featured-heading"><span>{t.featured}</span><b>01 / EDITOR'S PICK</b></div>
+        <button className="vh-catalog-featured-art" onClick={() => openPreview(featured)}>
+          {featured.thumbnail_url ? <img src={featured.thumbnail_url} alt={featured.title} /> : <div className="vh-catalog-placeholder"><b>VICEHUB</b><span>{featured.category?.toUpperCase()}</span></div>}
+          <span className="vh-catalog-featured-play">▶</span><span className="vh-catalog-featured-overlay"><small>{featured.category} · {(featured.language || "en").toUpperCase()}</small><strong>{featured.title}</strong><i>{t.preview} ↗</i></span>
         </button>
       </section>}
 
-      <section className="vh-library-controls">
-        <div className="vh-library-controls-top">
-          <div><span className="vh-library-eyebrow">{t.category}</span><h2>{t.latest}</h2></div>
-          <span className="vh-library-count">{filtered.length} {t.results}</span>
+      <section className="vh-catalog-controls">
+        <div className="vh-catalog-controls-top">
+          <div><span className="vh-catalog-eyebrow">{t.category}</span><h2>{t.latest}</h2></div>
+          <span className="vh-catalog-count">{filtered.length} {t.results}</span>
         </div>
-        <div className="vh-library-search-row">
-          <label className="vh-library-search"><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} /></label>
-          <label className="vh-library-select"><span>{t.language}</span><select value={language} onChange={event => setLanguage(event.target.value)}>{languages.map(value => <option key={value} value={value}>{languageLabel(value)}</option>)}</select></label>
+        <div className="vh-catalog-search-row">
+          <label className="vh-catalog-search"><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} /></label>
+          <label className="vh-catalog-select"><span>{t.language}</span><select value={language} onChange={event => setLanguage(event.target.value)}>{languages.map(value => <option key={value} value={value}>{languageLabel(value)}</option>)}</select></label>
         </div>
-        <div className="vh-library-categories">{categories.map(value => <button key={value} type="button" className={category === value ? "active" : ""} onClick={() => setCategory(value)}>{categoryLabel(value)}</button>)}</div>
+        <div className="vh-catalog-categories">{categories.map(value => <button key={value} type="button" className={category === value ? "active" : ""} onClick={() => setCategory(value)}>{categoryLabel(value)}</button>)}</div>
       </section>
 
-      {error && <div className="vh-library-alert" role="alert">{error}</div>}
-      {downloadMessage && <div className="vh-library-alert" role="status">{downloadMessage}</div>}
-      <section className="vh-library-results" id="library-results">
-        {loading && videos.length === 0 ? <div className="vh-library-empty">{t.loading}</div> :
-          filtered.length === 0 ? <div className="vh-library-empty">{t.empty}</div> :
-          <div className="vh-library-grid">{gridVideos.map((video, index) => <article className="vh-library-card" key={video.id}>
-            <button type="button" className="vh-library-card-art" onClick={() => openPreview(video)} aria-label={t.preview + ": " + video.title}>
-              {video.thumbnail_url ? <img src={video.thumbnail_url} alt={video.title} loading="lazy" /> : <div className="vh-library-placeholder"><b>VICEHUB</b><span>{(video.category || "GTA VI").toUpperCase()}</span></div>}
-              <span className="vh-library-card-number">{String(index + 1).padStart(2, "0")}</span>
-              <span className="vh-library-card-duration">{formatDuration(video.duration_seconds)}</span>
-              <span className="vh-library-card-play">▶</span>
+      {error && <div className="vh-catalog-alert" role="alert">{error}</div>}
+      {downloadMessage && <div className="vh-catalog-alert" role="status">{downloadMessage}</div>}
+      <section className="vh-catalog-results" id="library-results">
+        {loading && videos.length === 0 ? <div className="vh-catalog-empty">{t.loading}</div> :
+          filtered.length === 0 ? <div className="vh-catalog-empty">{t.empty}</div> :
+          <div className="vh-catalog-grid">{gridVideos.map((video, index) => <article className="vh-catalog-card" key={video.id}>
+            <button type="button" className="vh-catalog-card-art" onClick={() => openPreview(video)} aria-label={t.preview + ": " + video.title}>
+              {video.thumbnail_url ? <img src={video.thumbnail_url} alt={video.title} loading="lazy" /> : <div className="vh-catalog-placeholder"><b>VICEHUB</b><span>{(video.category || "GTA VI").toUpperCase()}</span></div>}
+              <span className="vh-catalog-card-number">{String(index + 1).padStart(2, "0")}</span>
+              <span className="vh-catalog-card-duration">{formatDuration(video.duration_seconds)}</span>
+              <span className="vh-catalog-card-play">▶</span>
             </button>
-            <div className="vh-library-card-body">
-              <div className="vh-library-card-tags"><span>{video.category || "GTA VI"}</span><span>{(video.language || "en").toUpperCase()}</span>{video.is_featured && <b>FEATURED</b>}</div>
+            <div className="vh-catalog-card-body">
+              <div className="vh-catalog-card-tags"><span>{video.category || "GTA VI"}</span><span>{(video.language || "en").toUpperCase()}</span>{video.is_featured && <b>FEATURED</b>}</div>
               <h3>{video.title}</h3>
               <p>{video.creator_name || "VICEHUB COMMUNITY"}</p>
-              <div className="vh-library-card-actions"><button type="button" onClick={() => openPreview(video)}>{t.preview}</button><button type="button" onClick={() => download(video)}>{t.download} ↓</button></div>
+              <div className="vh-catalog-card-actions"><button type="button" onClick={() => openPreview(video)}>{t.preview}</button><button type="button" onClick={() => download(video)}>{t.download} ↓</button></div>
             </div>
           </article>)}</div>
         }
       </section>
-      <div className="vh-library-pagination">{hasMore ? <button type="button" onClick={() => fetchPage()} disabled={loadingMore}>{loadingMore ? t.loading : t.more} ↗</button> : !loading && videos.length > 0 ? <span>{t.end}</span> : null}</div>
+      <div className="vh-catalog-pagination">{hasMore ? <button type="button" onClick={() => fetchPage()} disabled={loadingMore}>{loadingMore ? t.loading : t.more} ↗</button> : !loading && videos.length > 0 ? <span>{t.end}</span> : null}</div>
     </div>
 
-    {selected && <div className="vh-preview-backdrop" role="presentation" onClick={closePreview}>
-      <section className="vh-preview-modal" role="dialog" aria-modal="true" aria-label={selected.title} onClick={event => event.stopPropagation()}>
-        <div className="vh-preview-head"><div><span>{t.rights}</span><h2>{selected.title}</h2></div><button type="button" onClick={closePreview}>×</button></div>
-        {previewUrl ? <video className="vh-preview-player" src={previewUrl} controls playsInline autoPlay /> : <div className="vh-preview-loading">{previewMessage}</div>}
-        <div className="vh-preview-meta"><span>{t.creator}: {selected.creator_name || "VICEHUB COMMUNITY"}</span><span>{selected.category} · {(selected.language || "en").toUpperCase()}</span></div>
-        <div className="vh-preview-actions"><button type="button" className="vh-preview-close" onClick={closePreview}>{t.close}</button><button type="button" className="vh-preview-download" onClick={() => download(selected)}>{t.download} ↓</button></div>
-        {!isAuthenticated && <p className="vh-preview-note">Sign in to download videos and manage your monthly allowance.</p>}
+    {selected && <div className="vh-catalog-preview-backdrop" role="presentation" onClick={closePreview}>
+      <section className="vh-catalog-preview-modal" role="dialog" aria-modal="true" aria-label={selected.title} onClick={event => event.stopPropagation()}>
+        <div className="vh-catalog-preview-head"><div><span>{t.rights}</span><h2>{selected.title}</h2></div><button type="button" onClick={closePreview}>×</button></div>
+        {previewUrl ? <video className="vh-catalog-preview-player" src={previewUrl} controls playsInline autoPlay /> : <div className="vh-catalog-preview-loading">{previewMessage}</div>}
+        <div className="vh-catalog-preview-meta"><span>{t.creator}: {selected.creator_name || "VICEHUB COMMUNITY"}</span><span>{selected.category} · {(selected.language || "en").toUpperCase()}</span></div>
+        <div className="vh-catalog-preview-actions"><button type="button" className="vh-catalog-preview-close" onClick={closePreview}>{t.close}</button><button type="button" className="vh-catalog-preview-download" onClick={() => download(selected)}>{t.download} ↓</button></div>
+        {!isAuthenticated && <p className="vh-catalog-preview-note">Sign in to download videos and manage your monthly allowance.</p>}
       </section>
     </div>}
   </SiteFrame>;
