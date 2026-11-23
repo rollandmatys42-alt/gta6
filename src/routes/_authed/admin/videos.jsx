@@ -250,6 +250,19 @@ function AdminVideosPage() {
           <span>{storageState === "ready" ? storageDetails : storageState === "checking" ? "Testing private storage permissions…" : storageState === "failed" ? storageDetails : "Storage has not yet been tested in this session. Uploads are locked until a real write, read-back and cleanup test succeeds."}</span>
           <div className="admin-form-actions"><button className="outline-btn" type="button" onClick={checkStorage} disabled={storageBusy || busy}>{storageBusy ? "Checking…" : storageState === "ready" ? "Recheck storage" : "Test private storage"}</button><span>{storageState === "ready" ? "READY" : storageState === "failed" ? "NOT READY" : "NOT CHECKED"}</span></div>
         </section>
+        <details className="admin-warning admin-storage-setup">
+          <summary><b>R2 PRIVATE STORAGE — SETUP INSTRUCTIONS</b></summary>
+          <span>Uploads remain disabled until the real private-storage test succeeds. Create a private Cloudflare R2 bucket, then add these values in the VICEHUB app's Base44 Secrets. Do not put credentials in source code or send them in chat.</span>
+          <ul>
+            <li><code>VIDEO_STORAGE_ENDPOINT</code> — your HTTPS R2 S3 endpoint: <code>https://ACCOUNT_ID.r2.cloudflarestorage.com</code></li>
+            <li><code>VIDEO_STORAGE_BUCKET</code> — the exact bucket name</li>
+            <li><code>VIDEO_STORAGE_ACCESS_KEY_ID</code> — an R2 access key limited to this bucket</li>
+            <li><code>VIDEO_STORAGE_SECRET_ACCESS_KEY</code> — the matching secret access key</li>
+            <li><code>VIDEO_STORAGE_REGION</code> — optional; use <code>auto</code></li>
+          </ul>
+          <span>Configure bucket CORS to allow the published VICEHUB origin <code>https://gta6-creator-hub-c26cc578.base44.app</code>, methods <code>PUT</code>, <code>GET</code> and <code>DELETE</code>, and header <code>Content-Type</code>. Keep the bucket private; do not enable public bucket access or public object URLs.</span>
+          <span>Create an R2 token with only the object permissions needed for this bucket. After saving the secrets, return here and run the private-storage test. It writes a temporary health-check object, reads it back, then deletes it.</span>
+        </details>
         <form className="admin-video-form" onSubmit={submit}>
           <label>Video title<input required minLength={2} maxLength={140} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Vice City night drive" /></label>
           <label>Description<textarea maxLength={3000} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe the footage and permitted use." /></label>

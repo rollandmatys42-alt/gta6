@@ -750,3 +750,13 @@
 .admin-video-library-filters input,.admin-video-library-filters select{width:100%;min-width:0;min-height:42px;padding:9px 12px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:#10182a;color:#f3f4fa;font:12px Inter,Arial,sans-serif}
 .admin-video-library-filters input:focus,.admin-video-library-filters select:focus{outline:none;border-color:#ff78b6}
 @media(max-width:760px){.admin-video-library-filters{grid-template-columns:1fr 1fr}.admin-video-library-filters input{grid-column:1/-1}}
+
+
+.admin-storage-setup{display:block;margin:14px 0 22px;padding:16px 18px;border:1px solid rgba(45,224,210,.28);border-radius:12px;background:rgba(9,20,32,.72);color:#dce6f2}
+.admin-storage-setup summary{cursor:pointer;color:#42e2d6;list-style:none}
+.admin-storage-setup summary::-webkit-details-marker{display:none}
+.admin-storage-setup summary:after{content:"＋";float:right;color:#ff82bd;font-size:18px}
+.admin-storage-setup[open] summary:after{content:"−"}
+.admin-storage-setup>span{display:block;margin:12px 0;color:#c0c9d8;font-size:12px;line-height:1.65}
+.admin-storage-setup ul{margin:10px 0 14px;padding-left:22px;color:#c0c9d8;font-size:12px;line-height:1.9}
+.admin-storage-setup code{padding:2px 5px;border-radius:4px;background:#070c17;color:#55e3dc;font-size:11px;overflow-wrap:anywhere}
