@@ -64,7 +64,7 @@
       "minimum": 0,
       "default": 0
     },
-    "price_ladder_cents": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "Degressive monthly prices, e.g. [4999,3999,2999,999]" },
+    "price_ladder_cents": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "Configured monthly prices in cents, one positive integer per loyalty period. No default prices are supplied." },
     "ladder_step_months": { "type": "integer", "minimum": 1, "default": 3 },
     "stripe_product_id": { "type": "string" },
     "stripe_price_id": { "type": "string" },
