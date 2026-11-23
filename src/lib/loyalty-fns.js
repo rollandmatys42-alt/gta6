@@ -16,7 +16,8 @@ export const getMyLadderQuote = createServerFn({ method: "GET" }).middleware([re
     if (!plan) throw Object.assign(new Error("This plan is not configured in the selected currency."), { status: 404 });
     const sub = (await db.UserSubscription.filter({ user_id: context.user.id }, "-created_date", 1, 0))[0];
     const active = (sub?.status === "active" || (sub?.status === "past_due" && sub?.grace_period_ends_at && new Date(sub.grace_period_ends_at) > new Date())) && !sub?.voluntary_cancelled;
-    const streak = active ? Number(sub?.streak_months || 0) : 0;
+    const samePlan = sub?.tier_code === data.tierCode && sub?.currency === data.currency;
+    const streak = active && samePlan ? Number(sub?.streak_months || 0) : 0;
     return { tierCode: data.tierCode, currency: data.currency, currentPriceCents: priceForMonth(plan, streak + 1), nextChargeMonth: streak + 1, streakMonths: streak, schedule: ladderSchedule(plan), resetOnVoluntaryCancellation: true };
   });
 
