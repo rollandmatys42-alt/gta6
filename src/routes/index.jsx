@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import Carousel from "@/components/Carousel";
 import { useAuth } from "@/lib/AuthContext";
-import { listPublishedVideos, getVideoPreviewUrl, requestVideoDownload, getNewsFeed, getPublicPlans, getCreatorDirectory, getShopProducts, createStripeCheckoutSession } from "@/lib/server-fns";
+import { listPublishedVideos, getVideoPreviewUrl, requestVideoDownload, getNewsFeed, getPublicPlans, getCreatorDirectory, getShopProducts, createStripeCheckoutSession, getPublicCommunityReviews, submitCommunityReview } from "@/lib/server-fns";
 import { ladderSchedule, formatMoney } from "@/lib/loyalty";
 
 const TITLE = "VICEHUB — GTA VI fan drops: vertical videos to download & post";
@@ -61,6 +61,12 @@ function HomePage() {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
   const [faq, setFaq] = useState(0);
+  const [reviews, setReviews] = useState([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewText, setReviewText] = useState("");
+  const [reviewNotice, setReviewNotice] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   useEffect(() => {
     listPublishedVideos().then(r => setVideos(Array.isArray(r) ? r : [])).catch(() => setVideos([])).finally(() => setLoadingVideos(false));
@@ -68,6 +74,7 @@ function HomePage() {
     getPublicPlans({ data: { currency: "USD" } }).then(r => setPlans(Array.isArray(r) ? r : [])).catch(() => setPlans([]));
     getCreatorDirectory({ data: {} }).then(r => setCreators(Array.isArray(r) ? r : [])).catch(() => setCreators([]));
     getShopProducts().then(r => setProducts(Array.isArray(r) ? r : [])).catch(() => setProducts([]));
+    getPublicCommunityReviews().then(r => setReviews(Array.isArray(r) ? r : [])).catch(() => setReviews([]));
   }, []);
   useEffect(() => {
     if (!preview) return;
@@ -79,6 +86,14 @@ function HomePage() {
   const featured = useMemo(() => videos.find(v => v.is_featured) || videos[0] || null, [videos]);
   const byCat = useMemo(() => cats => videos.filter(v => cats.includes(v.category)), [videos]);
   const shorts = byCat(["Shorts"]), packs = byCat(["Edit packs"]), cinematics = byCat(["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions"]);
+  const gallery = [
+    { title: "Jason & Lucia", label: "THE DUO", src: "https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=3840" },
+    { title: "Vice City", label: "THE CITY", src: "https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=3840" },
+    { title: "Lucia Caminos", label: "CHARACTERS", src: "https://www.rockstargames.com/VI/_next/static/media/Lucia_Caminos_12.0saq9ns-~xj03.jpg?akim=1&imdensity=1&imwidth=3840" },
+    { title: "Neon nights", label: "NIGHTLIFE", src: "https://www.rockstargames.com/VI/_next/static/media/VINTAGE_VICE_CITY_PACK_01.05zaof7o1uz.3.jpg?akim=1&imdensity=1&imwidth=3840" },
+    { title: "Leonida supercars", label: "VEHICLES", src: "https://www.rockstargames.com/VI/_next/static/media/ULTIMATE_EDITION_GROTTI_CHEETAH_01.0a.wy3s_ogjey.jpg?akim=1&imdensity=1&imwidth=3840" },
+    { title: "Leonida stories", label: "OFFICIAL ART", src: "https://www.rockstargames.com/VI/_next/static/media/ULTIMATE_EDITION_02.0q-6.nrtf~jj0.jpg?akim=1&imdensity=1&imwidth=3840" },
+  ];
   const plan = plans[0];
   const steps = ladderSchedule(plan || {});
   const firstPrice = formatMoney(steps[0].priceCents);
@@ -109,11 +124,11 @@ function HomePage() {
       <div className="fh-hero-copy">
         <div className="fh-kicker">WELCOME TO VICE CITY</div>
         <h1>Post GTA VI videos.<br /><em>Grow your page.</em></h1>
-        <p>The weekly drop for GTA VI fans: ready-to-post vertical videos for TikTok, Instagram Reels and YouTube Shorts, the latest news, and tools to publish like a pro.</p>
+        <p>Your independent home for GTA VI culture: cinematic video drops, official media, verified news and a community built for creators.</p>
         <div className="fh-hero-cta"><button type="button" className="fh-btn solid big" onClick={subscribe} disabled={busy}>{busy ? "Opening checkout…" : `Start at ${firstPrice}/month`}</button><a href="#drops" className="fh-btn ghost big">Watch the drops</a></div>
         <ul className="fh-stats">
-          <li><b>{videos.length || "—"}</b><span>videos ready</span></li>
-          <li><b>{creators.length || "—"}</b><span>creators</span></li>
+          <li><b>{videos.length}</b><span>videos ready</span></li>
+          <li><b>{creators.length}</b><span>creators</span></li>
           <li><b>9:16</b><span>made for socials</span></li>
           <li><b>Weekly</b><span>new drops</span></li>
         </ul>
@@ -124,11 +139,22 @@ function HomePage() {
           {featured.thumbnail_url ? <img src={featured.thumbnail_url} alt="" /> : <span className="fh-reel-fallback big">VICE<br />HUB</span>}
           <span className="fh-reel-play big" aria-hidden="true">▶</span>
           <span className="fh-reel-cap"><small>FEATURED DROP</small><b>{featured.title}</b></span>
-        </button> : <div className="fh-phone empty"><span className="fh-reel-fallback big">VICE<br />HUB</span><span className="fh-reel-cap"><small>COMING SOON</small><b>First drops land this week</b></span></div>}
+        </button> : <div className="fh-phone empty"><img src="https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=3840" alt="Jason and Lucia in Vice City — official GTA VI artwork"/><span className="fh-reel-cap"><small>VICE CITY · LEONIDA</small><b>Enter the world of GTA VI</b></span></div>}
       </div>
     </section>
 
     <div className="fh-platforms">{["TikTok", "Instagram Reels", "YouTube Shorts", "Facebook Reels", "X"].map(p => <span key={p}>{p}</span>)}</div>
+
+    <section className="fh-section fh-gallery-section">
+      <header className="fh-section-head"><div><span className="fh-section-kicker">OFFICIAL ROCKSTAR MEDIA</span><h2>Welcome to Leonida</h2><p>Explore the characters, streets and atmosphere of GTA VI.</p></div><a className="fh-more" href="https://www.rockstargames.com/VI/media" target="_blank" rel="noreferrer">Official media gallery ↗</a></header>
+      <div className="fh-gallery-grid">
+        {gallery.map((item, i) => <a className={"fh-gallery-card gallery-" + i} href="https://www.rockstargames.com/VI/media" target="_blank" rel="noreferrer" key={item.title}>
+          <img src={item.src} alt={item.title + " — official GTA VI artwork"} loading={i < 2 ? "eager" : "lazy"} />
+          <span className="fh-gallery-label">{item.label}</span><b>{item.title}</b><i>↗</i>
+        </a>)}
+      </div>
+      <p className="fh-gallery-credit">Official Grand Theft Auto VI promotional images © Rockstar Games. Images are displayed from Rockstar's media CDN and link to its official media page.</p>
+    </section>
 
     <div id="drops" />
     <Row title="Latest drops" sub="Fresh vertical videos, ready to download and post" to="/library" auto={6000}>
@@ -144,7 +170,7 @@ function HomePage() {
     <section className="fh-section">
       <header className="fh-section-head"><div><h2>How it works</h2><p>Easy as a heist</p></div></header>
       <div className="fh-steps">
-        {[["1", "Pick a drop", "Browse the weekly vertical videos and preview them."], ["2", "Download", "One tap, full quality. Members get clean files with no watermark."], ["3", "Post it", "Publish on your own TikTok, Instagram or YouTube and grow your page."], ["4", "Pay less over time", "Your price drops every 3 months, down to $9.99."]].map(([n, t, d]) => <div className="fh-step" key={n}><span>{n}</span><h3>{t}</h3><p>{d}</p></div>)}
+        {[["1", "Pick a drop", "Browse the weekly vertical videos and preview them."], ["2", "Download", "One tap, full quality. Members get clean files with no watermark."], ["3", "Post it", "Publish on your own TikTok, Instagram or YouTube and grow your page."], ["4", "Pay less over time", "Your price follows the loyalty schedule shown below."]].map(([n, t, d]) => <div className="fh-step" key={n}><span>{n}</span><h3>{t}</h3><p>{d}</p></div>)}
       </div>
     </section>
 
@@ -157,6 +183,32 @@ function HomePage() {
     {creators.length > 0 && <Row title="Creators" sub="Fans building the GTA VI community" to="/creators">
       {creators.slice(0, 12).map(c => <Link role="listitem" to="/creators" className="fh-creator" key={c.id}>{c.avatar_url ? <img src={c.avatar_url} alt="" loading="lazy" /> : <span className="fh-avatar">{(c.display_name || "?").slice(0, 1).toUpperCase()}</span>}<b>{c.display_name}</b><small>{c.location_label || (c.skills || []).slice(0, 2).join(" · ")}</small></Link>)}
     </Row>}
+
+    <section className="fh-section fh-reviews-section" id="community-reviews">
+      <header className="fh-section-head"><div><span className="fh-section-kicker">COMMUNITY VOICES</span><h2>Creator reviews</h2><p>Feedback from people using VICEHUB. Reviews are moderated before publication.</p></div><span className="fh-review-count">{reviews.length} published</span></header>
+      {reviews.length ? <Carousel label="Community reviews">
+        {reviews.map(review => <article className="fh-review-card" role="listitem" key={review.id}>
+          <div className="fh-review-stars" aria-label={review.rating + " out of 5 stars"}>{"★".repeat(review.rating)}{"☆".repeat(5-review.rating)}</div>
+          <h3>{review.title}</h3><p>“{review.review_text}”</p>
+          <div className="fh-review-author"><span>{(review.display_name || "Creator").slice(0,1).toUpperCase()}</span><div><b>{review.display_name || "VICEHUB creator"}</b><small>Verified VICEHUB account</small></div></div>
+        </article>)}
+      </Carousel> : <div className="fh-review-empty"><div className="fh-review-empty-stars">★★★★★</div><h3>The community writes this story.</h3><p>No published reviews yet. We will only display feedback submitted by real members and approved by our moderation team.</p></div>}
+      <div className="fh-review-form-wrap">
+        <div><span className="fh-section-kicker">HAVE YOUR SAY</span><h3>Share your experience</h3><p>Signed-in members can submit one review. It appears publicly only after moderation.</p></div>
+        {isAuthenticated ? <form className="fh-review-form" onSubmit={async e => {
+          e.preventDefault(); setReviewBusy(true); setReviewNotice("");
+          try { const result = await submitCommunityReview({data:{rating:reviewRating,title:reviewTitle,reviewText}}); setReviewNotice(result?.message || "Review submitted for moderation."); setReviewTitle(""); setReviewText(""); }
+          catch(err) { setReviewNotice(err?.message || "Your review could not be submitted."); }
+          finally { setReviewBusy(false); }
+        }}>
+          <label>Rating<select value={reviewRating} onChange={e=>setReviewRating(Number(e.target.value))}><option value={5}>★★★★★ — Excellent</option><option value={4}>★★★★☆ — Very good</option><option value={3}>★★★☆☆ — Good</option><option value={2}>★★☆☆☆ — Fair</option><option value={1}>★☆☆☆☆ — Poor</option></select></label>
+          <label>Review title<input required minLength={3} maxLength={90} value={reviewTitle} onChange={e=>setReviewTitle(e.target.value)} placeholder="What should other creators know?"/></label>
+          <label>Your review<textarea required minLength={20} maxLength={800} rows={4} value={reviewText} onChange={e=>setReviewText(e.target.value)} placeholder="Describe your actual experience with VICEHUB…"/></label>
+          <button className="fh-btn solid" disabled={reviewBusy}>{reviewBusy ? "Submitting…" : "Submit review"}</button>
+          {reviewNotice && <p className="fh-review-notice" role="status">{reviewNotice}</p>}
+        </form> : <button type="button" className="fh-btn solid" onClick={navigateToLogin}>Sign in to leave a review</button>}
+      </div>
+    </section>
 
     <section className="fh-section" id="plans">
       <div className="ladder-wrap fh-plan">
