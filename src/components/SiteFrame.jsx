@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import "@/styles/fan-theme.css";
 import "@/styles/fan-pages.css";
 import "@/styles/fan-admin.css";
+import "@/styles/fan-admin-fix.css";
 import {useLocale,setSiteLocale,translate} from "@/lib/i18n";
 
 const links=[["/","nav.home"],["/library","nav.library"],["/news","nav.news"],["/creators","nav.creators"],["/shop","nav.shop"],["/studio","nav.studio"],["/social","nav.social"],["/dashboard","nav.account"]];
