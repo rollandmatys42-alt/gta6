@@ -37,7 +37,7 @@ export default function CookieConsent() {
       <section className="vh-cookie-panel" role="dialog" aria-modal="true" aria-labelledby="vh-cookie-title">
         <div className="vh-cookie-kicker">YOUR PRIVACY / VICEHUB</div>
         <h2 id="vh-cookie-title">Your cookies. Your call.</h2>
-        <p>We use essential storage to keep VICEHUB working. Optional analytics and marketing technologies stay off unless you choose to enable them. You can change your choice at any time.</p>
+        <p>We use essential storage to keep VICEHUB working. Optional analytics and marketing technologies remain off unless the relevant service is integrated and you choose to enable it. You can change your choice at any time.</p>
         {preferences && <div className="vh-cookie-options">
           <div><span><b>Strictly necessary</b><small>Security, login and core platform functions. Always active.</small></span><input type="checkbox" checked disabled aria-label="Strictly necessary cookies always active" /></div>
           <div><span><b>Analytics</b><small>Helps us understand how the platform is used.</small></span><input type="checkbox" checked={choices.analytics} onChange={e=>setChoices(v=>({...v,analytics:e.target.checked}))} aria-label="Allow analytics cookies" /></div>
