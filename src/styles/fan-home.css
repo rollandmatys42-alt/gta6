@@ -169,3 +169,21 @@
 .fh-pending-card .fh-membership-price strong,.fh-pending-card .fh-membership-allowance b{color:#8d8496}
 .fh-pending-card .fh-membership-features li:before{content:"—";color:#8d8496}
 .fh-pending-card .fh-btn:disabled{opacity:.55;cursor:not-allowed;filter:saturate(.4)}
+
+
+/* VICEHUB cookie consent */
+.vh-cookie-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(3,2,8,.76);backdrop-filter:blur(8px);display:flex;align-items:flex-end;justify-content:center;padding:22px}
+.vh-cookie-panel{width:min(760px,100%);background:#100b1c;border:1px solid rgba(255,255,255,.16);border-radius:22px;padding:26px;color:#fff;box-shadow:0 24px 90px rgba(0,0,0,.55)}
+.vh-cookie-kicker{font-size:10px;letter-spacing:.22em;font-weight:900;color:#35e5ed}
+.vh-cookie-panel h2{font-size:clamp(25px,4vw,36px);margin:8px 0;color:#fff}
+.vh-cookie-panel p{color:#c5bdcf;line-height:1.55;margin:0 0 18px}
+.vh-cookie-options{display:grid;gap:9px;margin:18px 0}
+.vh-cookie-options>div{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 15px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.035)}
+.vh-cookie-options span{display:grid;gap:3px}.vh-cookie-options small,.vh-cookie-footnote{font-size:12px;color:#aaa0b8}
+.vh-cookie-options input{width:19px;height:19px;accent-color:#ff2d95}
+.vh-cookie-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-top:18px}
+.vh-cookie-actions button,.vh-cookie-manage{border-radius:999px;padding:11px 17px;font-weight:800;cursor:pointer;border:1px solid rgba(255,255,255,.2)}
+.vh-cookie-secondary{background:transparent;color:#fff}.vh-cookie-primary{background:linear-gradient(90deg,#ff2d95,#8b5cf6);color:#fff;border:0!important}
+.vh-cookie-footnote{display:block;margin-top:16px}.vh-cookie-footnote a{color:#35e5ed}
+.vh-cookie-manage{position:fixed;z-index:90;bottom:14px;left:14px;background:#100b1c;color:#fff;border-color:rgba(255,255,255,.2);font-size:11px;box-shadow:0 5px 24px rgba(0,0,0,.35)}
+@media(max-width:640px){.vh-cookie-backdrop{padding:10px}.vh-cookie-panel{padding:19px;border-radius:17px}.vh-cookie-actions{display:grid;grid-template-columns:1fr 1fr}.vh-cookie-actions button:last-child{grid-column:1/-1}.vh-cookie-manage{bottom:8px;left:8px}}
