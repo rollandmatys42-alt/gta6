@@ -118,7 +118,7 @@ function HomePage() {
     { id: "VQRLujxTm3c", title: "Trailer 2", url: "https://www.youtube.com/watch?v=VQRLujxTm3c" },
     { id: "tJbzMqJGH4k", title: "An Extended Look", url: "https://www.youtube.com/watch?v=tJbzMqJGH4k" },
   ];
-  const firstPlan = plans[0] || null;
+
 
   const openPreview = async video => {
     setPreview({ video, url: "", msg: "Loading preview…" });
@@ -270,7 +270,7 @@ function HomePage() {
             <li>Browse the published video library</li>
             <li>Access public GTA VI news and community pages</li>
           </ul>
-          <button type="button" className="fh-btn ghost big" onClick={navigateToLogin}>Create a free account</button>
+          <button type="button" className="fh-btn ghost big" onClick={navigateToLogin} disabled={isAuthenticated}>{isAuthenticated ? "Free access available" : "Create a free account"}</button>
           <small className="fh-membership-foot">Free allowance resets each UTC calendar month.</small>
         </article>
 
