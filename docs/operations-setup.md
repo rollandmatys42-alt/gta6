@@ -6,17 +6,17 @@ This document records the external account configuration required to activate th
 
 Create a private R2 bucket. Keep public bucket access disabled. Configure bucket CORS to allow the published VICEHUB origin and the required PUT, GET and HEAD methods and Content-Type / Range headers.
 
-Required Base44 secrets:
+Required Base44 secrets (four):
 
 - VIDEO_STORAGE_ENDPOINT — account S3 endpoint, e.g. https://<account-id>.r2.cloudflarestorage.com
 - VIDEO_STORAGE_BUCKET — private bucket name
 - VIDEO_STORAGE_ACCESS_KEY_ID
 - VIDEO_STORAGE_SECRET_ACCESS_KEY
-- VIDEO_STORAGE_REGION — normally auto
+- VIDEO_STORAGE_REGION — optional; defaults to `auto`
 
 R2 currently includes 10 GB-month standard storage in its free tier. Above that, standard storage is billed per GB-month. Egress to the public Internet is free. Actual monthly cost depends on total stored GB, operation class and region. There is no unlimited free 1,000-video plan.
 
-The app uses private objects and short-lived signed URLs. Original masters and watermarked renditions are stored under separate keys. Never make the bucket public.
+The app uses private objects and short-lived signed URLs. Original masters and watermarked renditions are stored under separate keys. The admin upload flow generates the watermarked MP4 in the browser using Canvas and MediaRecorder; it requires current Chrome or Edge on desktop and an open tab until processing finishes. This is not server-side transcoding. Never make the bucket public.
 
 ## Stripe recurring memberships
 

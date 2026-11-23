@@ -6,11 +6,11 @@
 - The active tier is stored in the admin-managed UserSubscription entity, separate from Base44's built-in User record.
 - Free accounts are served only the separately prepared watermarked rendition. Publishing requires both private renditions and verified content rights.
 - Admin-only upload URL, draft creation and publish functions are server-side and check the Base44 admin role.
-- Required Base44 secrets: VIDEO_STORAGE_ENDPOINT, VIDEO_STORAGE_BUCKET, VIDEO_STORAGE_ACCESS_KEY_ID, VIDEO_STORAGE_SECRET_ACCESS_KEY, VIDEO_STORAGE_REGION (usually auto).
+- Required Base44 secrets: VIDEO_STORAGE_ENDPOINT, VIDEO_STORAGE_BUCKET, VIDEO_STORAGE_ACCESS_KEY_ID and VIDEO_STORAGE_SECRET_ACCESS_KEY. VIDEO_STORAGE_REGION is optional and defaults to `auto`.
 
 ## Release gates
 
 - R2 bucket CORS must allow the published admin origin to PUT video/mp4 and video/quicktime uploads.
-- Watermarked renditions must be generated and uploaded before publication. This foundation does not generate a watermark/transcode itself.
+- The admin upload flow generates a watermarked MP4 in the browser using Canvas and MediaRecorder, then uploads both the clean master and watermarked rendition to private R2. Use current Chrome or Edge on desktop and keep the tab open until processing finishes. This is browser-side rendering, not a server-side transcoding service; a managed server-side pipeline remains necessary for robust high-volume processing.
 - Monthly quota uses a conditional atomic increment after a quota row exists. First-time concurrent quota-row creation and full end-to-end load/race testing remain required before commercial launch.
 - Signed download URLs expire after 120 seconds; they are not persistent public URLs.

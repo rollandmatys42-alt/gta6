@@ -38,7 +38,7 @@ async function presignR2({ method, objectKey, contentType, expiresIn = DOWNLOAD_
   const secretKey = secrets.get("VIDEO_STORAGE_SECRET_ACCESS_KEY");
   const region = secrets.get("VIDEO_STORAGE_REGION") || "auto";
   if (!endpoint || !bucket || !accessKey || !secretKey) {
-    throw Object.assign(new Error("Private video storage is not configured. Add the five VIDEO_STORAGE_* secrets before enabling downloads."), { status: 503, code: "VIDEO_STORAGE_NOT_CONFIGURED" });
+    throw Object.assign(new Error("Private video storage is not configured. Add VIDEO_STORAGE_ENDPOINT, VIDEO_STORAGE_BUCKET, VIDEO_STORAGE_ACCESS_KEY_ID and VIDEO_STORAGE_SECRET_ACCESS_KEY. VIDEO_STORAGE_REGION is optional and defaults to auto."), { status: 503, code: "VIDEO_STORAGE_NOT_CONFIGURED" });
   }
   if (!objectKey || objectKey.startsWith("/") || objectKey.split("/").some((part) => part === "..") || !/^[a-zA-Z0-9/_ .-]+$/.test(objectKey)) {
     throw Object.assign(new Error("Invalid private storage key."), { status: 400, code: "INVALID_STORAGE_KEY" });
