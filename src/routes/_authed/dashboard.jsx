@@ -3,10 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { getMyAccount, getMyMessages, getMyNotifications, getMySocialPosts, getMyStudioDrafts, getMyCreatorProfile, refreshMySubscription, createStripePortalSession } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
-import {useLocale,translate} from "@/lib/i18n";
+import { useLocale, translate } from "@/lib/i18n";
 import { getMyLadderQuote as getMyPlanQuote } from "@/lib/loyalty-fns";
 import { formatMoney } from "@/lib/loyalty";
-import "@/styles/fan-theme.css";
+import "@/styles/client-dashboard.css";
 
 export const Route = createFileRoute("/_authed/dashboard")({
   ssr: false,
@@ -14,138 +14,237 @@ export const Route = createFileRoute("/_authed/dashboard")({
   component: DashboardPage,
 });
 
-const modules = [
-  ["/", "01", "dashboard.module.video", "dashboard.module.videoDesc"],
-  ["/social", "02", "dashboard.module.social", "dashboard.module.socialDesc"],
-  ["/studio", "03", "dashboard.module.studio", "dashboard.module.studioDesc"],
-  ["/creators", "04", "dashboard.module.profile", "dashboard.module.profileDesc"],
-  ["/messages", "05", "dashboard.module.messages", "dashboard.module.messagesDesc"],
-  ["/notifications", "06", "dashboard.module.notifications", "dashboard.module.notificationsDesc"],
-  ["/shop", "07", "dashboard.module.shop", "dashboard.module.shopDesc"],
+const navItems = [
+  { href: "/dashboard", icon: "⌂", label: "Overview" },
+  { href: "/library", icon: "▤", label: "Video library" },
+  { href: "/social", icon: "↗", label: "Social planner" },
+  { href: "/studio", icon: "✦", label: "Creator studio" },
+  { href: "/messages", icon: "✉", label: "Messages", key: "messages" },
+  { href: "/notifications", icon: "◉", label: "Notifications", key: "notifications" },
+  { href: "/creators", icon: "◎", label: "My creator profile" },
+  { href: "/news", icon: "▧", label: "GTA VI news" },
 ];
 
-function Metric({ label, value, note, href }) {
-  return <a className="account-metric" href={href}><span>{label}</span><strong>{value}</strong><small>{note}</small></a>;
-}
+const money = (cents, currency) => formatMoney(Number(cents || 0), currency || "USD");
+const dateTime = value => value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
+const dateOnly = value => value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 function DashboardPage() {
   const { user } = Route.useRouteContext();
   const { logout } = useAuth();
-  const locale=useLocale(),tx=key=>translate(locale,key);
+  const locale = useLocale();
+  const tx = key => translate(locale, key);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [billingBusy, setBillingBusy] = useState(false);
   const [quote, setQuote] = useState(null);
-  useEffect(() => {
-    const currency = data?.account?.currency;
-    if (!currency) return;
-    const tierCode = ["starter", "pro", "premium"].includes(data?.account?.tier) ? data.account.tier : "starter";
-    getMyPlanQuote({ data: { tierCode, currency } }).then(setQuote).catch(() => setQuote(null));
-  }, [data?.account?.currency, data?.account?.tier]);
+  const [quoteLoading, setQuoteLoading] = useState(false);
 
   const load = async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     await refreshMySubscription().catch(() => null);
-    const jobs = await Promise.allSettled([getMyAccount(), getMyMessages(), getMyNotifications(), getMySocialPosts(), getMyStudioDrafts(), getMyCreatorProfile()]);
-    const val = (i, fallback) => jobs[i].status === "fulfilled" ? jobs[i].value : fallback;
-    if (jobs[0].status === "rejected") setError(jobs[0].reason?.message || "Your account data could not be loaded.");
+    const jobs = await Promise.allSettled([
+      getMyAccount(),
+      getMyMessages(),
+      getMyNotifications(),
+      getMySocialPosts(),
+      getMyStudioDrafts(),
+      getMyCreatorProfile(),
+    ]);
+    const value = (i, fallback) => jobs[i].status === "fulfilled" ? jobs[i].value : fallback;
+    if (jobs[0].status === "rejected") setError(jobs[0].reason?.message || "Your account could not be loaded.");
     setData({
-      account: val(0, null), messages: val(1, { inbox: [], sent: [] }), notifications: val(2, []),
-      posts: val(3, []), drafts: val(4, []), profile: val(5, null),
+      account: value(0, null),
+      messages: value(1, { inbox: [], sent: [] }),
+      notifications: value(2, []),
+      posts: value(3, []),
+      drafts: value(4, []),
+      profile: value(5, null),
       secondaryErrors: jobs.slice(1).filter(x => x.status === "rejected").length,
     });
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
-  const upcoming = useMemo(() => (data?.posts || []).filter(p => p.scheduled_at && new Date(p.scheduled_at) >= new Date())
-    .sort((a,b) => new Date(a.scheduled_at) - new Date(b.scheduled_at)).slice(0,4), [data]);
+
   const account = data?.account;
-  const used = Number(account?.downloadsUsed || 0), limit = Number(account?.downloadsLimit || 0);
+  useEffect(() => {
+    if (!account?.currency || !["starter", "pro", "premium"].includes(account?.tier)) {
+      setQuote(null);
+      return;
+    }
+    let active = true;
+    setQuoteLoading(true);
+    getMyPlanQuote({ data: { tierCode: account.tier, currency: account.currency } })
+      .then(result => { if (active) setQuote(result); })
+      .catch(() => { if (active) setQuote(null); })
+      .finally(() => { if (active) setQuoteLoading(false); });
+    return () => { active = false; };
+  }, [account?.currency, account?.tier]);
+
+  const posts = data?.posts || [];
+  const drafts = data?.drafts || [];
+  const history = account?.history || [];
+  const upcoming = useMemo(() => posts
+    .filter(p => p.scheduled_at && new Date(p.scheduled_at) >= new Date())
+    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))
+    .slice(0, 4), [posts]);
+  const used = Number(account?.downloadsUsed || 0);
+  const limit = Number(account?.downloadsLimit || 0);
+  const remaining = Number(account?.downloadsRemaining || 0);
   const percent = limit ? Math.min(100, used / limit * 100) : 0;
   const unreadMessages = data?.messages?.inbox?.filter(m => m.status !== "seen").length || 0;
   const unreadAlerts = data?.notifications?.filter(n => !n.read_at).length || 0;
+  const firstName = (user?.full_name || user?.email || "Creator").split(" ")[0];
+  const planName = account?.planName || (account?.tier === "free" ? "Free member" : "Membership");
+  const profile = data?.profile;
+  const profileFields = [!!profile?.display_name, !!profile?.bio, !!(profile?.skills || []).length, !!(profile?.social_links && Object.keys(profile.social_links).length)];
+  const profilePercent = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
+
   const manageBilling = async () => {
-    setBillingBusy(true); setError("");
-    try { const result = await createStripePortalSession(); window.location.assign(result.url); }
-    catch (err) { setError(err?.message || "Billing portal could not be opened."); setBillingBusy(false); }
+    setBillingBusy(true);
+    setError("");
+    try {
+      const result = await createStripePortalSession();
+      window.location.assign(result.url);
+    } catch (err) {
+      setError(err?.message || "Billing portal could not be opened.");
+      setBillingBusy(false);
+    }
   };
 
-  return <SiteFrame eyebrow="VICEHUB / FAN CONTROL ROOM">
-    {quote && <section className="ladder-wrap" style={{ marginBottom: 24 }}>
-      <div className="eyebrow">YOUR LOYALTY PRICE</div>
-      <h2 style={{ margin: 0 }}>{quote.streakMonths > 0 ? `Month ${quote.streakMonths} paid — next charge ${formatMoney(quote.currentPriceCents, quote.currency)}` : `Starts at ${formatMoney(quote.currentPriceCents, quote.currency)}/month`}</h2>
-      <div className="ladder">{quote.schedule.map(st => { const now = quote.nextChargeMonth >= st.fromMonth && (st.toMonth === null || quote.nextChargeMonth <= st.toMonth); return <div key={st.fromMonth} className={"ladder-step" + (now ? " now" : "")}><small>{st.toMonth ? `Months ${st.fromMonth}–${st.toMonth}` : `Month ${st.fromMonth}+`}</small><b>{formatMoney(st.priceCents, quote.currency)}</b></div>; })}</div>
-      <small>Cancelling and resubscribing restarts at the first step.</small>
-    </section>}
-    <section className="vice-dashboard-hero">
-      <div className="vice-dashboard-sky"><span className="vice-dashboard-sun" /><span className="vice-dashboard-tower tower-a" /><span className="vice-dashboard-tower tower-b" /><span className="vice-dashboard-tower tower-c" /><span className="vice-dashboard-palm">🌴</span><span className="vice-dashboard-road" /></div>
-      <div className="vice-dashboard-copy">
-        <div className="eyebrow"><i className="live-dot" /> WELCOME TO LEONIDA · YOUR CREATOR ACCOUNT</div>
-        <div className="vice-dashboard-kicker">{tx("dashboard.heroKicker")}</div>
-        <h1>{tx("dashboard.title")}<br/><em>{(user?.full_name || user?.email || "CREATOR").split(" ")[0].toUpperCase()}.</em></h1>
-        <p>{tx("dashboard.desc")}</p>
-        <div className="vice-dashboard-actions"><a className="primary-btn" href="/">{tx("dashboard.explore")} <span>↗</span></a><a className="outline-btn" href="/social">{tx("dashboard.socialDesk")}</a></div>
-      </div>
-      <div className="vice-dashboard-side">
-        <div className="vice-dashboard-membership"><span>{tx("dashboard.access")}</span><b>{account?.tier === "free" ? "FREE MEMBER" : (account?.planName || "MEMBERSHIP").toUpperCase()}</b><small>{account?.subscriptionStatus || "ACCOUNT ACTIVE"}</small></div>
-        <div className="vice-dashboard-download-count"><strong>{account?.downloadsRemaining ?? 0}</strong><span>{tx("dashboard.downloads")}<br/>{tx("dashboard.thisMonth")}</span></div>
-        <button className="vice-dashboard-refresh" onClick={load} disabled={loading}>{loading ? tx("dashboard.sync") : "↻ " + tx("dashboard.sync")}</button>
-        <button className="vice-dashboard-signout" onClick={logout}>{tx("dashboard.signout")} ↗</button>
-      </div>
-      <div className="vice-dashboard-coordinate">YOUR VICEHUB ACCOUNT <span>VICE CITY · LEONIDA</span></div>
-    </section>
-    {error && <div className="platform-alert" role="alert">{error}</div>}
-    {loading && !data && <div className="platform-empty">Loading your creator workspace…</div>}
-    {data && <>
-      {data.secondaryErrors > 0 && <div className="platform-note">{data.secondaryErrors} secondary section(s) could not be refreshed. Your account and download data remain available.</div>}
-      <section className="vice-dashboard-stats">
-        <a className="vice-stat-card stat-downloads" href="/"><span>01 / {tx("dashboard.allowance")}</span><strong>{used}<i> / {limit}</i></strong><small>{account?.downloadsRemaining ?? 0} {tx("dashboard.allowanceNote")}</small><div className="vice-stat-track"><i style={{width:percent+"%"}} /></div></a>
-        <a className="vice-stat-card" href="/social"><span>02 / {tx("dashboard.socialStat")}</span><strong>{data.posts.length.toString().padStart(2,"0")}</strong><small>{tx("dashboard.socialStatNote")}</small><b className="vice-stat-arrow">↗</b></a>
-        <a className="vice-stat-card" href="/studio"><span>03 / {tx("dashboard.studioStat")}</span><strong>{data.drafts.length.toString().padStart(2,"0")}</strong><small>{tx("dashboard.studioStatNote")}</small><b className="vice-stat-arrow">↗</b></a>
-        <a className="vice-stat-card" href="/messages"><span>04 / {tx("dashboard.inboxStat")}</span><strong>{(unreadMessages+unreadAlerts).toString().padStart(2,"0")}</strong><small>{unreadMessages} {tx("dashboard.messages")} · {unreadAlerts} {tx("dashboard.alerts")}</small><b className="vice-stat-arrow">↗</b></a>
-      </section>
-      <div className="account-dashboard-columns">
-        <section className="account-panel account-plan-panel">
-          <div className="section-head"><div><div className="eyebrow">{tx("dashboard.membership")}</div><h2>{account?.planName || "FREE PLAN"}</h2></div><span className="source-pill">{account?.subscriptionStatus || "inactive"}</span></div>
-          <div className="quota-track"><i style={{ width: percent + "%" }} /></div>
-          <div className="account-plan-foot"><span>{used} {tx("dashboard.used")}</span><b>{account?.downloadsRemaining ?? 0} {tx("dashboard.left")}</b></div>
-          <p className="account-muted">{account?.tier === "free" ? "Your free membership currently includes five downloads per UTC calendar month. Paid memberships will appear here once billing is activated." : "Your allowance is controlled by your active membership."}</p>
-          <a className="outline-btn account-wide-link" href="/">{tx("dashboard.library")} ↗</a>
-          {account?.hasBillingCustomer && <button className="primary-btn account-wide-link" type="button" disabled={billingBusy} onClick={manageBilling}>{billingBusy?"OPENING BILLING…":"MANAGE MEMBERSHIP / CANCEL ↗"}</button>}
-          {!account?.hasBillingCustomer && <p className="account-muted">Billing is not yet linked to this account. Paid memberships will become available when the platform opens subscriptions.</p>}
-        </section>
-        <section className="account-panel account-profile-panel">
-          <div className="eyebrow">{tx("dashboard.profile")}</div><h2>{data.profile?.display_name || tx("dashboard.profile")}</h2>
-          <p className="account-muted">{data.profile?.bio || tx("dashboard.profileEmpty")}</p>
-          <div className="account-profile-meta"><span>{data.profile ? "Profile saved" : "Profile not created"}</span><span>{data.profile?.skills?.length || 0} skills</span></div>
-          <a className="outline-btn account-wide-link" href="/creators">{tx("dashboard.manageProfile")} ↗</a>
-        </section>
-      </div>
-      <section className="account-panel account-modules-panel">
-        <div className="section-head"><div><div className="eyebrow">{tx("dashboard.kicker")}</div><h2>{tx("dashboard.workspaces")}</h2></div><span className="source-pill">CONTROL ROOM</span></div>
-        <div className="account-module-grid">{modules.map(([href,code,title,description]) => <a className="account-module-card" href={href} key={href}>
-          <span>{code}</span><b>{tx(title)}</b><small>{tx(description)}</small><i>{tx("dashboard.openModule")} ↗</i>
-        </a>)}</div>
-      </section>
-      <div className="account-dashboard-columns">
-        <section className="account-panel">
-          <div className="section-head"><div><div className="eyebrow">SOCIAL PUBLISHING</div><h2>{tx("dashboard.nextPosts")}</h2></div><a className="text-btn" href="/social">{tx("dashboard.socialDesk")} ↗</a></div>
-          {upcoming.length ? upcoming.map(p => <div className="account-feed-row" key={p.id}><div><b>{p.platform}</b><small>{p.caption?.slice(0,100)}</small></div><time>{new Date(p.scheduled_at).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}</time></div>) : <div className="account-empty">{tx("dashboard.noPosts")}</div>}
-          <p className="account-muted">{tx("dashboard.directNote")}</p>
-        </section>
-        <section className="account-panel">
-          <div className="section-head"><div><div className="eyebrow">CREATOR STUDIO</div><h2>{tx("dashboard.savedDrafts")}</h2></div><a className="text-btn" href="/studio">OPEN STUDIO ↗</a></div>
-          <div className="account-feed-row"><div><b>{data.drafts.length} saved drafts</b><small>{tx("dashboard.draftNote")}</small></div><span>DRAFTS</span></div>
-          <div className="account-feed-row"><div><b>{data.profile?.social_links ? Object.keys(data.profile.social_links).length : 0} {tx("dashboard.socialLinks")}</b><small>{tx("dashboard.socialLinksNote")}</small></div><span>PROFILE</span></div>
-        </section>
-      </div>
-      <section className="account-panel history-panel">
-        <div className="section-head"><div><div className="eyebrow">{tx("dashboard.history")}</div><h2>{tx("dashboard.history")}</h2></div><a className="text-btn" href="/">{tx("dashboard.browse")} ↗</a></div>
-        {account?.history?.length ? <div className="history-list">{account.history.map(item => <div className="history-row" key={item.id}><div><b>{item.video_title || "Video download"}</b><small>Reference: {item.video_id}</small></div><span>{item.watermark_applied ? tx("dashboard.watermarked") : tx("dashboard.clean")} · {item.status}</span><time>{new Date(item.created_date).toLocaleDateString("en-GB")}</time></div>)}</div> : <div className="account-empty">{tx("dashboard.noDownloads")}</div>}
-      </section>
-      {user?.role === "admin" && <div className="admin-shortcut"><div><b>{tx("dashboard.admin")}</b><small>Manage video ingestion, rights review, subscriptions, users and platform settings.</small></div><div className="admin-shortcut-actions"><button className="primary-btn" onClick={() => window.location.assign("/admin")}>{tx("dashboard.openAdmin")} ↗</button><button className="outline-btn" onClick={() => window.location.assign("/admin/videos")}>MANAGE VIDEOS</button></div></div>}
-    </>}
+  return <SiteFrame eyebrow="VICEHUB / CREATOR CONTROL ROOM">
+    <div className="cd-layout">
+      <aside className="cd-sidebar">
+        <div className="cd-side-brand"><span className="cd-brand-mark">V</span><div><b>VICEHUB</b><small>CREATOR CONTROL ROOM</small></div></div>
+        <div className="cd-side-user">
+          <div className="cd-avatar">{firstName.slice(0, 1).toUpperCase()}</div>
+          <div><b>{firstName}</b><small>{(account?.tier || "free").toUpperCase()} ACCOUNT</small></div>
+          <span className="cd-online-dot" />
+        </div>
+        <div className="cd-nav-caption">YOUR WORKSPACE</div>
+        <nav className="cd-side-nav" aria-label="Creator workspace navigation">
+          {navItems.map(item => <a key={item.href} href={item.href} className={item.href === "/dashboard" ? "active" : ""}>
+            <span className="cd-nav-icon">{item.icon}</span><span>{item.label}</span>
+            {item.key === "messages" && unreadMessages > 0 && <i>{unreadMessages}</i>}
+            {item.key === "notifications" && unreadAlerts > 0 && <i>{unreadAlerts}</i>}
+          </a>)}
+        </nav>
+        <div className="cd-sidebar-bottom">
+          <div className="cd-side-plan"><span>YOUR MEMBERSHIP</span><b>{planName}</b><small>{account?.subscriptionStatus || "Account active"}</small><a href="/#plans">View membership ↗</a></div>
+          <button type="button" onClick={logout} className="cd-logout">↪ <span>Sign out</span></button>
+        </div>
+      </aside>
+
+      <main className="cd-main">
+        <header className="cd-topbar">
+          <div><span className="cd-overline">MONDAY · VICE CITY, LEONIDA</span><h1>Your creator space<span>.</span></h1><p>Everything you need to manage your GTA VI content, in one place.</p></div>
+          <div className="cd-top-actions"><a href="/library" className="cd-primary-action">Browse videos <span>↗</span></a><button type="button" className="cd-refresh" onClick={load} disabled={loading}>{loading ? "SYNCING…" : "↻ REFRESH"}</button></div>
+        </header>
+
+        {error && <div className="cd-alert" role="alert">{error}</div>}
+        {loading && !data && <div className="cd-loading"><span className="cd-spinner" /> Loading your private creator workspace…</div>}
+        {data && <>
+          {data.secondaryErrors > 0 && <div className="cd-note">{data.secondaryErrors} secondary section(s) could not be refreshed. Your account information is still available.</div>}
+
+          <section className="cd-welcome">
+            <div className="cd-welcome-image" />
+            <div className="cd-welcome-content">
+              <span className="cd-eyebrow"><i /> YOUR VICEHUB SESSION IS ACTIVE</span>
+              <h2>Welcome back,<br /><em>{firstName}.</em></h2>
+              <p>Your next post starts here. Find a new drop, prepare your content and publish it on your own channels.</p>
+              <div className="cd-welcome-actions"><a href="/library">Explore the video library ↗</a><a href="/social">Open social planner →</a></div>
+            </div>
+            <div className="cd-welcome-stamp"><b>VICE</b><span>CITY</span><small>LEONIDA · USA</small></div>
+          </section>
+
+          <section className="cd-metrics" aria-label="Account overview">
+            <a href="/library" className="cd-metric cd-metric-downloads">
+              <span className="cd-metric-icon">⇩</span><small>MONTHLY DOWNLOADS</small>
+              <strong>{remaining}<i> / {limit || "—"}</i></strong>
+              <span className="cd-progress"><i style={{ width: percent + "%" }} /></span>
+              <em>{used} used this month</em>
+            </a>
+            <a href="/social" className="cd-metric"><span className="cd-metric-icon">↗</span><small>SOCIAL PUBLICATIONS</small><strong>{posts.length.toString().padStart(2, "0")}</strong><em>Drafts, scheduled and published</em></a>
+            <a href="/studio" className="cd-metric"><span className="cd-metric-icon">✦</span><small>STUDIO DRAFTS</small><strong>{drafts.length.toString().padStart(2, "0")}</strong><em>Saved creative work</em></a>
+            <a href="/messages" className="cd-metric"><span className="cd-metric-icon">✉</span><small>UNREAD ACTIVITY</small><strong>{(unreadMessages + unreadAlerts).toString().padStart(2, "0")}</strong><em>{unreadMessages} messages · {unreadAlerts} alerts</em></a>
+          </section>
+
+          <section className="cd-section">
+            <div className="cd-section-heading"><div><span className="cd-eyebrow">01 / YOUR ACCOUNT</span><h2>Membership &amp; downloads</h2></div><span className="cd-live-pill">● ACCOUNT STATUS: {account?.subscriptionStatus || "ACTIVE"}</span></div>
+            <div className="cd-membership-grid">
+              <article className="cd-panel cd-plan-panel">
+                <div className="cd-panel-top"><span>YOUR CURRENT PLAN</span><b>{(account?.tier || "free").toUpperCase()}</b></div>
+                <h3>{planName}</h3>
+                <p>{account?.tier === "free" ? "Your free access includes five downloads per UTC calendar month." : "Your monthly allowance and download rights are controlled by your active membership."}</p>
+                <div className="cd-plan-stats"><div><b>{remaining}</b><small>Downloads left</small></div><div><b>{limit}</b><small>Monthly allowance</small></div><div><b>{used}</b><small>Already used</small></div></div>
+                <div className="cd-progress cd-progress-large"><i style={{ width: percent + "%" }} /></div>
+                <div className="cd-panel-actions">
+                  <a href="/#plans" className="cd-secondary-action">View loyalty memberships</a>
+                  {account?.hasBillingCustomer && <button type="button" className="cd-text-action" onClick={manageBilling} disabled={billingBusy}>{billingBusy ? "OPENING…" : "Manage / cancel billing ↗"}</button>}
+                </div>
+                {!account?.hasBillingCustomer && <small className="cd-muted">Billing management will appear here when a billing customer is linked to your account.</small>}
+              </article>
+
+              <article className="cd-panel cd-loyalty-panel">
+                <div className="cd-panel-top"><span>LOYALTY REWARD</span><b>STAY LONGER · PAY LESS</b></div>
+                {quote ? <>
+                  <h3>Your price goes down as you stay.</h3>
+                  <p>{quote.streakMonths > 0 ? "You have completed " + quote.streakMonths + " paid month(s). Your next charge is " + money(quote.currentPriceCents, quote.currency) + "." : "Your first loyalty step starts at " + money(quote.currentPriceCents, quote.currency) + " per month."}</p>
+                  <div className="cd-loyalty-steps">{(quote.schedule || []).map(step => {
+                    const current = quote.nextChargeMonth >= step.fromMonth && (step.toMonth === null || quote.nextChargeMonth <= step.toMonth);
+                    return <div className={current ? "cd-loyalty-step current" : "cd-loyalty-step"} key={step.fromMonth}>
+                      <span>{step.toMonth ? "MONTHS " + step.fromMonth + "–" + step.toMonth : "MONTH " + step.fromMonth + "+"}</span><b>{money(step.priceCents, quote.currency)}<small>/mo</small></b>
+                    </div>;
+                  })}</div>
+                  <small className="cd-muted">Your loyalty progress is retained while your subscription remains active. Cancelling and subscribing again restarts the schedule at step one.</small>
+                </> : quoteLoading ? <div className="cd-quote-loading">Loading your loyalty schedule…</div> : <><h3>Loyalty pricing</h3><p>Your membership's loyalty schedule will appear here when your paid plan is active.</p><a href="/#plans" className="cd-secondary-action">Explore memberships ↗</a></>}
+              </article>
+            </div>
+          </section>
+
+          <section className="cd-section">
+            <div className="cd-section-heading"><div><span className="cd-eyebrow">02 / QUICK ACCESS</span><h2>Your creator tools</h2></div><span className="cd-muted">Choose a workspace to continue</span></div>
+            <div className="cd-tool-grid">
+              <a href="/library" className="cd-tool-card cd-tool-library"><span className="cd-tool-number">01</span><div className="cd-tool-icon">▤</div><h3>Video library</h3><p>Discover vertical videos, preview your next drop and download within your allowance.</p><b>OPEN LIBRARY ↗</b></a>
+              <a href="/social" className="cd-tool-card cd-tool-social"><span className="cd-tool-number">02</span><div className="cd-tool-icon">↗</div><h3>Social planner</h3><p>Connect your own accounts, prepare captions and manage scheduled publications.</p><b>OPEN PLANNER ↗</b></a>
+              <a href="/studio" className="cd-tool-card cd-tool-studio"><span className="cd-tool-number">03</span><div className="cd-tool-icon">✦</div><h3>Creator studio</h3><p>Generate and organise creative drafts before publishing your content.</p><b>OPEN STUDIO ↗</b></a>
+              <a href="/creators" className="cd-tool-card"><span className="cd-tool-number">04</span><div className="cd-tool-icon">◎</div><h3>Creator profile</h3><p>Update your public identity, bio, skills and social links.</p><b>EDIT PROFILE ↗</b></a>
+              <a href="/messages" className="cd-tool-card"><span className="cd-tool-number">05</span><div className="cd-tool-icon">✉</div><h3>Messages</h3><p>Keep up with your private conversations and account messages.</p><b>OPEN INBOX ↗</b>{unreadMessages > 0 && <i className="cd-tool-badge">{unreadMessages} NEW</i>}</a>
+              <a href="/notifications" className="cd-tool-card"><span className="cd-tool-number">06</span><div className="cd-tool-icon">◉</div><h3>Notifications</h3><p>See important updates and activity connected to your account.</p><b>VIEW ALERTS ↗</b>{unreadAlerts > 0 && <i className="cd-tool-badge">{unreadAlerts} NEW</i>}</a>
+            </div>
+          </section>
+
+          <section className="cd-section cd-activity-grid">
+            <article className="cd-panel">
+              <div className="cd-section-heading compact"><div><span className="cd-eyebrow">03 / PUBLISHING</span><h2>Coming up next</h2></div><a href="/social">OPEN PLANNER ↗</a></div>
+              {upcoming.length ? <div className="cd-list">{upcoming.map(post => <div className="cd-list-row" key={post.id}><span className="cd-list-icon">↗</span><div><b>{post.platform}</b><small>{(post.caption || "Scheduled publication").slice(0, 105)}</small></div><time>{dateTime(post.scheduled_at)}</time></div>)}</div> : <div className="cd-empty"><span>◷</span><b>No scheduled posts</b><p>Your scheduled publications will appear here.</p><a href="/social">Plan your next post ↗</a></div>}
+            </article>
+            <article className="cd-panel">
+              <div className="cd-section-heading compact"><div><span className="cd-eyebrow">04 / CREATIVE WORK</span><h2>Studio &amp; profile</h2></div><a href="/studio">OPEN STUDIO ↗</a></div>
+              <div className="cd-summary-line"><span>Saved studio drafts</span><b>{drafts.length}</b></div>
+              <div className="cd-summary-line"><span>Profile completion</span><b>{profilePercent}%</b></div>
+              <div className="cd-progress"><i style={{ width: profilePercent + "%" }} /></div>
+              <div className="cd-profile-summary"><div className="cd-avatar large">{(profile?.display_name || firstName).slice(0, 1).toUpperCase()}</div><div><b>{profile?.display_name || "Your creator profile"}</b><small>{profile?.bio || "Add a short bio to introduce yourself to the VICEHUB community."}</small></div></div>
+              <a href="/creators" className="cd-secondary-action">Manage your creator profile ↗</a>
+            </article>
+          </section>
+
+          <section className="cd-section">
+            <div className="cd-section-heading"><div><span className="cd-eyebrow">05 / DOWNLOAD HISTORY</span><h2>Your recent downloads</h2></div><a href="/library">BROWSE MORE VIDEOS ↗</a></div>
+            {history.length ? <div className="cd-history">
+              {history.slice(0, 5).map(item => <div className="cd-history-row" key={item.id}>
+                <span className="cd-history-icon">⇩</span><div><b>{item.video_title || "Video download"}</b><small>{item.watermark_applied ? "Watermarked file" : "Clean file"} · {item.status || "Processed"}</small></div><time>{dateOnly(item.created_date)}</time>
+              </div>)}
+            </div> : <div className="cd-empty cd-history-empty"><span>▤</span><b>Your download history is ready</b><p>Every successful download will be recorded here. Your files are downloaded to your device, not stored in this dashboard.</p><a href="/library">Explore the video library ↗</a></div>}
+          </section>
+
+          {user?.role === "admin" && <section className="cd-admin-strip"><div><span className="cd-eyebrow">ADMINISTRATOR</span><b>Platform management</b><small>Manage members, videos, subscriptions and platform settings.</small></div><a href="/admin">OPEN ADMIN CONTROL ROOM ↗</a></section>}
+        </>}
+        <footer className="cd-footer">VICEHUB IS AN INDEPENDENT GTA VI FAN PLATFORM · YOUR ACCOUNT DATA IS PRIVATE · YOUR CHANNELS, YOUR CONTENT.</footer>
+      </main>
+    </div>
   </SiteFrame>;
 }
