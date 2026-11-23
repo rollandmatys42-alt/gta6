@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { secrets } from "base44:runtime";
 import { requireUser } from "@/lib/auth-middleware";
+import { priceForMonth } from "@/lib/loyalty";
 
 const encoder = new TextEncoder();
 const MONTHLY_FREE_LIMIT = 5;
@@ -141,7 +142,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
     let cleanDownloads = false;
     if (tier !== "free") {
       const plans = await base44.asServiceRole.entities.SubscriptionPlan.filter(
-        { tier_code: tier, status: "active" }, "-created_date", 1, 0,
+        { tier_code: tier, currency: subscription?.currency || "USD", status: "active" }, "-created_date", 1, 0,
       );
       const plan = plans[0];
       if (!plan) throw Object.assign(new Error("This subscription plan is not configured yet."), { status: 403, code: "PLAN_NOT_CONFIGURED" });
@@ -295,7 +296,7 @@ export const getMyAccount = createServerFn({ method: "GET" })
     let planName = "Free";
     if (tier !== "free") {
       const plans = await base44.asServiceRole.entities.SubscriptionPlan.filter(
-        { tier_code: tier, status: "active" }, "-created_date", 1, 0,
+        { tier_code: tier, currency: subscription?.currency || "USD", status: "active" }, "-created_date", 1, 0,
       );
       if (plans[0]) {
         limit = Number(plans[0].monthly_download_limit || 0);
@@ -847,8 +848,9 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     const existing=existingRows[0];
     if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
     const streak=existing?.status==="active"&&!existing?.voluntary_cancelled?Number(existing.streak_months||0):0;
-    const discount=Math.min(Number(plan.loyalty_max_discount_percent||0),streak*Number(plan.loyalty_monthly_discount_percent||0));
-    const priceCents=Math.max(Number(plan.loyalty_floor_price_cents||0),Math.round(Number(plan.monthly_price_cents)*(1-discount/100)));
+    // The first ladder step is the actual Stripe checkout amount. Legacy percentage discounts are not mixed with the explicit ladder.
+    const priceCents=priceForMonth(plan,1);
+    const discount=0;
     if(priceCents<=0)throw Object.assign(new Error("The calculated membership price is invalid. Check the administrator pricing settings."),{status:409,code:"INVALID_PLAN_PRICE"});
     let stripeProductId=plan.stripe_product_id;
     if(!stripeProductId){

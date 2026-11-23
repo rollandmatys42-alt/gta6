@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
 
 const FAQ = [
   ["What do I get?", "Every week we publish vertical (9:16) GTA VI videos made for TikTok, Instagram Reels and YouTube Shorts. Subscribers download them in one tap and post them on their own accounts."],
-  ["How does the price work?", "Loyalty pays: $49.99/month for your first 3 months, $39.99 for the next 3, $29.99 for the next 3, then $9.99/month for as long as you stay. Prices drop automatically."],
+  ["How does the price work?", "Each membership tier and currency has its own loyalty price schedule. Your exact monthly price and upcoming reductions are shown in your account and before checkout. Prices reduce while you remain subscribed."],
   ["What if I cancel?", "You can cancel any time from your account. If you subscribe again later, your price starts again from the first step."],
   ["Can I post the videos on my own pages?", "Yes — on your own TikTok, Instagram, YouTube or Facebook accounts. Reselling or redistributing the files is not allowed. See the Terms."],
   ["Where do the news come from?", "Every story is labelled (official, confirmed, reported, rumour) and links to its original source. We never present rumours as facts."],

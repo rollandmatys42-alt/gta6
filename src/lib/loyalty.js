@@ -6,7 +6,10 @@ export const DEFAULT_STEP_MONTHS = 3;
 
 export function getLadder(plan) {
   const raw = Array.isArray(plan?.price_ladder_cents) ? plan.price_ladder_cents.map(Number).filter(n => Number.isInteger(n) && n > 0) : [];
-  return raw.length ? raw : DEFAULT_LADDER_CENTS;
+  if (raw.length) return raw;
+  // Preserve existing plan pricing until an administrator explicitly saves a ladder.
+  const basePrice = Number(plan?.monthly_price_cents);
+  return [Number.isInteger(basePrice) && basePrice > 0 ? basePrice : DEFAULT_LADDER_CENTS[0]];
 }
 export function getStepMonths(plan) {
   const n = Number(plan?.ladder_step_months);

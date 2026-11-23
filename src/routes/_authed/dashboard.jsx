@@ -37,7 +37,12 @@ function DashboardPage() {
   const [error, setError] = useState("");
   const [billingBusy, setBillingBusy] = useState(false);
   const [quote, setQuote] = useState(null);
-  useEffect(() => { getMyPlanQuote({ data: { tierCode: "starter", currency: "USD" } }).then(setQuote).catch(() => setQuote(null)); }, []);
+  useEffect(() => {
+    const currency = data?.account?.currency;
+    if (!currency) return;
+    const tierCode = ["starter", "pro", "premium"].includes(data?.account?.tier) ? data.account.tier : "starter";
+    getMyPlanQuote({ data: { tierCode, currency } }).then(setQuote).catch(() => setQuote(null));
+  }, [data?.account?.currency, data?.account?.tier]);
 
   const load = async () => {
     setLoading(true); setError("");
