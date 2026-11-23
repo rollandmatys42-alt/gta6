@@ -78,6 +78,12 @@ const dashboardPolishWords = {"en":{"dashboard.title":"Your creator space","dash
 for (const locale of supportedLocales) Object.assign(dictionaries[locale], dashboardPolishWords[locale] || {});
 for (const locale of supportedLocales) Object.assign(dictionaries[locale], dashboardWords[locale] || {}, legalWords[locale] || {}, dashboardExtraWords[locale] || {});
 
+const dashboardClientWords = {"en":{"overview":"Overview","library":"Video library","social":"Social planner","studio":"Creator studio","messages":"Messages","notifications":"Notifications","profile":"Creator profile","news":"GTA VI news"},"fr":{"overview":"Vue d’ensemble","library":"Bibliothèque vidéo","social":"Planificateur social","studio":"Studio créateur","messages":"Messages","notifications":"Notifications","profile":"Profil créateur","news":"Actualités GTA VI"},"es":{"overview":"Resumen","library":"Biblioteca de vídeos","social":"Planificador social","studio":"Estudio de creador","messages":"Mensajes","notifications":"Notificaciones","profile":"Perfil de creador","news":"Noticias de GTA VI"},"pt":{"overview":"Visão geral","library":"Biblioteca de vídeos","social":"Planeador social","studio":"Estúdio de criador","messages":"Mensagens","notifications":"Notificações","profile":"Perfil de criador","news":"Notícias GTA VI"},"it":{"overview":"Panoramica","library":"Libreria video","social":"Planner social","studio":"Creator studio","messages":"Messaggi","notifications":"Notifiche","profile":"Profilo creator","news":"Notizie GTA VI"},"de":{"overview":"Übersicht","library":"Videobibliothek","social":"Social-Planer","studio":"Creator-Studio","messages":"Nachrichten","notifications":"Mitteilungen","profile":"Creator-Profil","news":"GTA-VI-News"}};
+for (const locale of supportedLocales) {
+  const words = dashboardClientWords[locale] || dashboardClientWords.en;
+  for (const [key, value] of Object.entries(words)) dictionaries[locale]["dashboard.nav." + key] = value;
+}
+
 export function translate(locale, key) {
   return dictionaries[locale]?.[key] || dictionaries.en[key] || key;
 }
