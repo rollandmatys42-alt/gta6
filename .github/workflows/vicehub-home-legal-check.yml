@@ -1,6 +1,8 @@
 name: VICEHUB homepage and legal checks
 
 on:
+  push:
+    branches: [feature/vicehub-home-legal-cookie-video-library]
   pull_request:
     branches: [main]
 
