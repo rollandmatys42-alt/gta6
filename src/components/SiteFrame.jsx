@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import "@/styles/fan-theme.css";
 import "@/styles/fan-pages.css";
@@ -26,10 +26,23 @@ const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Bi
 
 function NotificationBell({isAuthenticated}) {
   const [unread,setUnread]=useState(0);
+  const [permission,setPermission]=useState(typeof Notification==="undefined"?"unsupported":Notification.permission);
+  const newestId=useRef(null);
   useEffect(()=>{
-    if(!isAuthenticated){setUnread(0);return;}
+    if(!isAuthenticated){setUnread(0);newestId.current=null;return;}
     let active=true;
-    const load=()=>getMyNotifications().then(rows=>{if(active)setUnread((rows||[]).filter(n=>!n.read_at).length);}).catch(()=>{});
+    const load=()=>getMyNotifications().then(rows=>{
+      if(!active)return;
+      const ordered=[...(rows||[])].sort((a,b)=>new Date(b.created_date||0)-new Date(a.created_date||0));
+      setUnread(ordered.filter(n=>!n.read_at).length);
+      const newest=ordered[0];
+      if(newestId.current && newest && newest.id!==newestId.current && typeof Notification!=="undefined" && Notification.permission==="granted"){
+        const notice={title:newest.title||"VICEHUB update",body:newest.body||"A new update is available.",data:{url:newest.target_url||"/notifications"},tag:"vicehub-"+newest.id};
+        if("serviceWorker" in navigator)navigator.serviceWorker.ready.then(reg=>reg.showNotification(notice.title,notice)).catch(()=>{});
+        else new Notification(notice.title,{body:notice.body});
+      }
+      if(newest?.id)newestId.current=newest.id;
+    }).catch(()=>{});
     load();
     const timer=window.setInterval(load,60000);
     const onFocus=()=>load();
@@ -37,7 +50,8 @@ function NotificationBell({isAuthenticated}) {
     return()=>{active=false;window.clearInterval(timer);window.removeEventListener("focus",onFocus);};
   },[isAuthenticated]);
   if(!isAuthenticated)return null;
-  return <Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">♢</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>;
+  const enable=async()=>{if(typeof Notification==="undefined")return;const result=await Notification.requestPermission();setPermission(result);};
+  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">♢</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{permission==="default"&&<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable browser notifications" title="Enable browser notifications">●</button>}</span>;
 }
 
 function PwaInstallButton() {
