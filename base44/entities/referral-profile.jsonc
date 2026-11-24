@@ -8,7 +8,7 @@
   },
   "required": ["user_id", "referral_code", "status"],
   "rls": {
-    "read": { "$or": [{ "user_condition": { "id": "{{user.id}}" } }, { "user_condition": { "role": "admin" } }] },
+    "read": { "$or": [{ "data.user_id": "{{user.id}}" }, { "user_condition": { "role": "admin" } }] },
     "create": false,
     "update": false,
     "delete": false
