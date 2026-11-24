@@ -51,7 +51,7 @@ function NotificationBell({isAuthenticated}) {
   },[isAuthenticated]);
   if(!isAuthenticated)return null;
   const enable=async()=>{if(typeof Notification==="undefined")return;const result=await Notification.requestPermission();setPermission(result);};
-  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">♢</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{permission==="default"&&<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable browser notifications" title="Enable browser notifications">●</button>}</span>;
+  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">🔔</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{permission==="default"&&<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable browser notifications" title="Enable browser notifications">●</button>}</span>;
 }
 
 function PwaInstallButton() {
