@@ -10,7 +10,7 @@ import "@/styles/fan-home.css";
 import "@/styles/client-workspace.css";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
-import { getMyNotifications } from "@/lib/server-fns";
+import { getMyNotifications, getPushNotificationConfig, savePushSubscription } from "@/lib/server-fns";
 
 const links = [["/", "nav.home"], ["/library", "nav.library"], ["/news", "nav.news"], ["/creators", "nav.creators"]];
 const workspaceLinks = [
@@ -24,13 +24,20 @@ const workspaceLinks = [
 const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Biblioteca de vídeos", pt: "Biblioteca de vídeos", it: "Libreria video", de: "Videobibliothek" };
 
 
+function decodeVapidKey(value){
+  const padded=value.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((value.length+3)%4);
+  const raw=atob(padded);return Uint8Array.from(raw,char=>char.charCodeAt(0));
+}
 function NotificationBell({isAuthenticated}) {
   const [unread,setUnread]=useState(0);
   const [permission,setPermission]=useState(typeof Notification==="undefined"?"unsupported":Notification.permission);
+  const [pushAvailable,setPushAvailable]=useState(false);
+  const [pushMessage,setPushMessage]=useState("");
   const newestId=useRef(null);
   useEffect(()=>{
     if(!isAuthenticated){setUnread(0);newestId.current=null;return;}
     let active=true;
+    getPushNotificationConfig().then(config=>{if(active)setPushAvailable(!!config.available);}).catch(()=>{});
     const load=()=>getMyNotifications().then(rows=>{
       if(!active)return;
       const ordered=[...(rows||[])].sort((a,b)=>new Date(b.created_date||0)-new Date(a.created_date||0));
@@ -50,8 +57,24 @@ function NotificationBell({isAuthenticated}) {
     return()=>{active=false;window.clearInterval(timer);window.removeEventListener("focus",onFocus);};
   },[isAuthenticated]);
   if(!isAuthenticated)return null;
-  const enable=async()=>{if(typeof Notification==="undefined")return;const result=await Notification.requestPermission();setPermission(result);};
-  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">🔔</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{permission==="default"&&<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable browser notifications" title="Enable browser notifications">●</button>}</span>;
+  const enable=async()=>{
+    try{
+      if(typeof Notification==="undefined"||!("serviceWorker" in navigator)||!("PushManager" in window))throw new Error("Web push is not supported by this browser.");
+      const config=await getPushNotificationConfig();
+      if(!config.available||!config.publicKey)throw new Error("Server push keys are not configured yet.");
+      const granted=await Notification.requestPermission();
+      setPermission(granted);
+      if(granted!=="granted")return;
+      const registration=await navigator.serviceWorker.ready;
+      let subscription=await registration.pushManager.getSubscription();
+      if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decodeVapidKey(config.publicKey)});
+      const payload=subscription.toJSON();
+      if(!payload.endpoint||!payload.keys?.p256dh||!payload.keys?.auth)throw new Error("The browser returned an incomplete push subscription.");
+      await savePushSubscription({data:{endpoint:payload.endpoint,p256dh:payload.keys.p256dh,auth:payload.keys.auth,expirationTime:payload.expirationTime||undefined}});
+      setPushMessage("Push alerts enabled on this device.");
+    }catch(error){setPushMessage(error?.message||"Push alerts could not be enabled.");}
+  };
+  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">🔔</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{pushAvailable&&permission!=="denied"&&<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable push notifications" title="Enable push notifications">+</button>}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
 }
 
 function PwaInstallButton() {
