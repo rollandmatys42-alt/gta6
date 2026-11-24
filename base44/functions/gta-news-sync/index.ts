@@ -86,14 +86,14 @@ async function generateEditorial(source: any, title: string, summary: string, ar
     return { title: String(result.title).slice(0,180), summary: String(result.summary).slice(0,500), body: String(result.body).slice(0,20000) };
   } catch { return fallback; }
 }
-async function notifyPublished(entities: any, title: string, service?: any) {
+async function notifyPublished(entities: any, title: string, service?: any, targetUrl = "/news") {
   const dispatchSecret=Deno.env.get("PUSH_DISPATCH_SECRET")||"";
   for (let offset=0; offset<100000; offset+=5000) {
     const users = await entities.User.list("-created_date", 5000, offset);
     if (!users.length) break;
     for (const user of users) await entities.UserNotification.create({
       user_id: user.id, type: "news", title: "New official GTA VI update",
-      body: title, target_url: "/news"
+      body: title, target_url: targetUrl
     }).catch(() => null);
     if(dispatchSecret&&service?.functions?.invoke){
       for(let start=0;start<users.length;start+=100)await service.functions.invoke("vicehub-send-push",{dispatchSecret,userIds:users.slice(start,start+100).map((user:any)=>user.id),title:"New official GTA VI update",body:title,url:"/news"}).catch(()=>null);
@@ -136,9 +136,11 @@ async function importX(source: any, url: URL, db: any, service?: any) {
       source_published_at: tweet.created_at || new Date().toISOString(), last_verified_at: new Date().toISOString(),
       ...(publishedAt ? { published_at: publishedAt } : {}),
     });
-    if (status === "published") await notifyPublished(db,editorial.title,service);
+    if (status === "published") await notifyPublished(db,editorial.title,service,"/news/"+slug);
     created++;
   }
+  const newestId = payload.data?.[0]?.id;
+  if (newestId) await db.NewsSource.update(source.id,{last_external_id:String(newestId)}).catch(()=>null);
   return created;
 }
 async function importRss(source: any, url: URL, db: any, service?: any) {
@@ -163,7 +165,7 @@ async function importRss(source: any, url: URL, db: any, service?: any) {
     const exists = await db.NewsArticle.filter({ source_url: articleUrl }, "-created_date", 1, 0);
     if (exists.length) continue;
     const editorial = await generateEditorial(source,title,summary || title,articleUrl);
-    const status = source.source_type === "official" ? "published" : "draft";
+    const status = source.source_type === "official" && imageUrl ? "published" : "draft";
     const publishedAt = status === "published" ? new Date().toISOString() : undefined;
     const slug = editorial.title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 170) + "-" + crypto.randomUUID().slice(0, 6);
     await db.NewsArticle.create({
@@ -176,7 +178,7 @@ async function importRss(source: any, url: URL, db: any, service?: any) {
       source_published_at: publishedDate, last_verified_at: new Date().toISOString(),
       ...(publishedAt ? { published_at: publishedAt } : {}),
     });
-    if (status === "published") await notifyPublished(db,editorial.title);
+    if (status === "published") await notifyPublished(db,editorial.title,service,"/news/"+slug);
     created++;
   }
   return created;
