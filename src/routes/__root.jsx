@@ -17,6 +17,8 @@ export const Route = createRootRoute({
       { title: "VICEHUB — GTA VI Creator Hub" },
       { name: "description", content: "Independent GTA VI creator hub: verified news, creator community and a curated video library." },
       { name: "theme-color", content: "#09090d" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "description", content: "A full-stack Base44 app built with TanStack Start." },
     ],
     // No icon link: the platform adds the app's logo when serving.
