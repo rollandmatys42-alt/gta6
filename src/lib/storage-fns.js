@@ -114,7 +114,7 @@ export const disableStorageConnection = createServerFn({method:"POST"}).middlewa
   const parsed=JSON.parse(row.setting_value||"{}"); parsed.public.enabled=false;
   await entities.SiteSetting.update(row.id,{setting_value:JSON.stringify(parsed),updated_by:context.user.id}); return {ok:true};
 });
-export async function issueStorageUploadUrl({entities,fileName,contentType,fileSize,reservedBytes=0,assetVariant,connectionId}) {
+export async function issueStorageUploadUrl({entities,contentType,fileSize,reservedBytes=0,assetVariant,connectionId}) {
   const rows=await allConnectionRows(entities), connections=await Promise.all(rows.map(readConnection));
   let connection=connectionId?connections.find(item=>item.id===connectionId):null;
   if(connectionId&&!connection)throw new Error("The selected storage connection no longer exists.");

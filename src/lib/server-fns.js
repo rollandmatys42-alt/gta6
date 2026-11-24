@@ -159,7 +159,7 @@ export const getVideoPreviewUrl = createServerFn({ method: "GET" })
       throw Object.assign(new Error("The protected preview is not ready yet."), { status: 409, code: "PREVIEW_NOT_READY" });
     }
     const previewUrl = "/api/video/preview/" + encodeURIComponent(video.id);
-    return { previewUrl, expiresInSeconds: 180, watermarkApplied: true };
+    return { previewUrl, watermarkApplied: true };
   });
 
 export const getPublicFreeSamplePack = createServerFn({method:"GET"}).handler(async({context})=>{
@@ -294,7 +294,7 @@ export const createVideoUploadUrl = createServerFn({ method: "POST" })
     const extension = data.contentType === "video/quicktime" ? "mov" : "mp4";
     const objectKey = "videos/" + data.assetVariant + "/" + crypto.randomUUID() + "." + extension;
     const entities = context.getBase44().asServiceRole.entities;
-    const multi = await issueStorageUploadUrl({ entities, fileName: data.fileName, contentType: data.contentType, fileSize: data.fileSize, reservedBytes: data.reservedBytes, assetVariant: data.assetVariant, connectionId: data.storageConnectionId });
+    const multi = await issueStorageUploadUrl({ entities, contentType: data.contentType, fileSize: data.fileSize, reservedBytes: data.reservedBytes, assetVariant: data.assetVariant, connectionId: data.storageConnectionId });
     if (multi) return { ...multi, contentType: data.contentType };
     const uploadUrl = await presignR2({ method: "PUT", objectKey, contentType: data.contentType, expiresIn: 300 });
     return { uploadUrl, objectKey, contentType: data.contentType, storageConnectionId: null, storageProvider: "cloudflare-r2", expiresInSeconds: 300 };
