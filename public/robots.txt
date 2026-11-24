@@ -12,3 +12,4 @@ Disallow: /_server/
 
 Sitemap: https://gta6-creator-hub-c26cc578.base44.app/sitemap.xml
 Sitemap: https://gta6-creator-hub-c26cc578.base44.app/news-sitemap.xml
+Sitemap: https://gta6-creator-hub-c26cc578.base44.app/articles-sitemap.xml
