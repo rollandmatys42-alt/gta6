@@ -25,7 +25,7 @@ const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Bi
 
 export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ", workspace = false, activeKey = "" }) {
   const locale = useLocale();
-  const { isAuthenticated, navigateToLogin, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const label = (key) => key === "nav.library" ? (libraryLabels[locale] || libraryLabels.en) : translate(locale, key);
   const tx = key => translate(locale, key);
@@ -68,7 +68,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
               <select className="fh-lang" aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select>
               {isAuthenticated
                 ? <><Link to="/dashboard" className="fh-btn solid" onClick={close}>My account</Link><button type="button" className="fh-btn ghost" onClick={() => { close(); logout(); }}>Sign out</button></>
-                : <><button type="button" className="fh-btn ghost" onClick={() => { close(); navigateToLogin(); }}>Sign in</button><button type="button" className="fh-btn solid" onClick={() => { close(); navigateToLogin(); }}>Join now</button></>}
+                : <><Link to="/login" className="fh-btn ghost" onClick={close}>Sign in</Link><Link to="/register" className="fh-btn solid" onClick={close}>Join now</Link></>}
             </div>
           </nav>
         </div>
