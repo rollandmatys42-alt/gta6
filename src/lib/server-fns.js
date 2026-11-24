@@ -1054,6 +1054,19 @@ export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([
  return {categoriesCreated:categoryCount,pagesCreated:pageCount,sourcesCreated,agentsCreated,legalPagesRequireReview:true};
 });
 
+export const getGrowthIntegrationStatus = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  requireAdmin(context);
+  const has=name=>!!secrets.get(name);
+  return [
+    {key:"OmniRoute AI",ready:has("OMNIROUTE_API_KEY")&&has("OMNIROUTE_BASE_URL"),required:["OMNIROUTE_API_KEY","OMNIROUTE_BASE_URL"]},
+    {key:"X API",ready:has("X_BEARER_TOKEN"),required:["X_BEARER_TOKEN"]},
+    {key:"Five-minute scheduler",ready:has("GTA_NEWS_SYNC_CRON_SECRET"),required:["GTA_NEWS_SYNC_CRON_SECRET in Base44 and GitHub Actions"]},
+    {key:"Google Search Console",ready:has("GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN"),required:["Google OAuth/Search Console refresh token"]},
+    {key:"Google Analytics 4",ready:has("GA4_REFRESH_TOKEN"),required:["GA4 refresh token"]},
+    {key:"PWA background push",ready:has("VAPID_PUBLIC_KEY")&&has("VAPID_PRIVATE_KEY")&&has("VAPID_SUBJECT")&&has("PUSH_DISPATCH_SECRET"),required:["VAPID_PUBLIC_KEY","VAPID_PRIVATE_KEY","VAPID_SUBJECT","PUSH_DISPATCH_SECRET"]},
+  ];
+});
+
 export const runScheduledGrowthAgents = createServerFn({method:"POST"})
  .validator(z.object({cronSecret:z.string().min(32).max(256)}))
  .handler(async({data,context})=>{
