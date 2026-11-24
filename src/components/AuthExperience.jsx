@@ -82,7 +82,7 @@ export default function AuthExperience({ mode = "login" }) {
         <div className="vh-auth-kicker"><i/> {view === "register" ? "NEW CREATOR REGISTRATION" : view === "verify" ? "EMAIL VERIFICATION" : view === "reset" ? "ACCOUNT RECOVERY" : "SECURE MEMBER ACCESS"}</div>
         <h2>{title}</h2><p className="vh-auth-intro">{subtitle}</p>
         {view === "login" && <div className="vh-auth-switch"><span>New to VICEHUB?</span><Link to="/register">Create an account ↗</Link></div>}
-        {view === "register" && <div className="vh-auth-switch"><span>Already have an account?</span><Link to="/login">Sign in ↗</Link></div>}
+        {view === "register" && <div className="vh-auth-switch"><span>Already have an account?</span><Link to="/sign-in">Sign in ↗</Link></div>}
         {error && <div className="vh-auth-alert" role="alert">{error}</div>}
         {notice && <div className="vh-auth-notice" role="status">{notice}</div>}
         {view === "login" && <form onSubmit={login} className="vh-auth-form">
