@@ -130,7 +130,7 @@ function ShopPage() {
           <span className="vh-shop-kicker">VICEHUB SUPPLY · DROP 001</span>
           <h1>THE STORE.<br /><em>THE CULTURE.</em></h1>
           <p>Independent creator gear, original VICEHUB designs and carefully verified licensed pieces. Built for the people shaping the community.</p>
-          <div className="vh-shop-hero-meta"><span>CURATED DROPS</span><i /> <span>SECURE CHECKOUT</span><i /> <span>WORLDWIDE CATALOGUE</span></div>
+          <div className="vh-shop-hero-meta"><span>CURATED DROPS</span><i /> <span>SECURE CHECKOUT</span><i /> <span>GBP · EUR · USD</span></div>
         </div>
         <div className="vh-shop-hero-art" aria-hidden="true"><div className="vh-shop-orbit" /><div className="vh-shop-hero-mark">VH<span>®</span></div><div className="vh-shop-hero-stamp">VICE CITY<br />SUPPLY CO.</div></div>
       </section>
