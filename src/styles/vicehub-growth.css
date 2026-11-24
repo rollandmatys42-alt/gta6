@@ -34,3 +34,13 @@
 .member-referral-notice{margin:10px 0 0;color:#8df0c7}
 @media(max-width:850px){.member-referral-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.member-referral-link{grid-column:1/-1}}
 @media(max-width:560px){.vh-hero-artwork{min-height:280px}.vh-hero-proof span{font-size:7px}.member-referral-card{padding:16px}.member-referral-head{gap:8px}.member-referral-mark{width:54px;height:54px;font-size:19px}.member-referral-grid{grid-template-columns:1fr 1fr}.member-referral-link{grid-column:1/-1}.member-referral-stat b{font-size:22px}}
+
+.member-referral-currency-note{margin:8px 0;color:#9e93aa;font-size:9px;line-height:1.5}
+.member-referral-link p a{color:#75e6e4;text-decoration:underline}
+.vh-referral-terms{max-width:900px;margin:0 auto;padding:clamp(25px,5vw,64px) 0;color:#f6efff}
+.vh-referral-terms h1{margin:12px 0 16px;font:900 clamp(42px,7vw,72px)/.9 'Barlow Condensed',Impact,sans-serif}
+.vh-referral-terms h2{margin:30px 0 10px;color:#ff8fbe;font:900 24px 'Barlow Condensed',sans-serif}
+.vh-referral-terms p,.vh-referral-terms li{color:#c5b9d0;font-size:14px;line-height:1.75}
+.vh-referral-terms ul{padding-left:22px}
+.vh-terms-lead{max-width:760px;font-size:17px!important}
+.vh-terms-note{margin:30px 0;padding:16px;border:1px solid #ffffff25;border-radius:12px;background:#ffffff08;font-size:12px!important}
