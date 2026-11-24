@@ -47,7 +47,7 @@ export async function downloadCleanVideo({ videoId, title, onProgress = () => {}
     throw new Error("This file is not MP4, MOV or WebM. No uncleaned file has been downloaded.");
   }
 
-  const cleaned = await cleanVideoBlob(sourceBlob, extension, onProgress);
+  const cleaned = await cleanVideoBlob(sourceBlob, extension, onProgress, { title });
   const fileName = safeBaseName(title) + "-cleaned." + extension;
   const objectUrl = URL.createObjectURL(cleaned.blob);
   const anchor = document.createElement("a");
