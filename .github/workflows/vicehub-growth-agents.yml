@@ -1,0 +1,35 @@
+name: VICEHUB daily SEO GEO and growth agents
+
+on:
+  schedule:
+    - cron: "15 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vicehub-daily-growth-agents
+  cancel-in-progress: false
+
+jobs:
+  run-growth-agents:
+    name: Generate SEO GEO and growth reports
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call protected VICEHUB growth agent scheduler
+        env:
+          CRON_SECRET: ${{ secrets.GTA_NEWS_SYNC_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::GTA_NEWS_SYNC_CRON_SECRET is not configured in GitHub Actions. Growth agents were not run."
+            exit 0
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-delay 5 --retry-connrefused --max-time 50 \
+            -X POST "https://gta6-creator-hub-c26cc578.base44.app/api/agents/growth/cron" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{}'

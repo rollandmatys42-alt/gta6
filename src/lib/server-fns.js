@@ -8,6 +8,46 @@ const encoder = new TextEncoder();
 const MONTHLY_FREE_LIMIT = 5;
 const DOWNLOAD_URL_TTL = 120;
 
+const FREE_SAMPLE_SETTING_KEY = "free_sample_pack_v1";
+
+async function readLockedFreeSamplePack(entities) {
+  const rows = await entities.SiteSetting.filter({ setting_key: FREE_SAMPLE_SETTING_KEY }, "-updated_date", 1, 0);
+  if (!rows.length) return null;
+  try {
+    const parsed = JSON.parse(rows[0].setting_value || "{}");
+    const ids = Array.isArray(parsed.videoIds) ? parsed.videoIds : [];
+    return ids.length === 3 && new Set(ids).size === 3 ? { ids, lockedAt: parsed.lockedAt || rows[0].updated_date || rows[0].created_date } : null;
+  } catch { return null; }
+}
+
+async function notifyAllMembers(service, notice) {
+  const entities = service.entities || service;
+  const dispatchSecret = secrets.get("PUSH_DISPATCH_SECRET") || "";
+  for (let offset = 0; offset < 100000; offset += 5000) {
+    const users = await entities.User.list("-created_date", 5000, offset);
+    if (!users.length) break;
+    for (const user of users) {
+      await entities.UserNotification.create({
+        user_id: user.id, type: notice.type || "system",
+        title: String(notice.title || "VICEHUB update").slice(0, 160),
+        body: String(notice.body || "A new VICEHUB update is available.").slice(0, 500),
+        target_url: String(notice.target_url || "/notifications").slice(0, 300),
+      }).catch(() => null);
+    }
+    if (dispatchSecret && service.functions?.invoke) {
+      for (let start = 0; start < users.length; start += 100) {
+        await service.functions.invoke("vicehub-send-push", {
+          dispatchSecret, userIds: users.slice(start, start + 100).map(user => user.id),
+          title: notice.title || "VICEHUB update", body: notice.body || "A new update is available.",
+          url: notice.target_url || "/notifications",
+        }).catch(() => null);
+      }
+    }
+    if (users.length < 5000) break;
+  }
+}
+
+
 function hex(bytes) {
   return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -122,24 +162,28 @@ export const getVideoPreviewUrl = createServerFn({ method: "GET" })
   });
 
 export const getPublicFreeSamplePack = createServerFn({method:"GET"}).handler(async({context})=>{
-  const rows=await context.getBase44().asServiceRole.entities.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"published_at",4,0);
-  return {ready:rows.length===3,videos:rows.slice(0,3).map(v=>({id:v.id,title:v.title,description:v.description||"",category:v.category,language:v.language||"en",thumbnail_url:v.thumbnail_url||"",duration_seconds:v.duration_seconds||0}))};
+  const entities=context.getBase44().asServiceRole.entities;
+  const pack=await readLockedFreeSamplePack(entities);
+  if(!pack)return {ready:false,locked:false,videos:[]};
+  const rows=await Promise.all(pack.ids.map(id=>entities.Video.get(id).catch(()=>null)));
+  const valid=rows.length===3&&rows.every(v=>v&&v.status==="published"&&v.license_status==="verified"&&v.watermarked_storage_key);
+  return {ready:valid,locked:true,videos:valid?rows.map(v=>({id:v.id,title:v.title,description:v.description||"",category:v.category,language:v.language||"en",thumbnail_url:v.thumbnail_url||"",duration_seconds:v.duration_seconds||0})):[]};
 });
 
 export const getFreeSamplePack = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
   const db=context.getBase44().asServiceRole.entities,user=context.user;
+  const pack=await readLockedFreeSamplePack(db);
+  if(!pack)return {packReady:false,locked:false,claimed:false,videoCount:0,videos:[],downloadedVideoIds:[],downloadsRemaining:3};
   const claims=await db.FreeSamplePackClaim.filter({user_id:user.id},"-created_date",1,0);
   const claim=claims[0];
-  const ids=claim?.video_ids||[];
-  const rows=claim
-    ? await Promise.all(ids.map(id=>db.Video.get(id).catch(()=>null)))
-    : await db.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"published_at",3,0);
-  const videos=rows.filter(v=>v&&v.status==="published"&&v.license_status==="verified").map(v=>({
+  if(claim&&JSON.stringify(claim.video_ids||[])!==JSON.stringify(pack.ids))throw Object.assign(new Error("Your sample pack record does not match the current fixed pack. Contact support before downloading."),{status:409,code:"FREE_SAMPLE_PACK_MISMATCH"});
+  const rows=await Promise.all(pack.ids.map(id=>db.Video.get(id).catch(()=>null)));
+  const videos=rows.filter(v=>v&&v.status==="published"&&v.license_status==="verified"&&v.watermarked_storage_key).map(v=>({
     id:v.id,title:v.title,description:v.description||"",category:v.category,language:v.language||"en",
     thumbnail_url:v.thumbnail_url||"",duration_seconds:v.duration_seconds||0,creator_name:v.creator_name||"VICEHUB"
   }));
   const downloaded=claim?.downloaded_video_ids||[];
-  return {packReady:videos.length===3,claimed:!!claim,videoCount:videos.length,videos,downloadedVideoIds:downloaded,downloadsRemaining:Math.max(0,3-downloaded.length)};
+  return {packReady:videos.length===3,locked:true,claimed:!!claim,videoCount:videos.length,videos,downloadedVideoIds:downloaded,downloadsRemaining:Math.max(0,3-downloaded.length)};
 });
 
 export const requestVideoDownload = createServerFn({ method: "POST" })
@@ -160,13 +204,17 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
     if (tier !== "free" && subscription?.status !== "active" && !(subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date())) tier = "free";
 
     if (tier === "free") {
+      const fixedPack = await readLockedFreeSamplePack(db);
+      if (!fixedPack) throw Object.assign(new Error("The three-video free trial pack is being prepared. Please check back soon."), { status: 409, code: "FREE_SAMPLE_PACK_NOT_READY" });
+      if (!fixedPack.ids.includes(video.id)) throw Object.assign(new Error("Free accounts can download only the three fixed VICEHUB sample videos. Upgrade for the full catalogue."), { status: 403, code: "FREE_SAMPLE_ONLY" });
       let claims = await db.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
       let claim = claims[0];
+      if (claim && JSON.stringify(claim.video_ids || []) !== JSON.stringify(fixedPack.ids)) throw Object.assign(new Error("Your sample pack record does not match the fixed pack. Contact support."), { status: 409, code: "FREE_SAMPLE_PACK_MISMATCH" });
       if (!claim) {
-        const pack = await db.Video.filter({ is_free_sample: true, status: "published", license_status: "verified" }, "published_at", 4, 0);
-        if (pack.length !== 3) throw Object.assign(new Error("The three-video free trial pack is being prepared. Please check back soon."), { status: 409, code: "FREE_SAMPLE_PACK_NOT_READY" });
+        const pack = await Promise.all(fixedPack.ids.map(id=>db.Video.get(id).catch(()=>null)));
+        if (pack.length !== 3 || pack.some(v=>!v || v.status!=="published" || v.license_status!=="verified" || !v.watermarked_storage_key)) throw Object.assign(new Error("The fixed three-video pack is temporarily unavailable."), { status: 409, code: "FREE_SAMPLE_PACK_NOT_READY" });
         try {
-          claim = await db.FreeSamplePackClaim.create({ user_id: user.id, video_ids: pack.map(v=>v.id), downloaded_video_ids: [], claimed_at: new Date().toISOString() });
+          claim = await db.FreeSamplePackClaim.create({ user_id: user.id, video_ids: fixedPack.ids, downloaded_video_ids: [], claimed_at: new Date().toISOString() });
         } catch {
           claims = await db.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
           claim = claims[0];
@@ -293,6 +341,24 @@ export const importAdminVideoMetadataCsv = createServerFn({method:"POST"}).middl
  requireAdmin(context);const rows=parseAdminCsv(data.csvText);if(rows.length<2)throw Object.assign(new Error("The CSV must contain a header row and at least one video row."),{status:400});const headers=rows[0].map(x=>String(x).trim().toLowerCase());const titleIndex=headers.indexOf("title"),categoryIndex=headers.indexOf("category");if(titleIndex<0||categoryIndex<0)throw Object.assign(new Error("CSV headers must include title and category."),{status:400});if(rows.length-1>1000)throw Object.assign(new Error("Import is limited to 1,000 metadata rows per batch."),{status:400});const get=(r,key)=>{const i=headers.indexOf(key);return i<0?"":String(r[i]||"").trim();};const categories=["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"];const languages=["en","fr","es","pt","it","de"];const records=[],rejected=[];for(let i=1;i<rows.length;i++){const r=rows[i];const title=get(r,"title");const rawCategory=get(r,"category");const category=categories.find(x=>x.toLowerCase()===rawCategory.toLowerCase());const language=(get(r,"language")||"en").toLowerCase();const source=get(r,"source_reference");if(!title||title.length<2){rejected.push({line:i+1,reason:"Missing or invalid title"});continue;}if(!category){rejected.push({line:i+1,reason:"Unknown category: "+rawCategory});continue;}if(!languages.includes(language)){rejected.push({line:i+1,reason:"Unsupported language: "+language});continue;}if(source){try{const parsed=new URL(source);if(!["http:","https:"].includes(parsed.protocol))throw new Error("Unsupported protocol");}catch{rejected.push({line:i+1,reason:"source_reference must be an HTTP or HTTPS URL"});continue;}}const duration=Number(get(r,"duration_seconds")||0);if(duration<0||duration>86400||!Number.isInteger(duration)){rejected.push({line:i+1,reason:"Invalid duration_seconds"});continue;}records.push({title:title.slice(0,140),description:get(r,"description").slice(0,3000),category,language,creator_name:get(r,"creator_name").slice(0,80),...(source?{source_reference:source}:{}),...(duration?{duration_seconds:duration}:{}),is_featured:false,status:"draft",license_status:"pending"});}
  const db=context.getBase44().asServiceRole.entities.Video;let imported=0;for(let i=0;i<records.length;i+=100){const created=await db.bulkCreate(records.slice(i,i+100));imported+=created.length;}return {imported,rejected:rejected.length,errors:rejected.slice(0,30),message:"Imported as metadata-only drafts. No media file or licence has been verified; upload and rights review are still required before publication."};
 });
+export const getAdminFreeSamplePack = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  requireAdmin(context);const entities=context.getBase44().asServiceRole.entities;
+  const locked=await readLockedFreeSamplePack(entities);
+  const rows=await entities.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",10,0);
+  return {locked:!!locked,lockedAt:locked?.lockedAt||null,videoIds:locked?.ids||[],selectedCount:rows.length,selected:rows.map(v=>({id:v.id,title:v.title,thumbnail_url:v.thumbnail_url||""}))};
+});
+export const lockFreeSamplePack = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({confirmation:z.literal("LOCK_VICEHUB_SAMPLE_PACK_V1")}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);const entities=context.getBase44().asServiceRole.entities;
+  const existingRows=await entities.SiteSetting.filter({setting_key:FREE_SAMPLE_SETTING_KEY},"-updated_date",1,0);
+  if(existingRows.length)throw Object.assign(new Error("The global three-video sample pack is already locked and cannot be replaced."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
+  const selected=await entities.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",4,0);
+  if(selected.length!==3||selected.some(v=>!v.storage_key||!v.watermarked_storage_key||!v.source_reference))throw Object.assign(new Error("Select exactly three published videos with verified rights, a rights reference and both private video files before locking the pack."),{status:409,code:"FREE_SAMPLE_PACK_NOT_READY"});
+  const setting={setting_key:FREE_SAMPLE_SETTING_KEY,setting_value:JSON.stringify({version:1,videoIds:selected.map(v=>v.id),lockedAt:new Date().toISOString()}),is_public:false,updated_by:context.user.id};
+  await entities.SiteSetting.create(setting);
+  return {locked:true,videoIds:selected.map(v=>v.id),videos:selected.map(v=>v.title)};
+ });
 export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.Video.list("-created_date",2000,0);});
 export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()}))
@@ -301,8 +367,10 @@ export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requ
   const entities=context.getBase44().asServiceRole.entities,db=entities.Video,current=await db.get(data.videoId);
   if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});
   if(data.isFreeSample!==undefined&&data.isFreeSample!==!!current.is_free_sample){
+    const locked=await readLockedFreeSamplePack(entities);
+    if(locked)throw Object.assign(new Error("The fixed three-video sample pack is locked for every account and cannot be changed."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
     const claims=await entities.FreeSamplePackClaim.list("-created_date",1,0);
-    if(claims.length)throw Object.assign(new Error("The three-video sample pack is locked because a member has already claimed it. This keeps every account on the same videos."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
+    if(claims.length)throw Object.assign(new Error("The three-video sample pack cannot be changed after a member has claimed it."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
   }
   if(data.isFreeSample===true){
     if(current.status!=="published"||current.license_status!=="verified"||!current.storage_key||!current.watermarked_storage_key)throw Object.assign(new Error("Only published videos with verified rights and both renditions can be added to the free sample pack."),{status:409,code:"FREE_SAMPLE_VIDEO_NOT_READY"});
@@ -319,8 +387,10 @@ export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([req
   requireAdmin(context);
   const entities=context.getBase44().asServiceRole.entities,db=entities.Video,video=await db.get(data.videoId);
   if(data.archived&&video.is_free_sample){
+    const locked=await readLockedFreeSamplePack(entities);
+    if(locked?.ids.includes(video.id))throw Object.assign(new Error("This video belongs to the globally locked sample pack and cannot be archived."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
     const claims=await entities.FreeSamplePackClaim.list("-created_date",1,0);
-    if(claims.length)throw Object.assign(new Error("This video belongs to the locked free sample pack and cannot be archived while members have claims."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
+    if(claims.length)throw Object.assign(new Error("This video belongs to a claimed sample pack and cannot be archived."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
   }
   if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});
   return db.update(data.videoId,{status:data.archived?"archived":"draft",...(data.archived?{is_free_sample:false}:{})});
@@ -458,7 +528,7 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
     const previous = data.id ? await db.NewsArticle.get(data.id).catch(()=>null) : null;
     const saved = data.id ? await db.NewsArticle.update(data.id,payload) : await db.NewsArticle.create(payload);
     if(data.status==="published" && previous?.status!=="published"){
-      await notifyAllMembers(base44.asServiceRole,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news"});
+      await notifyAllMembers(base44.asServiceRole,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news/"+saved.slug});
     }
     return saved;
   });
@@ -1073,6 +1143,7 @@ export const getGrowthIntegrationStatus = createServerFn({method:"GET"}).middlew
     {key:"OmniRoute AI",ready:has("OMNIROUTE_API_KEY")&&has("OMNIROUTE_BASE_URL"),required:["OMNIROUTE_API_KEY","OMNIROUTE_BASE_URL"]},
     {key:"X API",ready:has("X_BEARER_TOKEN"),required:["X_BEARER_TOKEN"]},
     {key:"Five-minute scheduler",ready:has("GTA_NEWS_SYNC_CRON_SECRET"),required:["GTA_NEWS_SYNC_CRON_SECRET in Base44 and GitHub Actions"]},
+    {key:"Daily SEO / GEO / Growth agents",ready:has("GTA_NEWS_SYNC_CRON_SECRET"),required:["Same GTA_NEWS_SYNC_CRON_SECRET in Base44 and GitHub Actions"]},
     {key:"Google Search Console",ready:has("GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN"),required:["Google OAuth/Search Console refresh token"]},
     {key:"Google Analytics 4",ready:has("GA4_REFRESH_TOKEN"),required:["GA4 refresh token"]},
     {key:"PWA background push",ready:has("VAPID_PUBLIC_KEY")&&has("VAPID_PRIVATE_KEY")&&has("VAPID_SUBJECT")&&has("PUSH_DISPATCH_SECRET"),required:["VAPID_PUBLIC_KEY","VAPID_PRIVATE_KEY","VAPID_SUBJECT","PUSH_DISPATCH_SECRET"]},
@@ -1139,7 +1210,7 @@ export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object(
  const db=context.getBase44().asServiceRole.entities;
  const rows=await db.SubscriptionPlan.filter({tier_code:"pro",status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",1,0);
  const assets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",20,0,["id"]);
- return rows.map(plan=>({...plan,catalogueReady:assets.length>=5,publishedAssetCount:assets.length}));
+ return rows.map(plan=>({...plan,catalogueReady:assets.length>=20,publishedAssetCount:assets.length}));
 });
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
 export const saveAdminPlan = createServerFn({method:"POST"}).middleware([requireUser])
@@ -1521,7 +1592,10 @@ export const unblockCreator = createServerFn({method:"POST"}).middleware([requir
  });
 export const getPushNotificationConfig = createServerFn({method:"GET"}).middleware([requireUser]).handler(async()=>{
   const publicKey=secrets.get("VAPID_PUBLIC_KEY")||"";
-  return {available:!!publicKey,publicKey};
+  const privateKey=secrets.get("VAPID_PRIVATE_KEY")||"";
+  const subject=secrets.get("VAPID_SUBJECT")||"";
+  const dispatchSecret=secrets.get("PUSH_DISPATCH_SECRET")||"";
+  return {available:!!(publicKey&&privateKey&&subject&&dispatchSecret),publicKey};
 });
 export const savePushSubscription = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({endpoint:z.string().url().max(2000),p256dh:z.string().min(20).max(300),auth:z.string().min(8).max(200),expirationTime:z.number().int().positive().optional()}))
