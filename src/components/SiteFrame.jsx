@@ -8,6 +8,7 @@ import "@/styles/fan-admin-fix.css";
 import "@/styles/pwa-notifications.css";
 import "@/styles/fan-home.css";
 import "@/styles/client-workspace.css";
+import "@/styles/vicehub-page-refresh.css";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
 import { getMyNotifications, getPushNotificationConfig, savePushSubscription } from "@/lib/server-fns";
@@ -20,6 +21,8 @@ const workspaceLinks = [
   ["/creators", "◎", "profile"],
   ["/messages", "✉", "messages"],
   ["/social", "↗", "social"],
+  ["/notifications", "⌖", "dispatch"],
+  ["/subscription", "◈", "subscription"],
 ];
 const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Biblioteca de vídeos", pt: "Biblioteca de vídeos", it: "Libreria video", de: "Videobibliothek" };
 
@@ -28,7 +31,7 @@ function decodeVapidKey(value){
   const padded=value.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((value.length+3)%4);
   const raw=atob(padded);return Uint8Array.from(raw,char=>char.charCodeAt(0));
 }
-function NotificationBell({isAuthenticated}) {
+function DispatchIndicator({isAuthenticated}) {
   const [unread,setUnread]=useState(0);
   const [permission,setPermission]=useState(typeof Notification==="undefined"?"unsupported":Notification.permission);
   const [pushAvailable,setPushAvailable]=useState(false);
@@ -75,7 +78,7 @@ function NotificationBell({isAuthenticated}) {
       setPushMessage("Background push alerts enabled on this device.");
     }catch(error){setPushMessage(error?.message||"Push alerts could not be enabled.");}
   };
-  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">🔔</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable push notifications" title="Enable push notifications">+</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
+  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-dispatch" aria-label={unread?unread+" unread dispatches":"VICEHUB dispatches"} title="VICEHUB dispatches"><span className="vh-notification-mark" aria-hidden="true"><b>VI</b><i/></span>{unread>0&&<b className="vh-notification-count">{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable dispatch alerts" title="Enable dispatch alerts">⌖</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
 }
 
 function PwaInstallButton() {
@@ -112,7 +115,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
         <div className="vh-workspace-caption">MEMBER NAVIGATION</div>
         <nav className="vh-workspace-nav" aria-label="Member workspace navigation">
           {workspaceLinks.map(([href, icon, key]) => <Link key={href} to={href} className={activeKey === key ? "active" : ""} aria-current={activeKey === key ? "page" : undefined}>
-            <span className="vh-workspace-icon">{icon}</span><span>{tx("dashboard.nav." + key)}</span>
+            <span className="vh-workspace-icon">{icon}</span><span>{key === "dispatch" ? "DISPATCHES" : key === "subscription" ? "MY SUBSCRIPTION" : tx("dashboard.nav." + key)}</span>
           </Link>)}
         </nav>
         <div className="vh-workspace-sidebar-bottom">
@@ -123,7 +126,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
       <div className="vh-workspace-content">
         <header className="vh-workspace-topbar">
           <div><small>VICEHUB / MEMBER AREA</small><b>{activeLabel ? tx("dashboard.nav." + activeLabel[2]) : "Member dashboard"}</b></div>
-          <div className="vh-workspace-actions"><NotificationBell isAuthenticated={isAuthenticated}/><PwaInstallButton/>
+          <div className="vh-workspace-actions"><DispatchIndicator isAuthenticated={isAuthenticated}/><PwaInstallButton/>
             <label><span className="sr-only">Language</span><select aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select></label>
             <Link to="/dashboard" className="vh-workspace-account">MY DASHBOARD ↗</Link>
           </div>
@@ -138,7 +141,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
           <nav className={"fh-nav" + (open ? " open" : "")} aria-label="Main">
             {links.map(([href, key]) => <Link key={href} to={href} className="fh-nav-link" activeProps={{ className: "fh-nav-link active" }} activeOptions={{ exact: href === "/" }} onClick={close}>{label(key)}</Link>)}
             <a href="/#plans" className="fh-nav-link" onClick={close}>Pricing</a>
-            <div className="fh-nav-actions"><NotificationBell isAuthenticated={isAuthenticated}/><PwaInstallButton/>
+            <div className="fh-nav-actions"><DispatchIndicator isAuthenticated={isAuthenticated}/><PwaInstallButton/>
               <select className="fh-lang" aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select>
               {isAuthenticated
                 ? <><Link to="/dashboard" className="fh-btn solid" onClick={close}>My account</Link><button type="button" className="fh-btn ghost" onClick={() => { close(); logout(); }}>Sign out</button></>
