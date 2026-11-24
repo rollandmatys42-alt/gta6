@@ -296,7 +296,8 @@ export const importAdminVideoMetadataCsv = createServerFn({method:"POST"}).middl
 export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.Video.list("-created_date",2000,0);});
 export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()})).handler(async({data,context})=>{requireAdmin(context);const entities=context.getBase44().asServiceRole.entities,db=entities.Video;const current=await db.get(data.videoId);if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});if(data.isFreeSample===true){if(current.status!=="published"||current.license_status!=="verified"||!current.storage_key||!current.watermarked_storage_key)throw Object.assign(new Error("Only published videos with verified rights and both renditions can be added to the free sample pack."),{status:409,code:"FREE_SAMPLE_VIDEO_NOT_READY"});const selected=await db.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",10,0);if(!current.is_free_sample&&selected.length>=3)throw Object.assign(new Error("The free sample pack must contain exactly three videos. Remove one before selecting another."),{status:409,code:"FREE_SAMPLE_PACK_FULL"});}const patch={};for(const [key,value] of Object.entries({title:data.title,description:data.description,category:data.category,language:data.language,is_featured:data.isFeatured,is_free_sample:data.isFreeSample,license_status:data.licenseStatus,source_reference:data.sourceReference}))if(value!==undefined)patch[key]=value;return db.update(data.videoId,patch);});
 export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),archived:z.boolean()})).handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.Video;const video=await db.get(data.videoId);if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});return db.update(data.videoId,{status:data.archived?"archived":"draft",...(data.archived?{is_free_sample:false}:{})});});
-async function notifyAllMembers(entities, notice) {
+async function notifyAllMembers(service, notice) {
+  const entities=service.entities,dispatchSecret=secrets.get("PUSH_DISPATCH_SECRET")||"";
   for (let offset=0; offset<100000; offset+=5000) {
     const users = await entities.User.list("-created_date", 5000, offset);
     if (!users.length) break;
@@ -305,6 +306,11 @@ async function notifyAllMembers(entities, notice) {
         user_id: user.id, type: notice.type, title: notice.title,
         body: notice.body, target_url: notice.target_url,
       }).catch(() => null);
+    }
+    if(dispatchSecret&&service.functions?.invoke){
+      for(let start=0;start<users.length;start+=100){
+        await service.functions.invoke("vicehub-send-push",{dispatchSecret,userIds:users.slice(start,start+100).map(user=>user.id),title:notice.title,body:notice.body,url:notice.target_url}).catch(()=>null);
+      }
     }
     if (users.length < 5000) break;
   }
@@ -323,7 +329,7 @@ export const publishVideo = createServerFn({ method: "POST" })
     const published = await base44.asServiceRole.entities.Video.update(video.id, {
       status: "published", published_at: new Date().toISOString(),
     });
-    await notifyAllMembers(base44.asServiceRole.entities, {
+    await notifyAllMembers(base44.asServiceRole, {
       type: "system", title: "New VICEHUB video drop",
       body: video.title + " is now available in the video library.",
       target_url: "/library",
@@ -440,7 +446,7 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
     const previous = data.id ? await db.NewsArticle.get(data.id).catch(()=>null) : null;
     const saved = data.id ? await db.NewsArticle.update(data.id,payload) : await db.NewsArticle.create(payload);
     if(data.status==="published" && previous?.status!=="published"){
-      await notifyAllMembers(db,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news"});
+      await notifyAllMembers(base44.asServiceRole,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news"});
     }
     return saved;
   });
@@ -1488,6 +1494,29 @@ export const unblockCreator = createServerFn({method:"POST"}).middleware([requir
   const db=context.getBase44().asServiceRole.entities,rows=await db.UserBlock.filter({blocker_id:context.user.id,blocked_id:data.userId},"-created_date",10,0);
   for(const row of rows)await db.UserBlock.delete(row.id);return {success:true};
  });
+export const getPushNotificationConfig = createServerFn({method:"GET"}).middleware([requireUser]).handler(async()=>{
+  const publicKey=secrets.get("VAPID_PUBLIC_KEY")||"";
+  return {available:!!publicKey,publicKey};
+});
+export const savePushSubscription = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({endpoint:z.string().url().max(2000),p256dh:z.string().min(20).max(300),auth:z.string().min(8).max(200),expirationTime:z.number().int().positive().optional()}))
+ .handler(async({data,context})=>{
+  const endpoint=new URL(data.endpoint);
+  if(endpoint.protocol!=="https:")throw Object.assign(new Error("Push endpoints must use HTTPS."),{status:400});
+  const db=context.getBase44().asServiceRole.entities.PushSubscription;
+  const existing=await db.filter({user_id:context.user.id,endpoint:data.endpoint},"-created_date",1,0);
+  const payload={user_id:context.user.id,endpoint:data.endpoint,p256dh:data.p256dh,auth:data.auth,expiration_time:data.expirationTime||0,last_error:""};
+  return existing[0]?db.update(existing[0].id,payload):db.create(payload);
+ });
+export const removePushSubscription = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({endpoint:z.string().url().max(2000)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities.PushSubscription;
+  const rows=await db.filter({user_id:context.user.id,endpoint:data.endpoint},"-created_date",100,0);
+  for(const row of rows)await db.delete(row.id);
+  return {removed:rows.length};
+ });
+
 export const getMyNotifications = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.UserNotification.filter({user_id:context.user.id},"-created_date",100,0));
 export const markNotificationRead = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({notificationId:z.string()}))
