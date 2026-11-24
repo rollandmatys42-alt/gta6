@@ -74,7 +74,7 @@ function NotificationBell({isAuthenticated}) {
       setPushMessage("Push alerts enabled on this device.");
     }catch(error){setPushMessage(error?.message||"Push alerts could not be enabled.");}
   };
-  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">🔔</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{pushAvailable&&permission!=="denied"&&<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable push notifications" title="Enable push notifications">+</button>}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
+  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">🔔</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable push notifications" title="Enable push notifications">+</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
 }
 
 function PwaInstallButton() {
