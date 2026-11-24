@@ -58,7 +58,7 @@ function Row({ title, sub, to, children, auto }) {
 }
 
 function HomePage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, navigateToLogin } = useAuth();
   const [videos, setVideos] = useState([]);
   const [loadingVideos, setLoadingVideos] = useState(true);
   const [news, setNews] = useState([]);
