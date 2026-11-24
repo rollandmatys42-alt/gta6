@@ -294,27 +294,37 @@ export const importAdminVideoMetadataCsv = createServerFn({method:"POST"}).middl
  const db=context.getBase44().asServiceRole.entities.Video;let imported=0;for(let i=0;i<records.length;i+=100){const created=await db.bulkCreate(records.slice(i,i+100));imported+=created.length;}return {imported,rejected:rejected.length,errors:rejected.slice(0,30),message:"Imported as metadata-only drafts. No media file or licence has been verified; upload and rights review are still required before publication."};
 });
 export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.Video.list("-created_date",2000,0);});
-export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()})).handler(async({data,context})=>{requireAdmin(context);const entities=context.getBase44().asServiceRole.entities,db=entities.Video;const current=await db.get(data.videoId);if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});if(data.isFreeSample===true){if(current.status!=="published"||current.license_status!=="verified"||!current.storage_key||!current.watermarked_storage_key)throw Object.assign(new Error("Only published videos with verified rights and both renditions can be added to the free sample pack."),{status:409,code:"FREE_SAMPLE_VIDEO_NOT_READY"});const selected=await db.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",10,0);if(!current.is_free_sample&&selected.length>=3)throw Object.assign(new Error("The free sample pack must contain exactly three videos. Remove one before selecting another."),{status:409,code:"FREE_SAMPLE_PACK_FULL"});}const patch={};for(const [key,value] of Object.entries({title:data.title,description:data.description,category:data.category,language:data.language,is_featured:data.isFeatured,is_free_sample:data.isFreeSample,license_status:data.licenseStatus,source_reference:data.sourceReference}))if(value!==undefined)patch[key]=value;return db.update(data.videoId,patch);});
-export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),archived:z.boolean()})).handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.Video;const video=await db.get(data.videoId);if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});return db.update(data.videoId,{status:data.archived?"archived":"draft",...(data.archived?{is_free_sample:false}:{})});});
-async function notifyAllMembers(service, notice) {
-  const entities=service.entities,dispatchSecret=secrets.get("PUSH_DISPATCH_SECRET")||"";
-  for (let offset=0; offset<100000; offset+=5000) {
-    const users = await entities.User.list("-created_date", 5000, offset);
-    if (!users.length) break;
-    for (const user of users) {
-      await entities.UserNotification.create({
-        user_id: user.id, type: notice.type, title: notice.title,
-        body: notice.body, target_url: notice.target_url,
-      }).catch(() => null);
-    }
-    if(dispatchSecret&&service.functions?.invoke){
-      for(let start=0;start<users.length;start+=100){
-        await service.functions.invoke("vicehub-send-push",{dispatchSecret,userIds:users.slice(start,start+100).map(user=>user.id),title:notice.title,body:notice.body,url:notice.target_url}).catch(()=>null);
-      }
-    }
-    if (users.length < 5000) break;
+export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const entities=context.getBase44().asServiceRole.entities,db=entities.Video,current=await db.get(data.videoId);
+  if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});
+  if(data.isFreeSample!==undefined&&data.isFreeSample!==!!current.is_free_sample){
+    const claims=await entities.FreeSamplePackClaim.list("-created_date",1,0);
+    if(claims.length)throw Object.assign(new Error("The three-video sample pack is locked because a member has already claimed it. This keeps every account on the same videos."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
   }
-}
+  if(data.isFreeSample===true){
+    if(current.status!=="published"||current.license_status!=="verified"||!current.storage_key||!current.watermarked_storage_key)throw Object.assign(new Error("Only published videos with verified rights and both renditions can be added to the free sample pack."),{status:409,code:"FREE_SAMPLE_VIDEO_NOT_READY"});
+    const selected=await db.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",10,0);
+    if(!current.is_free_sample&&selected.length>=3)throw Object.assign(new Error("The free sample pack must contain exactly three videos. Remove one before selecting another."),{status:409,code:"FREE_SAMPLE_PACK_FULL"});
+  }
+  const patch={};
+  for(const [key,value] of Object.entries({title:data.title,description:data.description,category:data.category,language:data.language,is_featured:data.isFeatured,is_free_sample:data.isFreeSample,license_status:data.licenseStatus,source_reference:data.sourceReference}))if(value!==undefined)patch[key]=value;
+  return db.update(data.videoId,patch);
+ });
+export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({videoId:z.string().min(1),archived:z.boolean()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const entities=context.getBase44().asServiceRole.entities,db=entities.Video,video=await db.get(data.videoId);
+  if(data.archived&&video.is_free_sample){
+    const claims=await entities.FreeSamplePackClaim.list("-created_date",1,0);
+    if(claims.length)throw Object.assign(new Error("This video belongs to the locked free sample pack and cannot be archived while members have claims."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
+  }
+  if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});
+  return db.update(data.videoId,{status:data.archived?"archived":"draft",...(data.archived?{is_free_sample:false}:{})});
+});
 
 export const publishVideo = createServerFn({ method: "POST" })
   .middleware([requireUser])
