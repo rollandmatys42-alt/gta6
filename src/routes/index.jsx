@@ -156,9 +156,9 @@ function HomePage() {
       <div className="fh-hero-copy">
         <div className="fh-kicker">WELCOME TO VICE CITY</div>
         <h1>Build your creator brand.<br /><em>Make every drop count.</em></h1>
-        <p>GTA creator content has never been easier to build. Discover rights-cleared, ready-to-edit video packs, hooks and social assets — download, customise and publish.</p>
+        <p>Your GTA creator journey starts here. Build your brand, explore the creator hub and earn membership credit by inviting new creators. Paid downloads unlock as rights-cleared packs pass review.</p>
         <div className="fh-hero-cta"><a href="#plans" className="fh-btn solid big">Get instant access</a><a href="#drops" className="fh-btn ghost big">Explore video drops</a></div>
-        <div className="vh-hero-proof"><span>READY-TO-EDIT VIDEO PACKS</span><span>ONE SIMPLE MEMBERSHIP</span><span>NEW CREATOR DROPS</span></div>
+        <div className="vh-hero-proof"><span>RIGHTS-CLEARED DROPS ONLY</span><span>ONE SIMPLE MEMBERSHIP</span><span>CREATOR REFERRAL REWARDS</span></div>
         <ul className="fh-stats">
           <li><b>{videos.length}</b><span>videos ready</span></li>
           <li><b>{creators.length}</b><span>creators</span></li>

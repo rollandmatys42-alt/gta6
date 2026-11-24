@@ -1071,6 +1071,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     if(!plan||Number(plan.monthly_price_cents||0)<=0||Number(plan.monthly_download_limit||0)<1)throw Object.assign(new Error("This membership is not yet open for sale. The administrator must configure a positive monthly price and download allowance first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
     const rightsClearedAssets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",5,0,["id"]);
     if(rightsClearedAssets.length<5)throw Object.assign(new Error("Paid checkout is temporarily closed until at least five rights-cleared downloads are published in the library."),{status:409,code:"CONTENT_LIBRARY_NOT_READY"});
+    if(secrets.get("STRIPE_TAX_ENABLED")!=="true")throw Object.assign(new Error("Paid checkout is disabled until Stripe Tax and the applicable tax registrations are configured."),{status:503,code:"STRIPE_TAX_NOT_CONFIGURED"});
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
     if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
@@ -1140,7 +1141,8 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     form.set("subscription_data[metadata][discount_percent]",String(discount));
     form.set("line_items[0][price]",stripePriceId);
     form.set("line_items[0][quantity]","1");
-    form.set("billing_address_collection","auto");
+    form.set("billing_address_collection","required");
+    form.set("automatic_tax[enabled]","true");
     if(existing?.stripe_customer_id)form.set("customer",existing.stripe_customer_id);
     else if(user.email)form.set("customer_email",user.email);
     const session=await stripeApi("checkout/sessions","POST",form);
