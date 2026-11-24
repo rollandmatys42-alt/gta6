@@ -63,7 +63,7 @@ function NewsPage() {
   return <SiteFrame eyebrow="VICEHUB / THE LEONIDA DISPATCH" workspace={isAuthenticated} activeKey="news">
     <div className="nr-page">
       <section className="nr-hero">
-        <img className="nr-hero-image" src="/vicehub-news-placeholder.svg" alt="VICEHUB editorial artwork" />
+        <img className="nr-hero-image" src="https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=1920" alt="VICEHUB editorial artwork" />
         <div className="nr-hero-shade" />
         <div className="nr-hero-content">
           <div className="nr-kicker"><span className="nr-live-dot" /> VICEHUB NEWSROOM <i /> LEONIDA / FLORIDA</div>
