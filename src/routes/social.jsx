@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import "@/styles/social-publishing.css";
@@ -54,6 +54,7 @@ function SocialPublishingPage() {
   const [aiBusy, setAiBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const connectIntentHandled = useRef(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -124,6 +125,15 @@ function SocialPublishingPage() {
       setConnecting("");
     }
   };
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === "undefined" || connectIntentHandled.current) return;
+    const requested = new URLSearchParams(window.location.search).get("connect");
+    if (!requested || !platforms.includes(requested)) return;
+    connectIntentHandled.current = true;
+    window.history.replaceState({}, "", "/social");
+    connect(requested === "Facebook" ? "Instagram" : requested);
+  }, [isAuthenticated]);
+
   const disconnect = async account => {
     if (!window.confirm("Disconnect " + account.accountName + " from VICEHUB?")) return;
     setBusy(true); setError(""); setNotice("");
@@ -212,7 +222,7 @@ function SocialPublishingPage() {
   return <SiteFrame eyebrow="VICEHUB / SOCIAL PUBLISHING" workspace={isAuthenticated} activeKey="social">
     <main className="social-shell">
       <header className="social-hero">
-        <div><span className="social-kicker">VICEHUB / CREATOR DISTRIBUTION</span><h1>YOUR SOCIAL<br/><em>CONTROL ROOM.</em></h1><p>Connect your own channels. Prepare platform-specific content. Publish to the account you select — never to another member's profile.</p></div>
+        <div><span className="social-kicker">VICEHUB / CREATOR DISTRIBUTION</span><h1>YOUR SOCIAL<br/><em>CONTROL ROOM.</em></h1><p>One clear workspace to connect your channels, prepare content and manage every publication. Each network is authorised securely through its official sign-in.</p><div className="social-hero-actions"><a href="#social-accounts">CONNECT CHANNELS ↓</a><a href="#social-composer">CREATE A POST ↗</a></div></div>
         <div className="social-hero-stamp"><b>06</b><span>NETWORKS</span><small>YOUR ACCOUNTS / YOUR TOKENS</small></div>
       </header>
 
@@ -220,7 +230,7 @@ function SocialPublishingPage() {
       {notice && <div className="social-notice" role="status">{notice}</div>}
 
       <section className="social-section">
-        <div className="social-section-head"><div><span className="social-kicker">01 / AUTHENTICATION</span><h2>CONNECTED ACCOUNTS</h2></div><span className="social-count">{accounts.length} CONNECTED</span></div>
+        <div className="social-section-head"><div><span className="social-kicker">01 / YOUR CHANNELS</span><h2>CONNECT YOUR ACCOUNTS</h2></div><span className="social-count">{accounts.length} CONNECTED</span></div>
         <p className="social-muted">Each member authorises their own accounts. VICEHUB stores encrypted credentials and only exposes account names and connection status to the interface.</p>
         <div className="social-connect-grid">
           {platforms.map(provider => <article className="social-provider-card" key={provider}>
@@ -239,7 +249,7 @@ function SocialPublishingPage() {
       </section>
 
       <section className="social-section">
-        <div className="social-section-head"><div><span className="social-kicker">02 / CONTENT DISTRIBUTION</span><h2>CREATE A PUBLICATION</h2></div><span className="social-count">PRIVATE PLANNER</span></div>
+        <div className="social-section-head"><div><span className="social-kicker">02 / CONTENT STUDIO</span><h2>PLAN A PUBLICATION</h2></div><span className="social-count">PRIVATE PLANNER</span></div>
         <form className="social-composer" onSubmit={save}>
           <div className="social-form-grid">
             <label>NETWORK<select value={platform} onChange={event => { setPlatform(event.target.value); setAccountId(""); setMediaUrl(""); setMediaFile(null); setExistingMediaObjectKey(""); }}><option value="TikTok">TikTok</option><option value="Instagram">Instagram</option><option value="Facebook">Facebook Page</option><option value="YouTube">YouTube</option><option value="LinkedIn">LinkedIn</option><option value="X">X</option></select></label>
@@ -257,7 +267,7 @@ function SocialPublishingPage() {
       </section>
 
       <section className="social-section">
-        <div className="social-section-head"><div><span className="social-kicker">03 / PUBLICATION HISTORY</span><h2>YOUR CONTENT QUEUE</h2></div><button type="button" className="social-secondary" onClick={processDue} disabled={busy}>PROCESS DUE POSTS ↻</button></div>
+        <div className="social-section-head"><div><span className="social-kicker">03 / YOUR SCHEDULE</span><h2>PUBLICATION TIMELINE</h2></div><button type="button" className="social-secondary" onClick={processDue} disabled={busy}>PROCESS DUE POSTS ↻</button></div>
         <div className="social-queue-toolbar"><span>{posts.length} POSTS</span><select value={filter} onChange={event => setFilter(event.target.value)}><option>All</option>{platforms.map(item => <option key={item}>{item}</option>)}</select><button type="button" className="social-secondary" onClick={refresh} disabled={loading || busy}>REFRESH</button></div>
         {loading ? <div className="social-empty">Loading your private queue…</div> : visiblePosts.length === 0 ? <div className="social-empty">No posts yet. Connect a network and create your first publication.</div> : <div className="social-post-list">
           {visiblePosts.map(post => <article className="social-post-card" key={post.id}>
