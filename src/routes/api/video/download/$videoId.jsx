@@ -18,7 +18,8 @@ export const Route = createFileRoute("/api/video/download/$videoId")({
         );
         const event = events.find(item => item.delivery_expires_at && new Date(item.delivery_expires_at).getTime() > Date.now());
         if (!event) return Response.json({ error: "Download authorisation expired or already used." }, { status: 403 });
-        await entities.DownloadEvent.update(event.id, { status: "delivered" });
+        const consumed = await entities.DownloadEvent.updateMany({ id: event.id, status: "signed" }, { $set: { status: "delivered" } });
+        if (!consumed?.updated) return Response.json({ error: "Download authorisation has already been used." }, { status: 403 });
         const watermarkApplied = !!event.watermark_applied;
         const objectKey = watermarkApplied ? video.watermarked_storage_key : video.storage_key;
         const connectionId = watermarkApplied ? video.watermarked_storage_connection_id : video.storage_connection_id;
