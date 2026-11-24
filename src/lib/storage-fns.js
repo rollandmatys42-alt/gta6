@@ -92,7 +92,8 @@ export async function addStorageConnection({ entities, data, userId }) {
   const endpoint = new URL(data.endpoint);
   if (endpoint.protocol !== "https:") throw new Error("The storage endpoint must use HTTPS.");
   const credentials = { accessKey: data.accessKey, secretKey: data.secretKey };
-  const connection = { ...data, endpoint: endpoint.origin + endpoint.pathname.replace(/\\/$/, "") };
+  const endpointPath = endpoint.pathname.endsWith("/") ? endpoint.pathname.slice(0, -1) : endpoint.pathname;
+  const connection = { ...data, endpoint: endpoint.origin + endpointPath };
   await verifyCredentials({ ...connection, ...credentials });
   const id = crypto.randomUUID(), now = new Date().toISOString();
   const publicData = { id, provider: data.provider, name: data.name, endpoint: connection.endpoint, bucket: data.bucket, region: data.region, capacityGb: data.capacityGb || null, usedBytes: 0, enabled: true, verifiedAt: now, createdAt: now };
