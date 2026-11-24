@@ -3,7 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import Carousel from "@/components/Carousel";
 import { useAuth } from "@/lib/AuthContext";
-import { listPublishedVideos, getVideoPreviewUrl, requestVideoDownload, getNewsFeed, getPublicPlans, getCreatorDirectory, getShopProducts, createStripeCheckoutSession, getPublicCommunityReviews, submitCommunityReview } from "@/lib/server-fns";
+import { listPublishedVideos, getVideoPreviewUrl, getNewsFeed, getPublicPlans, getCreatorDirectory, getShopProducts, createStripeCheckoutSession, getPublicCommunityReviews, submitCommunityReview } from "@/lib/server-fns";
+import { downloadCleanVideo } from "@/lib/video-download";
 import { formatMoney } from "@/lib/loyalty";
 import "@/styles/vicehub-growth.css";
 
@@ -132,8 +133,16 @@ function HomePage() {
   const download = async video => {
     if (!isAuthenticated) { window.location.assign("/sign-in"); return; }
     setNotice("Checking your plan…");
-    try { const r = await requestVideoDownload({ data: { videoId: video.id } }); window.location.assign(r.downloadUrl); setNotice(`Download started — ${r.downloadsRemaining} left this month.`); }
-    catch (e) { setNotice(e?.message || "Download unavailable."); }
+    try {
+      const result = await downloadCleanVideo({
+        videoId: video.id,
+        title: video.title,
+        onProgress: setNotice,
+      });
+      setNotice("Clean download started: " + result.fileName);
+    } catch (e) {
+      setNotice(e?.message || "Download unavailable.");
+    }
   };
   const subscribe = async selectedPlan => {
     if (!isAuthenticated) { navigateToLogin(); return; }

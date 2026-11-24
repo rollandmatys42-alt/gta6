@@ -17,7 +17,7 @@ jobs:
           node-version: 22
       - name: Parse changed JSX and JavaScript
         run: |
-          npx --yes esbuild src/routes/_authed/dashboard.jsx src/routes/library.jsx src/routes/social.jsx src/routes/admin.jsx src/routes/api/social/publisher.jsx src/routes/api/social/publisher/cron.jsx src/routes/api/news/sources/cron.jsx src/routes/api/agents/growth/cron.jsx src/routes/_authed/admin/videos.jsx 'src/routes/news/$slug.jsx' src/routes/news-sitemap[.]xml.jsx src/routes/articles-sitemap[.]xml.jsx src/routes/api/agents/growth/cron.jsx src/routes/shop.jsx src/routes/api/stripe/webhook.jsx src/lib/server-fns.js src/lib/i18n.js --bundle --external:* --outdir=/tmp/vicehub-syntax-check --log-level=warning
+          npx --yes esbuild src/routes/index.jsx src/routes/_authed/dashboard.jsx src/routes/library.jsx src/routes/social.jsx src/routes/admin.jsx src/routes/api/social/publisher.jsx src/routes/api/social/publisher/cron.jsx src/routes/api/news/sources/cron.jsx src/routes/api/agents/growth/cron.jsx src/routes/_authed/admin/videos.jsx 'src/routes/news/$slug.jsx' src/routes/news-sitemap[.]xml.jsx src/routes/articles-sitemap[.]xml.jsx src/routes/api/agents/growth/cron.jsx src/routes/shop.jsx src/routes/api/stripe/webhook.jsx src/lib/server-fns.js src/lib/i18n.js src/lib/video-cleaner.js src/lib/video-download.js --bundle --external:* --outdir=/tmp/vicehub-syntax-check --log-level=warning
 
   scheduled-worker:
     name: Scheduled social worker type check
@@ -27,5 +27,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Install npm dependencies for Deno checks
+        run: deno install
       - name: Type-check Deno automation
         run: deno check base44/functions/social-publisher/index.ts base44/functions/gta-news-sync/index.ts base44/functions/vicehub-send-push/index.ts
