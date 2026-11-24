@@ -123,22 +123,31 @@ function ShopPage() {
     }
   };
 
-  return <SiteFrame eyebrow="VICEHUB / SUPPLY">
-    <main className="vh-shop">
+  return <SiteFrame eyebrow="VISIT LEONIDA / FIELD SUPPLY">
+    <main className="vh-shop vh-shop-leonida">
       <section className="vh-shop-hero">
-        <div className="vh-shop-hero-copy">
-          <span className="vh-shop-kicker">VICEHUB SUPPLY · DROP 001</span>
-          <h1>THE STORE.<br /><em>THE CULTURE.</em></h1>
-          <p>Independent creator gear, original VICEHUB designs and carefully verified licensed pieces. Built for the people shaping the community.</p>
-          <div className="vh-shop-hero-meta"><span>CURATED DROPS</span><i /> <span>SECURE CHECKOUT</span><i /> <span>GBP · EUR · USD</span></div>
+        <div className="vh-shop-hero-map" aria-label="Map of Leonida">
+          <img src="https://media.base44.com/images/public/6b02e11e6786e710c26cc578/b847d1c5b310ab60bc010c554deeee19_Leonida_Map_Poster.jpg" alt="Visit Leonida map showing Vice City, Vice-Dale County, Leonida and surrounding districts" />
+          <div className="vh-shop-map-caption"><span>VISIT LEONIDA</span><b>THE GREAT STATE OF LEONIDA</b><small>FIELD GUIDE / MAP SERIES 001</small></div>
         </div>
-        <div className="vh-shop-hero-art" aria-hidden="true"><div className="vh-shop-orbit" /><div className="vh-shop-hero-mark">VH<span>®</span></div><div className="vh-shop-hero-stamp">VICE CITY<br />SUPPLY CO.</div></div>
+        <div className="vh-shop-hero-copy">
+          <span className="vh-shop-kicker">VICEHUB SUPPLY · LEONIDA COLLECTION</span>
+          <h1>GO BEYOND<br/><em>VICE CITY.</em></h1>
+          <p>A field store for the people exploring Leonida. Discover independent creator goods, original VICEHUB designs and properly licensed collectibles.</p>
+          <a className="vh-shop-explore" href="#collection">EXPLORE THE COLLECTION <span>↓</span></a>
+          <div className="vh-shop-hero-meta"><span>LEONIDA FIELD NOTES</span><i/><span>CURATED CREATOR GOODS</span></div>
+        </div>
+        <div className="vh-shop-hero-coordinate">27° 58' N&nbsp; / &nbsp;82° 27' W <b>LEONIDA, USA</b></div>
       </section>
 
-      <section className="vh-shop-toolbar">
-        <div><span className="vh-shop-section-label">THE COLLECTION</span><h2>Latest drops <small>{products.length.toString().padStart(2, "0")} ITEMS</small></h2></div>
+      <section className="vh-shop-intro-strip">
+        <span>THE LEONIDA EDITION</span><b>FROM THE KEYS TO THE NORTH COAST</b><span>VICEHUB / SUPPLY — EST. 2026</span>
+      </section>
+
+      <section className="vh-shop-toolbar" id="collection">
+        <div><span className="vh-shop-section-label">THE FIELD STORE / 001</span><h2>THE COLLECTION <small>{products.length.toString().padStart(2, "0")} ITEMS</small></h2></div>
         <div className="vh-shop-controls">
-          <label className="vh-shop-search"><span>⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search the store" aria-label="Search products" /></label>
+          <label className="vh-shop-search"><span>⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Find your next drop" aria-label="Search products"/></label>
           <button className={"vh-shop-bag-trigger" + (cartOpen ? " active" : "")} onClick={() => setCartOpen(v => !v)}>YOUR BAG <b>{String(cartCount).padStart(2, "0")}</b></button>
         </div>
       </section>
@@ -149,77 +158,62 @@ function ShopPage() {
 
       {message && <div className="vh-shop-message" role="status"><span>{message}</span><button onClick={() => setMessage("")} aria-label="Dismiss">×</button></div>}
 
-      {loading ? <div className="vh-shop-loading"><span /> LOADING THE COLLECTION</div> :
+      {loading ? <div className="vh-shop-loading"><span/> MAPPING THE COLLECTION…</div> :
         visible.length ? <div className="vh-shop-grid">
-          {visible.map((product, index) => {
-            const external = product.product_type === "external";
-            const outOfStock = product.product_type === "physical" && Number(product.stock_quantity || 0) < 1;
-            return <article className={"vh-shop-product" + (product.is_featured ? " featured" : "")} key={product.id}>
-              <button className="vh-shop-product-image" onClick={() => { setSelected(product); setSelectedSize(product.size_options?.[0] || ""); setSelectedColor(product.color_options?.[0] || ""); }} aria-label={"View " + product.title}>
-                {product.image_url ? <img src={product.image_url} alt={product.title} loading={index > 3 ? "lazy" : "eager"} /> : <span className="vh-shop-placeholder"><b>VICEHUB</b><small>{product.category || "SUPPLY"}</small></span>}
-                {product.is_featured && <span className="vh-shop-featured">FEATURED DROP</span>}
-                {external && <span className="vh-shop-external">OFFICIAL RETAILER</span>}
-                {outOfStock && <span className="vh-shop-soldout">SOLD OUT</span>}
+          {visible.map((product,index) => {
+            const external=product.product_type==="external";
+            const outOfStock=product.product_type==="physical"&&Number(product.stock_quantity||0)<1;
+            return <article className={"vh-shop-product"+(product.is_featured?" featured":"")} key={product.id}>
+              <button className="vh-shop-product-image" onClick={()=>{setSelected(product);setSelectedSize(product.size_options?.[0]||"");setSelectedColor(product.color_options?.[0]||"");}} aria-label={"View "+product.title}>
+                {product.image_url?<img src={product.image_url} alt={product.title} loading={index>3?"lazy":"eager"}/>:<span className="vh-shop-placeholder"><b>LEONIDA</b><small>{product.category||"FIELD SUPPLY"}</small></span>}
+                {product.is_featured&&<span className="vh-shop-featured">FIELD PICK</span>}
+                {external&&<span className="vh-shop-external">OFFICIAL RETAILER</span>}
+                {outOfStock&&<span className="vh-shop-soldout">OUT OF STOCK</span>}
               </button>
               <div className="vh-shop-product-copy">
-                <div className="vh-shop-product-meta"><span>{product.category || "VICEHUB"}</span><span>{product.sku || "DROP 001"}</span></div>
-                <h3>{product.title}</h3>
-                <p>{product.description}</p>
-                <div className="vh-shop-product-bottom"><strong>{money(product.price_cents, product.currency)}</strong>
-                  <button disabled={outOfStock} onClick={() => { setSelected(product); setSelectedSize(product.size_options?.[0] || ""); setSelectedColor(product.color_options?.[0] || ""); }}>{external ? "VIEW RETAILER ↗" : outOfStock ? "SOLD OUT" : "QUICK VIEW +"}</button>
-                </div>
+                <div className="vh-shop-product-meta"><span>{product.category||"VICEHUB"}</span><span>{product.sku||"LEONIDA / 001"}</span></div>
+                <h3>{product.title}</h3><p>{product.description}</p>
+                <div className="vh-shop-product-bottom"><strong>{money(product.price_cents,product.currency)}</strong><button disabled={outOfStock} onClick={()=>{setSelected(product);setSelectedSize(product.size_options?.[0]||"");setSelectedColor(product.color_options?.[0]||"");}}>{external?"VIEW OFFICIAL STORE ↗":outOfStock?"OUT OF STOCK":"QUICK VIEW +"}</button></div>
               </div>
             </article>;
           })}
-        </div> : <div className="vh-shop-empty"><span>VH / 001</span><h3>{products.length ? "NO MATCHING ITEMS." : "THE NEXT DROP IS IN PROGRESS."}</h3><p>{products.length ? "Try another category or search term." : "New pieces will appear here when the VICEHUB team has added and approved them. No placeholder products or fake prices."}</p></div>
-      }
+        </div> : <div className="vh-shop-empty">
+          <div className="vh-shop-empty-map"><img src="https://media.base44.com/images/public/6b02e11e6786e710c26cc578/b847d1c5b310ab60bc010c554deeee19_Leonida_Map_Poster.jpg" alt="Leonida map detail"/></div>
+          <div className="vh-shop-empty-copy"><span>LEONIDA / DROP 001</span><h3>{products.length?"NOTHING AT THIS COORDINATE.":"THE FIRST DROP IS BEING PREPARED."}</h3><p>{products.length?"Try another category or search term.":"Our team is preparing the first VICEHUB collection. Only real products with verified ownership or licensing will appear here."}</p><b>CHECK BACK SOON <i>✳</i></b></div>
+        </div>}
 
-      {isAuthenticated && myOrders.length > 0 && <section className="vh-shop-orders"><div className="vh-shop-orders-head"><div><span className="vh-shop-section-label">ACCOUNT / PURCHASE HISTORY</span><h2>MY ORDERS</h2></div><small>{myOrders.length} RECENT ORDERS</small></div>{myOrders.map(order => <article className="vh-shop-order-row" key={order.id}><div><b>ORDER / {order.id.slice(-8).toUpperCase()}</b><small>{(order.items||[]).map(item => item.quantity+" × "+item.title).join(" · ")}</small></div><span className={"vh-shop-order-status "+order.status}>{order.status.replaceAll("_"," ")}</span><strong>{money(order.total_cents,order.currency)}</strong>{order.tracking_url&&<a href={order.tracking_url} target="_blank" rel="noreferrer">TRACK ↗</a>}</article>)}</section>}
+      {isAuthenticated&&myOrders.length>0&&<section className="vh-shop-orders"><div className="vh-shop-orders-head"><div><span className="vh-shop-section-label">ACCOUNT / PURCHASE HISTORY</span><h2>MY ORDERS</h2></div><small>{myOrders.length} RECENT ORDERS</small></div>{myOrders.map(order=><article className="vh-shop-order-row" key={order.id}><div><b>ORDER / {order.id.slice(-8).toUpperCase()}</b><small>{(order.items||[]).map(item=>item.quantity+" × "+item.title).join(" · ")}</small></div><span className={"vh-shop-order-status "+order.status}>{order.status.replaceAll("_"," ")}</span><strong>{money(order.total_cents,order.currency)}</strong>{order.tracking_url&&<a href={order.tracking_url} target="_blank" rel="noreferrer">TRACK ↗</a>}</article>)}</section>}
 
       <section className="vh-shop-trust">
-        <div><b>01 / VERIFIED LISTINGS</b><p>Products are only published after ownership or licensing status is reviewed.</p></div>
-        <div><b>02 / SECURE PAYMENT</b><p>Checkout is handled by Stripe when payment setup is active.</p></div>
-        <div><b>03 / CLEAR FULFILMENT</b><p>Physical stock and shipping costs are displayed before payment.</p></div>
+        <div><b>01 / CREATOR-MADE</b><p>Independent goods and original designs from the VICEHUB community.</p></div>
+        <div><b>02 / RIGHTS REVIEWED</b><p>Original work and licensed products are reviewed before publication.</p></div>
+        <div><b>03 / SECURE CHECKOUT</b><p>Payments, delivery details and order updates are handled securely.</p></div>
       </section>
 
-      {selected && <div className="vh-shop-modal-backdrop" role="presentation" onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}>
+      {selected&&<div className="vh-shop-modal-backdrop" role="presentation" onClick={e=>{if(e.target===e.currentTarget)setSelected(null);}}>
         <section className="vh-shop-modal" role="dialog" aria-modal="true" aria-label={selected.title}>
-          <button className="vh-shop-modal-close" onClick={() => setSelected(null)} aria-label="Close">×</button>
-          <div className="vh-shop-modal-image">{selected.image_url ? <img src={selected.image_url} alt={selected.title} /> : <span className="vh-shop-placeholder"><b>VICEHUB</b></span>}</div>
-          <div className="vh-shop-modal-copy">
-            <span className="vh-shop-section-label">{selected.category || "VICEHUB SUPPLY"} / {selected.sku || "DROP 001"}</span>
-            <h2>{selected.title}</h2><p>{selected.description}</p>
-            <strong className="vh-shop-modal-price">{money(selected.price_cents, selected.currency)}</strong>
-            {selected.product_type === "external" ? <a className="vh-shop-checkout" href={selected.external_url} target="_blank" rel="noreferrer">SHOP OFFICIAL RETAILER ↗</a> : <>
-              {!!selected.size_options?.length && <label className="vh-shop-option">SIZE<select value={selectedSize} onChange={e => setSelectedSize(e.target.value)}>{selected.size_options.map(v => <option key={v}>{v}</option>)}</select></label>}
-              {!!selected.color_options?.length && <label className="vh-shop-option">COLOUR<select value={selectedColor} onChange={e => setSelectedColor(e.target.value)}>{selected.color_options.map(v => <option key={v}>{v}</option>)}</select></label>}
-              {selected.product_type === "physical" && selected.shipping_required && <small className="vh-shop-shipping-note">Shipping: {money(selected.shipping_price_cents, selected.currency)} per item</small>}
-              <button className="vh-shop-checkout" onClick={() => addToCart(selected, selectedSize, selectedColor)}>ADD TO BAG ↗</button>
+          <button className="vh-shop-modal-close" onClick={()=>setSelected(null)} aria-label="Close">×</button>
+          <div className="vh-shop-modal-image">{selected.image_url?<img src={selected.image_url} alt={selected.title}/>:<span className="vh-shop-placeholder"><b>LEONIDA</b></span>}</div>
+          <div className="vh-shop-modal-copy"><span className="vh-shop-section-label">{selected.category||"VICEHUB SUPPLY"} / {selected.sku||"DROP 001"}</span><h2>{selected.title}</h2><p>{selected.description}</p><strong className="vh-shop-modal-price">{money(selected.price_cents,selected.currency)}</strong>
+            {selected.product_type==="external"?<a className="vh-shop-checkout" href={selected.external_url} target="_blank" rel="noreferrer">SHOP OFFICIAL RETAILER ↗</a>:<>
+              {!!selected.size_options?.length&&<label className="vh-shop-option">SIZE<select value={selectedSize} onChange={e=>setSelectedSize(e.target.value)}>{selected.size_options.map(v=><option key={v}>{v}</option>)}</select></label>}
+              {!!selected.color_options?.length&&<label className="vh-shop-option">COLOUR<select value={selectedColor} onChange={e=>setSelectedColor(e.target.value)}>{selected.color_options.map(v=><option key={v}>{v}</option>)}</select></label>}
+              {selected.product_type==="physical"&&selected.shipping_required&&<small className="vh-shop-shipping-note">Shipping: {money(selected.shipping_price_cents,selected.currency)} per item</small>}
+              <button className="vh-shop-checkout" onClick={()=>addToCart(selected,selectedSize,selectedColor)}>ADD TO BAG ↗</button>
             </>}
-            <small className="vh-shop-rights-note">{selected.rights_status === "licensed" ? "Licensed third-party product" : selected.rights_status === "official_external" ? "Official retailer link — checkout takes place on the retailer's website" : "VICEHUB original product"}. VICEHUB is an independent platform and is not affiliated with Rockstar Games.</small>
+            <small className="vh-shop-rights-note">{selected.rights_status==="licensed"?"Licensed third-party product":selected.rights_status==="official_external"?"Official retailer link — checkout takes place on the retailer's website":"VICEHUB original product"}. VICEHUB is an independent platform and is not affiliated with Rockstar Games.</small>
           </div>
         </section>
       </div>}
 
-      {cartOpen && <div className="vh-shop-cart-backdrop" onClick={e => { if (e.target === e.currentTarget) setCartOpen(false); }}>
+      {cartOpen&&<div className="vh-shop-cart-backdrop" onClick={e=>{if(e.target===e.currentTarget)setCartOpen(false);}}>
         <aside className="vh-shop-cart" aria-label="Shopping bag">
-          <div className="vh-shop-cart-head"><div><span className="vh-shop-section-label">VICEHUB SUPPLY</span><h2>YOUR BAG <small>{cartCount} ITEMS</small></h2></div><button onClick={() => setCartOpen(false)} aria-label="Close bag">×</button></div>
-          <div className="vh-shop-cart-items">
-            {!cart.length ? <p className="vh-shop-cart-empty">Your bag is empty. Find your next drop.</p> : cart.map((item, index) => <div className="vh-shop-cart-item" key={item.product.id + item.size + item.color}>
-              <div className="vh-shop-cart-thumb">{item.product.image_url ? <img src={item.product.image_url} alt="" /> : <b>VH</b>}</div>
-              <div className="vh-shop-cart-item-copy"><b>{item.product.title}</b><small>{[item.size, item.color].filter(Boolean).join(" · ") || item.product.sku}</small><strong>{money(item.product.price_cents, item.product.currency)}</strong>
-                <div className="vh-shop-quantity"><button onClick={() => updateQuantity(index, -1)} aria-label="Decrease quantity">−</button><span>{item.quantity}</span><button onClick={() => updateQuantity(index, 1)} aria-label="Increase quantity">+</button><button className="remove" onClick={() => removeItem(index)}>REMOVE</button></div>
-              </div>
-            </div>)}
-          </div>
-          {!!cart.length && <div className="vh-shop-cart-footer">
-            <div><span>SUBTOTAL</span><b>{money(subtotal, cartCurrency)}</b></div>
-            {shipping > 0 && <div><span>ESTIMATED SHIPPING</span><b>{money(shipping, cartCurrency)}</b></div>}
-            <div className="total"><span>TOTAL BEFORE ANY APPLICABLE TAX</span><b>{money(total, cartCurrency)}</b></div>
-            <p>Final delivery details and any applicable taxes are shown in the secure payment flow.</p>
-            <button className="vh-shop-checkout" disabled={busy} onClick={checkout}>{busy ? "PLEASE WAIT…" : "SECURE CHECKOUT ↗"}</button>
-            <button className="vh-shop-clear" onClick={() => setCart([])}>CLEAR BAG</button>
-          </div>}
+          <div className="vh-shop-cart-head"><div><span className="vh-shop-section-label">VICEHUB / FIELD SUPPLY</span><h2>YOUR BAG <small>{cartCount} ITEMS</small></h2></div><button onClick={()=>setCartOpen(false)} aria-label="Close bag">×</button></div>
+          <div className="vh-shop-cart-items">{!cart.length?<p className="vh-shop-cart-empty">Your bag is empty. Find your next drop.</p>:cart.map((item,index)=><div className="vh-shop-cart-item" key={item.product.id+item.size+item.color}>
+            <div className="vh-shop-cart-thumb">{item.product.image_url?<img src={item.product.image_url} alt=""/>:<b>LH</b>}</div>
+            <div className="vh-shop-cart-item-copy"><b>{item.product.title}</b><small>{[item.size,item.color].filter(Boolean).join(" · ")||item.product.sku}</small><strong>{money(item.product.price_cents,item.product.currency)}</strong><div className="vh-shop-quantity"><button onClick={()=>updateQuantity(index,-1)} aria-label="Decrease quantity">−</button><span>{item.quantity}</span><button onClick={()=>updateQuantity(index,1)} aria-label="Increase quantity">+</button><button className="remove" onClick={()=>removeItem(index)}>REMOVE</button></div></div>
+          </div>)}</div>
+          {!!cart.length&&<div className="vh-shop-cart-footer"><div><span>SUBTOTAL</span><b>{money(subtotal,cartCurrency)}</b></div>{shipping>0&&<div><span>ESTIMATED SHIPPING</span><b>{money(shipping,cartCurrency)}</b></div>}<div className="total"><span>TOTAL BEFORE ANY APPLICABLE TAX</span><b>{money(total,cartCurrency)}</b></div><p>Final delivery details and any applicable taxes are shown in the secure payment flow.</p><button className="vh-shop-checkout" disabled={busy} onClick={checkout}>{busy?"PLEASE WAIT…":"SECURE CHECKOUT ↗"}</button><button className="vh-shop-clear" onClick={()=>setCart([])}>CLEAR BAG</button></div>}
         </aside>
       </div>}
     </main>
