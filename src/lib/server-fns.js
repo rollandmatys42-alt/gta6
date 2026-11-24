@@ -3,7 +3,7 @@ import { z } from "zod";
 import { secrets } from "base44:runtime";
 import { requireUser } from "@/lib/auth-middleware";
 import { priceForMonth } from "@/lib/loyalty";
-import { issueStorageUploadUrl, createStorageAssetUrl, recordStorageUsage } from "@/lib/storage-fns";
+import { issueStorageUploadUrl, recordStorageUsage } from "@/lib/storage-fns";
 
 const encoder = new TextEncoder();
 const MONTHLY_FREE_LIMIT = 5;
