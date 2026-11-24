@@ -112,7 +112,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
   return <div className={"platform-shell fh-shell" + (workspace ? " vh-workspace-mode" : "")}>
     {workspace ? <>
       <aside className="vh-workspace-sidebar">
-        <Link to="/dashboard" className="vh-workspace-brand"><span className="vh-workspace-mark">V</span><span>VICE<b>HUB</b><small>MEMBER HQ / LEONIDA</small></span></Link>
+        <Link to="/dashboard" className="vh-workspace-brand"><span className="vh-workspace-mark">VI</span><span>VICE<b>HUB</b><small>MEMBER HQ / LEONIDA</small></span></Link>
         <div className="vh-workspace-caption">MEMBER NAVIGATION</div>
         <nav className="vh-workspace-nav" aria-label="Member workspace navigation">
           {workspaceLinks.map(([href, icon, key]) => <Link key={href} to={href} className={activeKey === key ? "active" : ""} aria-current={activeKey === key ? "page" : undefined}>
@@ -137,7 +137,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
     </> : <>
       <header className="fh-header">
         <div className="fh-header-inner">
-          <Link to="/" className="fh-brand" onClick={close}><span className="fh-brand-mark">V</span><span className="fh-brand-text">VICE<b>HUB</b><small>GTA VI FAN DROPS</small></span></Link>
+          <Link to="/" className="fh-brand" onClick={close}><span className="fh-brand-mark">VI</span><span className="fh-brand-text">VICE<b>HUB</b><small>GTA VI FAN DROPS</small></span></Link>
           <button type="button" className="fh-burger" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}><i /><i /><i /></button>
           <nav className={"fh-nav" + (open ? " open" : "")} aria-label="Main">
             {links.map(([href, key]) => <Link key={href} to={href} className="fh-nav-link" activeProps={{ className: "fh-nav-link active" }} activeOptions={{ exact: href === "/" }} onClick={close}>{label(key)}</Link>)}
