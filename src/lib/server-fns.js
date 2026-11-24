@@ -435,7 +435,7 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
     const db = base44.asServiceRole.entities;
     const payload = { title:data.title, slug:data.slug, summary:data.summary, body:data.body, source_name:data.sourceName,
       source_url:data.sourceUrl, source_type:data.sourceType, confidence:data.confidence, locale:data.locale,
-      image_url:data.imageUrl || "", image_alt:data.imageAlt || "", tags:data.tags||[], status:data.status, created_by:context.user.id,
+      ...(data.imageUrl ? {image_url:data.imageUrl,image_alt:data.imageAlt||""} : {}), tags:data.tags||[], status:data.status, created_by:context.user.id,
       ...(data.status==="published" ? {published_at:new Date().toISOString(),last_verified_at:new Date().toISOString()} : {}) };
     const previous = data.id ? await db.NewsArticle.get(data.id).catch(()=>null) : null;
     const saved = data.id ? await db.NewsArticle.update(data.id,payload) : await db.NewsArticle.create(payload);
