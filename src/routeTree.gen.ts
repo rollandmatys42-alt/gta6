@@ -17,6 +17,7 @@ import { Route as MessagesRouteImport } from "./routes/messages";
 import { Route as NewsRouteImport } from "./routes/news";
 import { Route as NewsArticleRouteImport } from "./routes/news/$slug";
 import { Route as NewsSitemapRouteImport } from "./routes/news-sitemap[.]xml";
+import { Route as GrowthCronRouteImport } from "./routes/api/agents/growth/cron";
 import { Route as NotificationsRouteImport } from "./routes/notifications";
 import { Route as PrivacyRouteImport } from "./routes/privacy";
 import { Route as RefundsRouteImport } from "./routes/refunds";
@@ -43,6 +44,7 @@ const MessagesRoute = MessagesRouteImport.update({ id: "/messages", path: "/mess
 const NewsRoute = NewsRouteImport.update({ id: "/news", path: "/news", getParentRoute: () => rootRouteImport });
 const NewsArticleRoute = NewsArticleRouteImport.update({ id: "/news/$slug", path: "/news/$slug", getParentRoute: () => rootRouteImport });
 const NewsSitemapRoute = NewsSitemapRouteImport.update({ id: "/news-sitemap.xml", path: "/news-sitemap.xml", getParentRoute: () => rootRouteImport });
+const GrowthCronRoute = GrowthCronRouteImport.update({ id: "/api/agents/growth/cron", path: "/api/agents/growth/cron", getParentRoute: () => rootRouteImport });
 const NotificationsRoute = NotificationsRouteImport.update({ id: "/notifications", path: "/notifications", getParentRoute: () => rootRouteImport });
 const PrivacyRoute = PrivacyRouteImport.update({ id: "/privacy", path: "/privacy", getParentRoute: () => rootRouteImport });
 const RefundsRoute = RefundsRouteImport.update({ id: "/refunds", path: "/refunds", getParentRoute: () => rootRouteImport });
@@ -72,6 +74,7 @@ const rootRouteChildren = {
   NewsRoute,
   NewsArticleRoute,
   NewsSitemapRoute,
+  GrowthCronRoute,
   NotificationsRoute,
   PrivacyRoute,
   RefundsRoute,
