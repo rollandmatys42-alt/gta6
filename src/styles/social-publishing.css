@@ -6,3 +6,36 @@
 
 .social-provider-warning{display:block;margin:8px 0 12px;color:#ffb982;font-size:10px;line-height:1.55;letter-spacing:.04em}
 .social-provider-card button:disabled{opacity:.55;cursor:not-allowed}
+
+
+/* VICEHUB Social Control Room — full visual refresh */
+.social-shell{max-width:1380px;padding:8px 0 60px;color:#f8f4fb}
+.social-hero{min-height:310px;border-radius:22px;border-color:#ffffff24;background:linear-gradient(105deg,#0b0718f5 0%,#120b25e8 53%,#150a20a6 100%),url("https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=3840") center 46%/cover}
+.social-hero:after{background:radial-gradient(ellipse at 80% 50%,#ff4f9a33,transparent 45%)}
+.social-hero h1{font-size:clamp(48px,6vw,76px);letter-spacing:0}.social-hero h1 em{background:linear-gradient(90deg,#ffd36e,#ff4f9a 60%,#8d6cff);background-clip:text;color:transparent}
+.social-kicker{color:#68dfe2}.social-hero p{color:#d3c8dc;max-width:620px}
+.social-hero-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}.social-hero-actions a{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:9px;background:linear-gradient(110deg,#ff4f9a,#8264f4);color:white;text-decoration:none;font-size:8px;font-weight:900;letter-spacing:.12em}.social-hero-actions a+a{border:1px solid #ffffff40;background:#ffffff0c}
+.social-section{scroll-margin-top:18px;margin-top:18px;padding:clamp(16px,2.5vw,26px);border:1px solid #ffffff20;border-radius:18px;background:linear-gradient(145deg,#1b1429f5,#0d0918f7);box-shadow:0 18px 50px #0003}
+.social-section-head h2{font-size:clamp(27px,3vw,36px);letter-spacing:0}.social-count{padding:7px 10px;border:1px solid #68dfe244;border-radius:99px;color:#7ee5e4}
+.social-muted{color:#b4a9c0}.social-connect-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.social-provider-card{position:relative;display:flex;flex-direction:column;min-height:190px;padding:17px;border:1px solid #ffffff20;border-radius:14px;background:linear-gradient(145deg,#21182f,#100b1d);transition:transform .2s,border-color .2s}
+.social-provider-card:hover{transform:translateY(-2px);border-color:#ff4f9a88}
+.social-provider-top b{font-size:25px}.social-provider-top span{color:#77e6d0}.social-provider-card p{min-height:0;flex:1;color:#b2a8bf;font-size:10px}
+.social-provider-card button{min-height:40px;border:0;border-radius:9px;background:linear-gradient(110deg,#ff4f9a,#8064f1);color:#fff;font-size:8px;letter-spacing:.12em}
+.social-provider-card button:disabled{background:#ffffff14;color:#968ca3}
+.social-provider-warning{color:#ffc18b}
+.social-account-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.social-account-row{border-radius:12px;background:#0b0816;border-color:#ffffff20}
+.social-composer{gap:17px;padding:clamp(14px,2.5vw,23px);border-radius:14px;background:#0b0816;border-color:#ffffff20}
+.social-composer label{color:#cfc4d9}.social-composer input,.social-composer select,.social-composer textarea,.social-queue-toolbar select{min-height:42px;border-radius:9px;background:#171024;border-color:#ffffff24;color:#fff}
+.social-composer input:focus,.social-composer select:focus,.social-composer textarea:focus{border-color:#ff70ae;box-shadow:0 0 0 3px #ff4f9a18}
+.social-composer textarea{min-height:120px}.social-platform-hint{color:#73dfe2}
+.social-primary{min-height:42px;border:0;border-radius:9px;background:linear-gradient(110deg,#ff4f9a,#8064f1);color:white}
+.social-secondary{min-height:40px;border-radius:9px;border-color:#ffffff30;background:#ffffff0a;color:#e6ddec}
+.social-post-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.social-post-card{border-radius:13px;border-color:#ffffff20;background:linear-gradient(145deg,#21182f,#0c0917)}
+.social-post-actions button{min-height:34px;border-radius:8px}
+.social-empty{border-radius:12px;color:#b5a9c0}
+.social-footnote{padding:14px;border:1px solid #ffffff17;border-radius:10px;background:#ffffff08;color:#9e93aa}
+@media(max-width:900px){.social-connect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.social-hero{min-height:0;padding:24px 18px}.social-hero h1{font-size:46px}.social-section{padding:14px}.social-connect-grid,.social-account-list,.social-post-list,.social-form-grid{grid-template-columns:1fr}.social-provider-card{min-height:0}.social-provider-card p{margin:9px 0 14px}.social-section-head{gap:8px}.social-queue-toolbar select{flex:1}}
