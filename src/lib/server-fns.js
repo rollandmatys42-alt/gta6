@@ -558,6 +558,28 @@ export const getMyShopOrders = createServerFn({method:"GET"}).middleware([requir
 export const getAdminShopOrders = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);return context.getBase44().asServiceRole.entities.ShopOrder.list("-created_date",200,0);
 });
+export const refundShopOrder = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({orderId:z.string().min(1)}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const db=context.getBase44().asServiceRole.entities.ShopOrder;
+  const order=await db.get(data.orderId).catch(()=>null);
+  if(!order)throw Object.assign(new Error("Order not found."),{status:404});
+  if(!order.stripe_payment_intent_id)throw Object.assign(new Error("This order has no verified Stripe payment to refund."),{status:409});
+  if(!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("Only a paid order can be refunded."),{status:409});
+  const claim=await db.updateMany({id:order.id,status:order.status},{$set:{status:"refund_pending"}});
+  if(!claim?.updated)throw Object.assign(new Error("Another order operation is already processing this order."),{status:409});
+  try{
+   const form=new URLSearchParams();form.set("payment_intent",order.stripe_payment_intent_id);form.set("reason","requested_by_customer");
+   const refund=await stripeApi("refunds","POST",form);
+   if(!refund.id||!["succeeded","pending"].includes(refund.status))throw new Error("Stripe did not confirm the refund.");
+   return await db.update(order.id,{status:"refunded",stripe_refund_id:refund.id,refunded_at:new Date().toISOString(),admin_note:(order.admin_note?order.admin_note+" | ":"")+"Refund "+refund.id});
+  }catch(error){
+   await db.update(order.id,{status:order.status}).catch(()=>null);
+   throw error;
+  }
+ });
+
 export const updateShopOrder = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({orderId:z.string().min(1),status:z.enum(["pending_payment","paid","paid_stock_issue","processing","shipped","delivered","cancelled","refunded"]),trackingNumber:z.string().max(120).optional(),trackingUrl:z.string().url().optional(),adminNote:z.string().max(1000).optional()}))
  .handler(async({data,context})=>{
@@ -565,10 +587,9 @@ export const updateShopOrder = createServerFn({method:"POST"}).middleware([requi
   const db=context.getBase44().asServiceRole.entities.ShopOrder;
   const order=await db.get(data.orderId).catch(()=>null);
   if(!order)throw Object.assign(new Error("Order not found."),{status:404});
-  if(["paid","paid_stock_issue"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("Paid status can only be set by verified Stripe confirmation."),{status:409,code:"PAYMENT_CONFIRMATION_REQUIRED"});
+  if(["paid","paid_stock_issue","refund_pending","refunded"].includes(data.status))throw Object.assign(new Error("Payment and refund states are controlled by Stripe confirmation and the secure refund action."),{status:409,code:"PAYMENT_STATE_LOCKED"});
   if(["processing","shipped","delivered","refunded"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("This order cannot move to fulfilment until Stripe confirms payment."),{status:409,code:"ORDER_NOT_PAID"});
   if(data.status==="cancelled"&&["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("A paid order must be refunded in Stripe before it can be cancelled."),{status:409,code:"REFUND_REQUIRED"});
-  if(data.status==="refunded"&&order.status!=="refunded")throw Object.assign(new Error("Only mark an order as refunded after the refund has been completed in Stripe."),{status:409,code:"REFUND_CONFIRMATION_REQUIRED"});
   return db.update(order.id,{status:data.status,tracking_number:data.trackingNumber||"",tracking_url:data.trackingUrl||"",admin_note:data.adminNote||"",updated_by:context.user.id});
  });
 export const createShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
