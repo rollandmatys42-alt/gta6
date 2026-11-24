@@ -17,7 +17,6 @@ const workspaceLinks = [
   ["/news", "▧", "news"],
   ["/creators", "◎", "profile"],
   ["/messages", "✉", "messages"],
-  ["/notifications", "◉", "notifications"],
   ["/social", "↗", "social"],
 ];
 const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Biblioteca de vídeos", pt: "Biblioteca de vídeos", it: "Libreria video", de: "Videobibliothek" };
