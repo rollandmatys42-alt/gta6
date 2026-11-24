@@ -585,13 +585,13 @@ export const refundShopOrder = createServerFn({method:"POST"}).middleware([requi
  });
 
 export const updateShopOrder = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({orderId:z.string().min(1),status:z.enum(["pending_payment","paid","paid_stock_issue","processing","shipped","delivered","cancelled","refunded"]),trackingNumber:z.string().max(120).optional(),trackingUrl:z.string().url().optional(),adminNote:z.string().max(1000).optional()}))
+ .validator(z.object({orderId:z.string().min(1),status:z.enum(["pending_payment","payment_verifying","payment_failed","paid","paid_stock_issue","processing","shipped","delivered","cancelled","refund_pending","refunded"]),trackingNumber:z.string().max(120).optional(),trackingUrl:z.string().url().optional(),adminNote:z.string().max(1000).optional()}))
  .handler(async({data,context})=>{
   requireAdmin(context);
   const db=context.getBase44().asServiceRole.entities.ShopOrder;
   const order=await db.get(data.orderId).catch(()=>null);
   if(!order)throw Object.assign(new Error("Order not found."),{status:404});
-  if(["paid","paid_stock_issue","payment_verifying","refund_pending","refunded","payment_failed"].includes(data.status))throw Object.assign(new Error("Payment and refund states are controlled by Stripe confirmation and the secure refund action."),{status:409,code:"PAYMENT_STATE_LOCKED"});
+  if(["paid","paid_stock_issue","payment_verifying","refund_pending","refunded","payment_failed"].includes(data.status)&&data.status!==order.status)throw Object.assign(new Error("Payment and refund states are controlled by Stripe confirmation and the secure refund action."),{status:409,code:"PAYMENT_STATE_LOCKED"});
   if(["processing","shipped","delivered"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("This order cannot move to fulfilment until Stripe confirms payment."),{status:409,code:"ORDER_NOT_PAID"});
   const fulfilmentRank={paid:1,paid_stock_issue:1,processing:2,shipped:3,delivered:4};
   if(fulfilmentRank[data.status]&&fulfilmentRank[order.status]&&fulfilmentRank[data.status]<fulfilmentRank[order.status])throw Object.assign(new Error("Order fulfilment cannot move backwards."),{status:409,code:"ORDER_STATUS_REGRESSION"});
