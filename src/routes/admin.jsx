@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {createFileRoute} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
+import "@/styles/shop-commerce.css";
 import { AuthGateError, requireSignedIn } from "@/components/auth/AuthGate";
 import {getAdminOverview,getAdminAnalytics,getAdminNews,saveNewsArticle,getNewsSources,saveNewsSource,syncNewsSources,getAdminShopProducts,getAdminShopOrders,getShopPaymentReadiness,saveShopProduct,updateShopOrder,refundShopOrder,getAdminSitePages,saveSitePage,getAdminReports,updateReportStatus,getAdminAgents,saveAdminAgent,seedPlatformDefaults,runConfiguredAgent,getAdminPlans,saveAdminPlan,syncAdminPlanToStripe,getAdminCreatorProfiles,setCreatorProfileStatus,getAdminCommunityReviews,setCommunityReviewStatus,grantComplimentaryPremium,translateCmsPage,translateNewsArticle,getPlatformReadiness,testVideoStorage,getAdminSubscribers,getAdminFinanceSnapshot,adminInviteSubscriber,adminResetSubscriberPassword,adminUpdateSubscriber,adminSetSubscriberAccess,adminDeleteSubscriber,getAdminPromotions,saveAdminPromotion,getAdminInvoices,saveAdminInvoiceDraft,getAdminInvoiceSettings,saveAdminInvoiceSettings,getAdminVideoIntelligence,saveVideoPerformanceMetric,generateStudioDraft,testOmniRouteConnection,saveSocialPost} from "@/lib/server-fns";
 export const Route=createFileRoute("/admin")({ssr:false,beforeLoad:requireSignedIn,errorComponent:AuthGateError,head:()=>({meta:[{title:"Administration — VICEHUB"},{name:"robots",content:"noindex,nofollow"}]}),component:AdminPage});
