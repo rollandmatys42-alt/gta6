@@ -590,7 +590,7 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
    const form=new URLSearchParams();form.set("mode","payment");
    form.set("success_url",STRIPE_SITE_URL+"/shop?session_id={CHECKOUT_SESSION_ID}");
    form.set("cancel_url",STRIPE_SITE_URL+"/shop?checkout=cancelled");
-   form.set("client_reference_id",user.id);form.set("customer_email",user.email||"");
+   form.set("client_reference_id",user.id);if(user.email)form.set("customer_email",user.email);
    form.set("metadata[order_id]",order.id);form.set("metadata[user_id]",user.id);
    form.set("payment_intent_data[metadata][order_id]",order.id);form.set("payment_intent_data[metadata][user_id]",user.id);
    form.set("billing_address_collection","required");form.set("phone_number_collection[enabled]","true");
