@@ -529,20 +529,23 @@ export const saveShopProduct = createServerFn({method:"POST"}).middleware([requi
   imageUrl:z.string().url().optional(),status:z.enum(["draft","published","archived"]),sku:z.string().max(80).optional(),
   category:z.enum(["Apparel","Accessories","Collectibles","Digital","Creator Gear","Other"]),
   vendorType:z.enum(["vicehub","licensed_partner","official_external"]),
-  rightsStatus:z.enum(["unverified","original","licensed","official_external"]),
+  rightsStatus:z.enum(["unverified","original","licensed","official_external"]),rightsEvidenceUrl:z.string().url().optional(),rightsNote:z.string().max(1000).optional(),
   externalUrl:z.string().url().optional(),shippingRequired:z.boolean(),shippingPriceCents:z.number().int().min(0),
   sizeOptions:z.array(z.string().max(40)).max(30),colorOptions:z.array(z.string().max(40)).max(30),isFeatured:z.boolean()
  }))
  .handler(async({data,context})=>{
   requireAdmin(context);
   if(data.status==="published"&&data.rightsStatus==="unverified")throw Object.assign(new Error("Rights must be verified before a product can be published."),{status:400,code:"SHOP_RIGHTS_NOT_VERIFIED"});
+  if(data.status==="published"&&data.rightsStatus==="licensed"&&!data.rightsEvidenceUrl)throw Object.assign(new Error("A licence evidence URL is required before publishing a licensed partner product."),{status:400,code:"SHOP_LICENCE_EVIDENCE_REQUIRED"});
+  if(data.rightsStatus==="original"&&data.vendorType!=="vicehub"||data.rightsStatus==="licensed"&&data.vendorType!=="licensed_partner")throw Object.assign(new Error("The product origin and rights classification do not match."),{status:400,code:"SHOP_RIGHTS_CLASSIFICATION_MISMATCH"});
+  if(data.externalUrl&&!data.externalUrl.startsWith("https://"))throw Object.assign(new Error("External retailer links must use HTTPS."),{status:400});
   if(data.productType==="external"&&(!data.externalUrl||data.rightsStatus!=="official_external"||data.vendorType!=="official_external"))throw Object.assign(new Error("External official listings need an external URL and the official external classification."),{status:400,code:"SHOP_EXTERNAL_LINK_REQUIRED"});
   if(data.productType!=="external"&&data.vendorType==="official_external")throw Object.assign(new Error("Official external products must use the external link product type."),{status:400});
   const db=context.getBase44().asServiceRole.entities.ShopProduct;
   const p={
    title:data.title,description:data.description,product_type:data.productType,price_cents:data.priceCents,currency:data.currency,
    stock_quantity:data.stockQuantity||0,status:data.status,sku:data.sku||"",category:data.category,vendor_type:data.vendorType,
-   rights_status:data.rightsStatus,external_url:data.externalUrl||"",shipping_required:data.productType==="physical"&&data.shippingRequired,
+   rights_status:data.rightsStatus,rights_evidence_url:data.rightsEvidenceUrl||"",rights_note:data.rightsNote||"",external_url:data.externalUrl||"",shipping_required:data.productType==="physical"&&data.shippingRequired,
    shipping_price_cents:data.productType==="physical"&&data.shippingRequired?data.shippingPriceCents:0,
    size_options:data.sizeOptions,color_options:data.colorOptions,is_featured:data.isFeatured,
    ...(data.imageUrl?{image_url:data.imageUrl}:{})
@@ -550,7 +553,7 @@ export const saveShopProduct = createServerFn({method:"POST"}).middleware([requi
   return data.id?db.update(data.id,p):db.create(p);
  });
 export const getShopPaymentReadiness = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
- requireAdmin(context);return {stripeConfigured:!!secrets.get("STRIPE_SECRET_KEY"),webhookConfigured:!!secrets.get("STRIPE_WEBHOOK_SECRET")};
+ requireAdmin(context);return {stripeConfigured:!!secrets.get("STRIPE_SECRET_KEY"),webhookConfigured:!!secrets.get("STRIPE_WEBHOOK_SECRET"),taxEnabled:secrets.get("STRIPE_TAX_ENABLED")==="true"};
 });
 export const getMyShopOrders = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  return context.getBase44().asServiceRole.entities.ShopOrder.filter({user_id:context.user.id},"-created_date",30,0);
@@ -596,7 +599,9 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
  .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10),size:z.string().max(40).optional(),color:z.string().max(40).optional()})).min(1).max(20)}))
  .handler(async({data,context})=>{
   const user=context.user,db=context.getBase44().asServiceRole.entities;
-  if(!secrets.get("STRIPE_SECRET_KEY"))throw Object.assign(new Error("Online checkout is not active yet. The administrator must connect Stripe in the VICEHUB payment settings before orders can be paid."),{status:503,code:"SHOP_PAYMENTS_NOT_CONFIGURED"});
+  if(!secrets.get("STRIPE_SECRET_KEY"))throw Object.assign(new Error("Online checkout is not active yet. The administrator must connect Stripe before orders can be paid."),{status:503,code:"SHOP_PAYMENTS_NOT_CONFIGURED"});
+  if(!secrets.get("STRIPE_WEBHOOK_SECRET"))throw Object.assign(new Error("The signed Stripe webhook is not configured. Checkout remains disabled until payment events can be verified."),{status:503,code:"SHOP_WEBHOOK_NOT_CONFIGURED"});
+  if(secrets.get("STRIPE_TAX_ENABLED")!=="true")throw Object.assign(new Error("Stripe Tax is not configured. The administrator must complete tax registration and Stripe Tax settings before checkout can be enabled."),{status:503,code:"SHOP_TAX_NOT_CONFIGURED"});
   const products=await Promise.all(data.items.map(x=>db.ShopProduct.get(x.productId).catch(()=>null)));
   const cart=data.items.map((line,i)=>({line,product:products[i]}));
   if(cart.some(x=>!x.product||x.product.status!=="published"||!["original","licensed"].includes(x.product.rights_status)))throw Object.assign(new Error("One or more products are no longer available for sale."),{status:409,code:"SHOP_PRODUCT_UNAVAILABLE"});
@@ -623,7 +628,7 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
    form.set("client_reference_id",user.id);if(user.email)form.set("customer_email",user.email);
    form.set("metadata[order_id]",order.id);form.set("metadata[user_id]",user.id);
    form.set("payment_intent_data[metadata][order_id]",order.id);form.set("payment_intent_data[metadata][user_id]",user.id);
-   form.set("billing_address_collection","required");form.set("phone_number_collection[enabled]","true");
+   form.set("billing_address_collection","required");form.set("phone_number_collection[enabled]","true");form.set("automatic_tax[enabled]","true");
    if(cart.some(x=>x.product.product_type==="physical")){
     ["GB","US","CA","FR","DE","ES","IT","PT","BE","LU","NL","IE"].forEach((country,i)=>form.set("shipping_address_collection[allowed_countries]["+i+"]",country));
    }
