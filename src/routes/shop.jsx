@@ -7,9 +7,9 @@ import "@/styles/shop-commerce.css";
 
 export const Route = createFileRoute("/shop")({
   head: () => ({ meta: [
-    { title: "VICEHUB Supply — Independent Creator Store" },
-    { name: "description", content: "Shop independent VICEHUB creator gear, original designs and verified licensed collectibles." },
-    { property: "og:title", content: "VICEHUB Supply — Independent Creator Store" },
+    { title: "VICEHUB Supply — Visit Leonida Field Store" },
+    { name: "description", content: "Explore the Leonida field store: independent creator goods, original VICEHUB designs and properly licensed collectibles." },
+    { property: "og:title", content: "VICEHUB Supply — Visit Leonida Field Store" },
     { property: "og:description", content: "Independent creator gear, original designs and verified licensed collectibles." }
   ] }),
   component: ShopPage
