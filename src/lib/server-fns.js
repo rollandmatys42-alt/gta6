@@ -1139,11 +1139,21 @@ export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([
 export const getGrowthIntegrationStatus = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
   requireAdmin(context);
   const has=name=>!!secrets.get(name);
+  const settings=context.getBase44().asServiceRole.entities.SiteSetting;
+  const [newsRows,growthRows]=await Promise.all([
+    settings.filter({setting_key:"github_news_cron_last_seen"},"-updated_date",1,0),
+    settings.filter({setting_key:"github_growth_cron_last_seen"},"-updated_date",1,0),
+  ]);
+  const now=Date.now();
+  const newsSeen=newsRows[0]?.setting_value?new Date(newsRows[0].setting_value).getTime():0;
+  const growthSeen=growthRows[0]?.setting_value?new Date(growthRows[0].setting_value).getTime():0;
+  const newsReady=has("GTA_NEWS_SYNC_CRON_SECRET")&&Number.isFinite(newsSeen)&&now-newsSeen<15*60*1000;
+  const growthReady=has("GTA_NEWS_SYNC_CRON_SECRET")&&Number.isFinite(growthSeen)&&now-growthSeen<26*60*60*1000;
   return [
     {key:"OmniRoute AI",ready:has("OMNIROUTE_API_KEY")&&has("OMNIROUTE_BASE_URL"),required:["OMNIROUTE_API_KEY","OMNIROUTE_BASE_URL"]},
     {key:"X API",ready:has("X_BEARER_TOKEN"),required:["X_BEARER_TOKEN"]},
-    {key:"Five-minute scheduler",ready:has("GTA_NEWS_SYNC_CRON_SECRET"),required:["GTA_NEWS_SYNC_CRON_SECRET in Base44 and GitHub Actions"]},
-    {key:"Daily SEO / GEO / Growth agents",ready:has("GTA_NEWS_SYNC_CRON_SECRET"),required:["Same GTA_NEWS_SYNC_CRON_SECRET in Base44 and GitHub Actions"]},
+    {key:"Five-minute source scheduler",ready:newsReady,required:newsReady?[]:["Add GTA_NEWS_SYNC_CRON_SECRET to GitHub Actions; a successful five-minute run will confirm the connection."]},
+    {key:"Daily SEO / GEO / Growth agents",ready:growthReady,required:growthReady?[]:["Add GTA_NEWS_SYNC_CRON_SECRET to GitHub Actions; a successful daily run will confirm the connection."]},
     {key:"Google Search Console",ready:has("GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN"),required:["Google OAuth/Search Console refresh token"]},
     {key:"Google Analytics 4",ready:has("GA4_REFRESH_TOKEN"),required:["GA4 refresh token"]},
     {key:"PWA background push",ready:has("VAPID_PUBLIC_KEY")&&has("VAPID_PRIVATE_KEY")&&has("VAPID_SUBJECT")&&has("PUSH_DISPATCH_SECRET"),required:["VAPID_PUBLIC_KEY","VAPID_PRIVATE_KEY","VAPID_SUBJECT","PUSH_DISPATCH_SECRET"]},

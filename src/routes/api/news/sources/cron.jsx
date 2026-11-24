@@ -23,6 +23,11 @@ export const Route = createFileRoute("/api/news/sources/cron")({
             "gta-news-sync",
             { cronSecret: expected },
           );
+          const settings=context.getBase44().asServiceRole.entities.SiteSetting;
+          const key="github_news_cron_last_seen",now=new Date().toISOString();
+          const rows=await settings.filter({setting_key:key},"-updated_date",1,0);
+          if(rows[0])await settings.update(rows[0].id,{setting_value:now,is_public:false,updated_by:"system"});
+          else await settings.create({setting_key:key,setting_value:now,is_public:false,updated_by:"system"});
           return Response.json(result ?? { success: true });
         } catch (error) {
           return Response.json(
