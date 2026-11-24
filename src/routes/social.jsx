@@ -222,7 +222,7 @@ function SocialPublishingPage() {
 
   return <SiteFrame eyebrow="VICEHUB / SOCIAL PUBLISHING" workspace={isAuthenticated} activeKey="social">
     <main className="social-shell">
-      <header className="social-hero">
+      <header className="social-hero vh-image-hero"><img className="vh-page-art-image" src="https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=1920" alt="Jason and Lucia in Leonida — official GTA VI artwork" /><div className="vh-page-art-shade" />
         <div><span className="social-kicker">VICEHUB / CREATOR DISTRIBUTION</span><h1>YOUR SOCIAL<br/><em>CONTROL ROOM.</em></h1><p>One clear workspace to connect your channels, prepare content and manage every publication. Each network is authorised securely through its official sign-in.</p><div className="social-hero-actions"><a href="#social-accounts">CONNECT CHANNELS ↓</a><a href="#social-composer">CREATE A POST ↗</a></div></div>
         <div className="social-hero-stamp"><b>06</b><span>NETWORKS</span><small>YOUR ACCOUNTS / YOUR TOKENS</small></div>
       </header>
