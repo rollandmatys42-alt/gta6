@@ -149,6 +149,11 @@
     "stripe_refund_id": {
       "type": "string",
       "maxLength": 255
+    },
+    "tax_cents": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
     }
   },
   "required": [
