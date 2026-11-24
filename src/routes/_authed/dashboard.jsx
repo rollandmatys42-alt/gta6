@@ -107,7 +107,7 @@ function DashboardPage() {
           <p className="member-hero-intro">Your next GTA VI drop is waiting. Find fresh videos, download your favourites and catch up on what is happening in Leonida.</p>
           <div className="member-hero-actions"><Link to="/library">EXPLORE VIDEO LIBRARY <b>↗</b></Link><Link to="/news">LATEST GTA VI NEWS <b>↗</b></Link></div>
         </div>
-        <div className="member-hero-art"><span>VICE CITY</span><b>VI</b><small>THE MEMBER DISTRICT</small></div>
+        <div className="member-hero-art vh-member-image"><img src="https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=1920" alt="Jason and Lucia in Leonida — official GTA VI artwork" /><span>VICE CITY</span><b>VI</b><small>THE MEMBER DISTRICT</small></div>
       </section>
 
       {error && <div className="member-alert" role="alert">{error}</div>}
