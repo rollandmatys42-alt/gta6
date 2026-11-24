@@ -7,8 +7,8 @@ import { listPublishedVideos, getVideoPreviewUrl, requestVideoDownload, getNewsF
 import { formatMoney } from "@/lib/loyalty";
 import "@/styles/vicehub-growth.css";
 
-const TITLE = "VICEHUB — GTA VI fan drops: vertical videos to download & post";
-const DESC = "Download ready-to-post GTA VI vertical videos for TikTok, Reels and Shorts, read the latest GTA VI news and grow your fan page. New drops every week.";
+const TITLE = "VICEHUB — GTA VI Creator Hub";
+const DESC = "An independent GTA VI creator hub with rights-cleared video assets, creator tools, verified news and a community for social-first creators.";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -22,11 +22,12 @@ export const Route = createFileRoute("/")({
 });
 
 const FAQ = [
-  ["What do I get?", "Every week we publish vertical (9:16) GTA VI videos made for TikTok, Instagram Reels and YouTube Shorts. Subscribers download them in one tap and post them on their own accounts."],
+  ["What do I get?", "The library contains only published assets that have passed VICEHUB’s rights review. When a new download is published, members can preview it and download it from their account."],
   ["How does membership work?", "One Creator Membership gives you the complete paid VICEHUB experience for one clear monthly price. There are no confusing tiers or loyalty ladders."],
-  ["What if I cancel?", "You can cancel any time from your account. If you subscribe again later, your price starts again from the first step."],
+  ["What if I cancel?", "You can cancel at any time from your account. Access remains available until the end of the paid billing period."],
   ["Can I monetise every video?", "Only use assets whose licence expressly allows your intended commercial use. Rockstar game footage and official artwork remain subject to their owners’ rules; VICEHUB does not grant rights it does not own."],
   ["Where do the news come from?", "Every story is labelled (official, confirmed, reported, rumour) and links to its original source. We never present rumours as facts."],
+  ["How do referral rewards work?", "A new eligible member gets 5% off the first invoice. The referrer earns 20% of that first payment, excluding tax, as VICEHUB credit after 30 days. Credit is not cash and is applied to a future invoice in the same currency."] ,
   ["Is this made by Rockstar?", "No. VICEHUB is an independent fan community and is not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive."],
 ];
 const fmtDuration = s => { const n = Number(s) || 0; return n ? `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}` : ""; };
