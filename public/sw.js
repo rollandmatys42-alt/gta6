@@ -1,4 +1,4 @@
-const CACHE = "vicehub-public-v2";
+const CACHE = "vicehub-public-v3";
 const OFFLINE = "/offline.html";
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
