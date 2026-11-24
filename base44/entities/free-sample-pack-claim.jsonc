@@ -1,0 +1,23 @@
+{
+  "name": "FreeSamplePackClaim",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string" },
+    "video_ids": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 3 },
+    "downloaded_video_ids": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "claimed_at": { "type": "string", "format": "date-time" },
+    "last_download_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["user_id", "video_ids", "downloaded_video_ids", "claimed_at"],
+  "rls": {
+    "read": {
+      "$or": [
+        { "data.user_id": "{{user.id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
