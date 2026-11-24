@@ -141,7 +141,7 @@ function DashboardPage() {
           <p>{account?.tier === "free" ? "Your free access includes a limited monthly download allowance." : "Your downloads are included with your current membership."}</p>
           <div className="member-download-numbers"><strong>{remaining}<small>LEFT</small></strong><span><b>{used}</b> used of {limit || "—"} this month</span></div>
           <div className="member-progress"><i style={{width: percent + "%"}}/></div>
-          <div className="member-plan-actions"><Link to="/library">DOWNLOAD VIDEOS ↗</Link>{account?.hasBillingCustomer ? <button type="button" onClick={manageBilling} disabled={billingBusy}>{billingBusy ? "OPENING BILLING…" : "MANAGE / CANCEL PLAN ↗"}</button> : <Link to="/#plans">VIEW MEMBERSHIPS ↗</Link>}</div>
+          <div className="member-plan-actions"><Link to="/subscription">MY SUBSCRIPTION ↗</Link><Link to="/library">DOWNLOAD VIDEOS ↗</Link>{account?.hasBillingCustomer ? <button type="button" onClick={manageBilling} disabled={billingBusy}>{billingBusy ? "OPENING BILLING…" : "MANAGE / CANCEL PLAN ↗"}</button> : <Link to="/#plans">VIEW MEMBERSHIPS ↗</Link>}</div>
         </article>
         <div className="member-shortcuts">
           <Link to="/library"><span>01</span><b>VIDEO LIBRARY</b><small>Browse and download new drops</small><i>↗</i></Link>
@@ -154,7 +154,7 @@ function DashboardPage() {
         <header className="member-section-head"><div><span className="member-section-kicker">THE DROP ZONE / JUST RELEASED</span><h2>NEW VIDEOS <em>TO DOWNLOAD.</em></h2><p>Only published, rights-verified videos appear here.</p></div><Link to="/library">VIEW ALL VIDEOS ↗</Link></header>
         {loading && !videos.length ? <div className="member-empty">LOADING THE LATEST DROPS…</div> : newest.length ? <div className="member-video-grid">
           {newest.slice(0,6).map((video,index)=><article className="member-video-card" key={video.id}>
-            <Link to="/library" className="member-video-image">{video.thumbnail_url ? <img src={video.thumbnail_url} alt="" loading="lazy"/> : <span>VICEHUB<br/>DROP</span>}<i>{String(index+1).padStart(2,"0")}</i><small>{video.category || "GTA VI VIDEO"}</small></Link>
+            <Link to="/library" className="member-video-image">{(video.thumbnail_url || video.thumbnailUrl || video.poster_url || video.posterUrl || video.cover_image_url || video.image_url || video.preview_image_url) ? <img src={video.thumbnail_url || video.thumbnailUrl || video.poster_url || video.posterUrl || video.cover_image_url || video.image_url || video.preview_image_url} alt={video.title ? `${video.title} thumbnail` : "GTA VI video thumbnail"} loading="lazy" onError={e=>{e.currentTarget.style.display="none";}}/> : <span className="member-video-thumbnail-missing"><b>VI</b><small>VIDEO ARTWORK</small></span>}<i>{String(index+1).padStart(2,"0")}</i><small>{video.category || "GTA VI VIDEO"}</small></Link>
             <div className="member-video-info"><h3>{video.title}</h3><p>{video.creator_name || "VICEHUB"} · {dateLabel(video.published_at,locale)}</p><button type="button" onClick={()=>download(video)} disabled={busyVideo===video.id}>{busyVideo===video.id ? "PREPARING…" : "↓ DOWNLOAD"}</button></div>
           </article>)}
         </div> : <div className="member-empty"><b>NO NEW VIDEO DROPS YET</b><p>When our team publishes a verified video, it will appear here automatically.</p><Link to="/library">OPEN THE VIDEO LIBRARY ↗</Link></div>}
