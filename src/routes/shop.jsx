@@ -115,7 +115,7 @@ function ShopPage() {
     setBusy(true);
     setMessage("Preparing your secure checkout…");
     try {
-      const result = await createShopCheckoutSession({ data: { items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity })) } });
+      const result = await createShopCheckoutSession({ data: { items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity, size: item.size, color: item.color })) } });
       window.location.assign(result.url);
     } catch (error) {
       setMessage(error?.message || "Checkout could not be started.");
