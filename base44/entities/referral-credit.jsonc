@@ -1,0 +1,25 @@
+{
+  "name": "ReferralCredit",
+  "type": "object",
+  "properties": {
+    "referrer_user_id": { "type": "string" },
+    "referred_user_id": { "type": "string" },
+    "stripe_session_id": { "type": "string" },
+    "stripe_subscription_id": { "type": "string" },
+    "currency": { "type": "string", "enum": ["GBP", "EUR", "USD"] },
+    "amount_cents": { "type": "integer", "minimum": 0 },
+    "available_cents": { "type": "integer", "minimum": 0 },
+    "redeemed_cents": { "type": "integer", "minimum": 0, "default": 0 },
+    "commission_rate_percent": { "type": "number", "default": 20 },
+    "referral_discount_percent": { "type": "number", "default": 5 },
+    "status": { "type": "string", "enum": ["pending", "available", "redeemed", "reversed"], "default": "pending" },
+    "available_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["referrer_user_id", "referred_user_id", "currency", "amount_cents", "available_cents", "status"],
+  "rls": {
+    "read": { "$or": [{ "data.referrer_user_id": "{{user.id}}" }, { "data.referred_user_id": "{{user.id}}" }, { "user_condition": { "role": "admin" } }] },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

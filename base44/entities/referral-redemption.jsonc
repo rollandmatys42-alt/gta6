@@ -1,0 +1,23 @@
+{
+  "name": "ReferralRedemption",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string" },
+    "amount_cents": { "type": "integer", "minimum": 1 },
+    "currency": { "type": "string", "enum": ["GBP", "EUR", "USD"] },
+    "stripe_customer_id": { "type": "string" },
+    "idempotency_key": { "type": "string" },
+    "allocations": { "type": "array", "items": { "type": "object", "properties": { "credit_id": { "type": "string" }, "amount_cents": { "type": "integer" }, "remaining_after_cents": { "type": "integer" }, "redeemed_after_cents": { "type": "integer" } }, "required": ["credit_id", "amount_cents", "remaining_after_cents", "redeemed_after_cents"] } },
+    "stripe_balance_transaction_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["pending", "applied", "failed"], "default": "pending" },
+    "applied_at": { "type": "string", "format": "date-time" },
+    "last_error": { "type": "string", "maxLength": 500 }
+  },
+  "required": ["user_id", "amount_cents", "currency", "stripe_customer_id", "idempotency_key", "status"],
+  "rls": {
+    "read": { "$or": [{ "data.user_id": "{{user.id}}" }, { "user_condition": { "role": "admin" } }] },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
