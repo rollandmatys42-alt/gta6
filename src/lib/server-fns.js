@@ -660,6 +660,13 @@ export const confirmShopCheckoutSession = createServerFn({method:"POST"}).middle
   const db=context.getBase44().asServiceRole.entities,order=await db.ShopOrder.get(session.metadata?.order_id||"").catch(()=>null);
   if(!order||order.user_id!==user.id||order.stripe_session_id!==session.id)throw Object.assign(new Error("The order linked to this payment could not be verified."),{status:403,code:"SHOP_ORDER_MISMATCH"});
   if(["paid","processing","shipped","delivered","paid_stock_issue"].includes(order.status))return {success:true,orderId:order.id,status:order.status};
+  if(order.status==="payment_verifying")return {success:true,orderId:order.id,status:order.status};
+  const claim=await db.ShopOrder.updateMany({id:order.id,status:"pending_payment"},{$set:{status:"payment_verifying"}});
+  if(!claim?.updated){
+   const latest=await db.ShopOrder.get(order.id).catch(()=>null);
+   if(latest&&["paid","processing","shipped","delivered","paid_stock_issue","payment_verifying"].includes(latest.status))return {success:true,orderId:order.id,status:latest.status};
+   throw Object.assign(new Error("Payment confirmation is already being processed. Refresh your order history shortly."),{status:409,code:"SHOP_PAYMENT_PROCESSING"});
+  }
   let stockIssue=false;
   for(const item of order.items||[]){
    if(item.product_type!=="physical")continue;
