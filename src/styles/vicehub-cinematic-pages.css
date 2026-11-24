@@ -1,0 +1,95 @@
+/* VICEHUB cinematic page system — official GTA VI artwork */
+:root {
+  --vh-pink:#ff2d95; --vh-cyan:#2de2e6; --vh-orange:#ff9a3c;
+  --vh-ink:#090611; --vh-panel:rgba(17,10,29,.88); --vh-line:rgba(255,255,255,.12);
+}
+.platform-shell .platform-hero {
+  position:relative; isolation:isolate; overflow:hidden; min-height:310px;
+  display:flex; align-items:center; justify-content:space-between; gap:28px;
+  padding:clamp(28px,5vw,58px); border:1px solid rgba(255,45,149,.3);
+  border-radius:24px; color:#fff;
+  background-image:linear-gradient(90deg,rgba(7,4,14,.97) 0%,rgba(7,4,14,.84) 48%,rgba(7,4,14,.28) 100%),url("https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=3840");
+  background-size:cover; background-position:center 42%;
+  box-shadow:0 24px 70px rgba(0,0,0,.32);
+}
+.platform-shell .platform-hero:after {
+  content:""; position:absolute; z-index:0; inset:0; pointer-events:none;
+  background:linear-gradient(0deg,rgba(9,6,17,.42),transparent 65%),radial-gradient(450px 260px at 90% 12%,rgba(255,45,149,.2),transparent 72%);
+}
+.platform-shell .platform-hero>*,.platform-shell .platform-hero .hero-stamp {position:relative;z-index:1}
+.platform-shell .platform-hero>div:first-child {max-width:760px}
+.platform-shell .platform-hero .eyebrow,.platform-shell .platform-hero .hero-stamp {color:var(--vh-cyan);letter-spacing:.18em;font-weight:900}
+.platform-shell .platform-hero h1 {color:#fff;text-shadow:0 5px 25px rgba(0,0,0,.45);font-family:'Barlow Condensed',Impact,sans-serif;font-size:clamp(42px,6vw,76px);line-height:.92;text-transform:uppercase}
+.platform-shell .platform-hero h1 em {color:#ff8bc2;font-style:normal}
+.platform-shell .platform-hero p {max-width:650px;color:#e0d8e8;line-height:1.75}
+.platform-shell .platform-hero .hero-stamp {flex:0 0 auto;padding:18px 22px;border:1px solid rgba(45,226,230,.48);border-radius:16px;background:rgba(8,5,16,.62);box-shadow:0 0 35px rgba(45,226,230,.1);backdrop-filter:blur(10px);text-align:center}
+.platform-shell .platform-toolbar,.platform-shell .platform-form,.platform-shell .admin-panel,.platform-shell .studio-output {
+  border:1px solid var(--vh-line);border-radius:18px;background:linear-gradient(145deg,rgba(27,17,42,.96),rgba(11,8,20,.96));color:#f4edf8;box-shadow:0 18px 45px rgba(0,0,0,.2)
+}
+.platform-shell .platform-form,.platform-shell .admin-panel,.platform-shell .studio-output {padding:clamp(18px,3vw,28px)}
+.platform-shell .platform-form h2,.platform-shell .admin-panel h2,.platform-shell .studio-output h2 {color:#fff}
+.platform-shell .platform-form label {color:#c8bdd4}
+.platform-shell .platform-form input,.platform-shell .platform-form textarea,.platform-shell .platform-form select,
+.platform-shell .creator-tools input,.platform-shell .platform-toolbar select {
+  border:1px solid rgba(255,255,255,.15)!important;border-radius:10px!important;background:rgba(5,4,13,.82)!important;color:#f8f2fb!important
+}
+.platform-shell .platform-form input:focus,.platform-shell .platform-form textarea:focus,.platform-shell .platform-form select:focus {border-color:var(--vh-pink)!important;box-shadow:0 0 0 3px rgba(255,45,149,.12)!important;outline:0}
+.platform-shell .primary-btn,.platform-shell .platform-form .primary-btn {border:0!important;border-radius:999px!important;background:linear-gradient(100deg,#ff2d95,#ff784f)!important;color:#fff!important;font-weight:900;letter-spacing:.08em}
+.platform-shell .outline-btn {border:1px solid rgba(45,226,230,.42)!important;border-radius:999px!important;background:rgba(45,226,230,.07)!important;color:#8af4f0!important}
+.platform-shell .platform-note {border:1px solid rgba(45,226,230,.22);border-radius:14px;background:rgba(9,20,30,.72);color:#b8d5d9}
+.platform-shell .platform-empty {border:1px dashed rgba(255,255,255,.2);border-radius:16px;background:rgba(14,9,24,.78);color:#c7b8d1}
+.platform-shell .news-grid {gap:16px}
+.platform-shell .news-card {
+  position:relative;isolation:isolate;overflow:hidden;min-height:245px;padding:24px;
+  border:1px solid rgba(255,255,255,.13);border-radius:18px;
+  background:linear-gradient(0deg,rgba(8,5,15,.98),rgba(8,5,15,.68)),url("https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=3840") center/cover;
+  color:#f8f3fb;cursor:pointer;transition:transform .2s,border-color .2s
+}
+.platform-shell .news-card:nth-child(3n+2) {background-image:linear-gradient(0deg,rgba(8,5,15,.98),rgba(8,5,15,.66)),url("https://www.rockstargames.com/VI/_next/static/media/Lucia_Caminos_12.0saq9ns-~xj03.jpg?akim=1&imdensity=1&imwidth=3840")}
+.platform-shell .news-card:nth-child(3n) {background-image:linear-gradient(0deg,rgba(8,5,15,.98),rgba(8,5,15,.66)),url("https://www.rockstargames.com/VI/_next/static/media/VINTAGE_VICE_CITY_PACK_01.05zaof7o1uz.3.jpg?akim=1&imdensity=1&imwidth=3840")}
+.platform-shell .news-card:hover {transform:translateY(-4px);border-color:rgba(255,45,149,.6)}
+.platform-shell .news-card h2,.platform-shell .news-card p {color:#fff}
+.platform-shell .news-card p {color:#d5cbdc}
+.platform-shell .creator-card {
+  position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.13);border-radius:18px;
+  background:linear-gradient(145deg,rgba(24,15,38,.97),rgba(8,6,17,.98));color:#f5eff9;
+  box-shadow:0 16px 40px rgba(0,0,0,.2)
+}
+.platform-shell .creator-card:before {content:"";display:block;height:94px;margin:-1px -1px 18px;background:linear-gradient(90deg,rgba(8,5,15,.2),rgba(8,5,15,.7)),url("https://www.rockstargames.com/VI/_next/static/media/ULTIMATE_EDITION_GROTTI_CHEETAH_01.0a.wy3s_ogjey.jpg?akim=1&imdensity=1&imwidth=3840") center 42%/cover}
+.platform-shell .creator-card .creator-avatar {position:relative;margin-top:-58px;border:3px solid #100a1b;box-shadow:0 5px 22px rgba(0,0,0,.45)}
+.platform-shell .creator-card h2 {color:#fff}
+.platform-shell .creator-card p {color:#c7bbd2}
+.platform-shell .creator-skills span {border:1px solid rgba(45,226,230,.2);background:rgba(45,226,230,.08);color:#7dece9}
+.platform-shell .vh-catalog-hero {
+  background-image:linear-gradient(90deg,rgba(7,4,14,.97) 0%,rgba(7,4,14,.83) 52%,rgba(7,4,14,.25) 100%),url("https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=3840");
+  background-size:cover;background-position:center 42%;border-color:rgba(255,45,149,.35)
+}
+.platform-shell .vh-catalog-hero:before {display:none}
+.platform-shell .vh-catalog-hero:after {background:linear-gradient(0deg,rgba(7,4,14,.35),transparent 65%),radial-gradient(500px 280px at 85% 25%,rgba(255,45,149,.2),transparent 72%)}
+.platform-shell .vh-catalog-card {background:linear-gradient(160deg,rgba(27,17,42,.98),rgba(10,7,18,.98))}
+.platform-shell .vh-catalog-controls {background:transparent}
+.platform-shell .vh-catalog-search,.platform-shell .vh-catalog-select {background:rgba(18,11,30,.94)}
+.platform-shell .studio-layout {gap:20px}
+.platform-shell .studio-output {min-width:0}
+.platform-shell .studio-placeholder {border:1px dashed rgba(255,255,255,.18);border-radius:14px;background:rgba(5,4,13,.5);color:#c9bed4}
+.platform-shell .draft-row {border-color:rgba(255,255,255,.1);color:#e9e0ef}
+.platform-shell .notification-row,.platform-shell .message-row {border-color:rgba(255,255,255,.1);background:rgba(17,10,29,.84);color:#f0e8f5}
+.platform-shell .notification-row h2,.platform-shell .message-row b {color:#fff}
+.platform-shell .notification-row p,.platform-shell .message-row p {color:#cbbfd5}
+.platform-shell .notification-row small,.platform-shell .message-row small {color:#9d91aa}
+.platform-shell .notification-row.read {opacity:.68}
+.platform-shell .vh-workspace-sidebar {background:linear-gradient(180deg,#10091d,#080611);border-color:rgba(255,255,255,.1)}
+.platform-shell .vh-workspace-topbar {background:rgba(9,6,17,.94);border-color:rgba(255,255,255,.1)}
+.platform-shell .vh-workspace-page {background:transparent}
+@media(max-width:760px) {
+  .platform-shell .platform-hero {min-height:280px;align-items:flex-start;padding:26px 20px;border-radius:18px;background-position:58% center}
+  .platform-shell .platform-hero .hero-stamp {display:none}
+  .platform-shell .platform-hero h1 {font-size:clamp(38px,11vw,58px)}
+  .platform-shell .news-grid {grid-template-columns:1fr}
+  .platform-shell .news-card {min-height:220px;padding:19px}
+  .platform-shell .studio-layout {grid-template-columns:1fr}
+  .platform-shell .platform-form,.platform-shell .admin-panel,.platform-shell .studio-output {padding:17px}
+}
+@media(prefers-reduced-motion:reduce) {
+  .platform-shell .news-card {transition:none}
+}
