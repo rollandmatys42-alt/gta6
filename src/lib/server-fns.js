@@ -288,13 +288,14 @@ export const createVideoUploadUrl = createServerFn({ method: "POST" })
     assetVariant: z.enum(["original", "watermarked"]),
     storageConnectionId: z.string().optional(),
     fileSize: z.number().int().min(0).max(20000000000).optional(),
+    reservedBytes: z.number().int().min(0).max(20000000000).optional(),
   }))
   .handler(async ({ data, context }) => {
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
     const extension = data.contentType === "video/quicktime" ? "mov" : "mp4";
     const objectKey = "videos/" + data.assetVariant + "/" + crypto.randomUUID() + "." + extension;
     const entities = context.getBase44().asServiceRole.entities;
-    const multi = await issueStorageUploadUrl({ entities, fileName: data.fileName, contentType: data.contentType, fileSize: data.fileSize, assetVariant: data.assetVariant, connectionId: data.storageConnectionId });
+    const multi = await issueStorageUploadUrl({ entities, fileName: data.fileName, contentType: data.contentType, fileSize: data.fileSize, reservedBytes: data.reservedBytes, assetVariant: data.assetVariant, connectionId: data.storageConnectionId });
     if (multi) return { ...multi, contentType: data.contentType };
     const uploadUrl = await presignR2({ method: "PUT", objectKey, contentType: data.contentType, expiresIn: 300 });
     return { uploadUrl, objectKey, contentType: data.contentType, storageConnectionId: null, storageProvider: "cloudflare-r2", expiresInSeconds: 300 };
@@ -378,7 +379,7 @@ export const lockFreeSamplePack = createServerFn({method:"POST"}).middleware([re
   await entities.SiteSetting.create(setting);
   return {locked:true,videoIds:selected.map(v=>v.id),videos:selected.map(v=>v.title)};
  });
-export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.Video.list("-created_date",2000,0);});
+export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).validator(z.object({offset:z.number().int().min(0).default(0),limit:z.number().int().min(1).max(100).default(48)})).handler(async({data,context})=>{requireAdmin(context);const videos=await context.getBase44().asServiceRole.entities.Video.list("-created_date",data.limit,data.offset);return {videos,nextOffset:data.offset+videos.length,hasMore:videos.length===data.limit};});
 export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()}))
  .handler(async({data,context})=>{

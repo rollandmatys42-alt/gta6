@@ -114,14 +114,16 @@ export const disableStorageConnection = createServerFn({method:"POST"}).middlewa
   const parsed=JSON.parse(row.setting_value||"{}"); parsed.public.enabled=false;
   await entities.SiteSetting.update(row.id,{setting_value:JSON.stringify(parsed),updated_by:context.user.id}); return {ok:true};
 });
-export async function issueStorageUploadUrl({entities,fileName,contentType,fileSize,assetVariant,connectionId}) {
+export async function issueStorageUploadUrl({entities,fileName,contentType,fileSize,reservedBytes=0,assetVariant,connectionId}) {
   const rows=await allConnectionRows(entities), connections=await Promise.all(rows.map(readConnection));
   let connection=connectionId?connections.find(item=>item.id===connectionId):null;
   if(connectionId&&!connection)throw new Error("The selected storage connection no longer exists.");
-  if(!connection)connection=connections.filter(item=>item.enabled!==false&&item.verifiedAt).sort((a,b)=>(a.usedBytes||0)-(b.usedBytes||0))[0];
+  const candidates=connections.filter(item=>item.enabled!==false&&item.verifiedAt).sort((a,b)=>(a.usedBytes||0)-(b.usedBytes||0));
+  if(!connection)connection=candidates.find(item=>!item.capacityGb||(Number(item.usedBytes||0)+Number(fileSize||0)+Number(reservedBytes||0))<=item.capacityGb*1000000000);
+  if(!connection&&connections.length)throw new Error("No connected storage space has enough configured capacity for this upload.");
   if(!connection)return null;
   if(connection.enabled===false||!connection.verifiedAt)throw new Error("This storage connection is disabled or has not passed its connection test.");
-  if(connection.capacityGb&&(Number(connection.usedBytes||0)+Number(fileSize||0))>connection.capacityGb*1000000000)throw new Error("This storage space has reached its configured capacity. Connect another space or increase its authorised capacity.");
+  if(connection.capacityGb&&(Number(connection.usedBytes||0)+Number(fileSize||0)+Number(reservedBytes||0))>connection.capacityGb*1000000000)throw new Error("This storage space has reached its configured capacity. Connect another space or increase its authorised capacity.");
   const extension=contentType==="video/quicktime"?"mov":"mp4";
   const objectKey="videos/"+assetVariant+"/"+crypto.randomUUID()+"."+extension;
   return {uploadUrl:await signUrl(connection,"PUT",objectKey,contentType,300),objectKey,storageConnectionId:connection.id,storageProvider:connection.provider,expiresInSeconds:300};

@@ -147,7 +147,7 @@ export async function cleanVideoBlob(sourceBlob, extension, onProgress = () => {
     });
 
     const exportId = crypto.randomUUID();
-    const metadataTitle = String(options.title || "VICEHUB video").replace(/[\\r\\n\\0]/g, " ").slice(0, 140);
+    const metadataTitle = String(options.title || "VICEHUB video").split("").filter(char => char.charCodeAt(0) >= 32).join("").slice(0, 140);
     const metadataComment = "Processed by VICEHUB · Export " + exportId;
     args.push("-metadata", "title=" + metadataTitle, "-metadata", "comment=" + metadataComment, "-metadata", "encoded_by=VICEHUB");
     if (extension === "mp4") args.push("-movflags", "+faststart");
