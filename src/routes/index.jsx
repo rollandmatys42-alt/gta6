@@ -300,7 +300,7 @@ function HomePage() {
               <button type="button" className="fh-btn solid big fh-membership-select" onClick={() => subscribe(p)} disabled={busy || !p.catalogueReady}>
                 {busy ? "Opening checkout…" : p.catalogueReady ? "Get Creator Membership" : "Membership opening soon"}
               </button>
-              <small className="fh-membership-foot">{p.catalogueReady ? "Cancel any time. Referral credit can reduce a future invoice." : `${Number(p.publishedAssetCount || 0)} rights-cleared downloads live. Checkout opens when at least 5 are published.`}</small>
+              <small className="fh-membership-foot">{p.catalogueReady ? "Cancel any time. Referral credit can reduce a future invoice." : `${Number(p.publishedAssetCount || 0)} rights-cleared downloads live. Checkout opens when at least 20 are published.`}</small>
             </article>;
           })}
         {!plansLoading && !plans.some(p => p.tier_code === "pro") && <div className="fh-membership-card fh-pending-card"><h3>Membership setup in progress</h3><p className="fh-membership-description">The paid membership is not available in this currency yet. No payment will be taken.</p></div>}

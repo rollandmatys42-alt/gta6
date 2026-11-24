@@ -1002,7 +1002,7 @@ export const createContentReport = createServerFn({method:"POST"}).middleware([r
 export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object({currency:z.enum(["USD","EUR","GBP"]).default("USD")})).handler(async({data,context})=>{
  const db=context.getBase44().asServiceRole.entities;
  const rows=await db.SubscriptionPlan.filter({tier_code:"pro",status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",1,0);
- const assets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",5,0,["id"]);
+ const assets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",20,0,["id"]);
  return rows.map(plan=>({...plan,catalogueReady:assets.length>=5,publishedAssetCount:assets.length}));
 });
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
@@ -1069,8 +1069,8 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     const plans=await db.SubscriptionPlan.filter({tier_code:"pro",currency:data.currency,status:"active"},"-created_date",1,0);
     const plan=plans[0];
     if(!plan||Number(plan.monthly_price_cents||0)<=0||Number(plan.monthly_download_limit||0)<1)throw Object.assign(new Error("This membership is not yet open for sale. The administrator must configure a positive monthly price and download allowance first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
-    const rightsClearedAssets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",5,0,["id"]);
-    if(rightsClearedAssets.length<5)throw Object.assign(new Error("Paid checkout is temporarily closed until at least five rights-cleared downloads are published in the library."),{status:409,code:"CONTENT_LIBRARY_NOT_READY"});
+    const rightsClearedAssets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",20,0,["id"]);
+    if(rightsClearedAssets.length<20)throw Object.assign(new Error("Paid checkout is temporarily closed until at least twenty rights-cleared downloads are published in the library."),{status:409,code:"CONTENT_LIBRARY_NOT_READY"});
     if(secrets.get("STRIPE_TAX_ENABLED")!=="true")throw Object.assign(new Error("Paid checkout is disabled until Stripe Tax and the applicable tax registrations are configured."),{status:503,code:"STRIPE_TAX_NOT_CONFIGURED"});
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
