@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import "@/styles/fan-admin.css";
 import { createVideoRecord, createVideoUploadUrl, publishVideo, testVideoStorage, getAdminVideoLibrary, updateAdminVideo, archiveAdminVideo, importAdminVideoMetadataCsv, getAdminFreeSamplePack, lockFreeSamplePack, getVideoPreviewUrl } from "@/lib/server-fns";
-import { getStorageConnections, saveStorageConnection, testStorageConnection, disableStorageConnection } from "@/lib/storage-fns";
+import { getStorageConnections, saveStorageConnection, testStorageConnection, disableStorageConnection } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/_authed/admin/videos")({
   ssr: false,

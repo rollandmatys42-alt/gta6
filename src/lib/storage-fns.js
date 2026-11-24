@@ -1,13 +1,7 @@
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { secrets } from "base44:runtime";
-import { requireUser } from "@/lib/auth-middleware";
 
 const enc = new TextEncoder();
 const PREFIX = "vicehub_storage_conn_";
-const safeAdmin = context => {
-  if (context.user?.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
-};
 const b64 = bytes => { let binary = ""; for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte); return btoa(binary); };
 const unb64 = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
 async function encryptionKey() {
@@ -89,38 +83,45 @@ async function readConnection(row) {
 function publicConnection(c) {
   return { id:c.id, provider:c.provider, name:c.name, bucket:c.bucket, endpointHost:(()=>{try{return new URL(c.endpoint).host;}catch{return "Invalid endpoint";}})(), region:c.region, capacityGb:c.capacityGb||null, usedBytes:c.usedBytes||0, enabled:c.enabled!==false, verifiedAt:c.verifiedAt||null };
 }
-export const getStorageConnections = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
-  safeAdmin(context); const rows=await allConnectionRows(context.getBase44().asServiceRole.entities);
-  return Promise.all(rows.map(readConnection)).then(list=>list.map(publicConnection));
-});
-export const saveStorageConnection = createServerFn({method:"POST"}).middleware([requireUser])
-.validator(z.object({name:z.string().trim().min(2).max(80),provider:z.enum(["cloudflare-r2","s3-compatible"]),endpoint:z.string().url().max(300),bucket:z.string().trim().min(1).max(120).regex(/^[a-zA-Z0-9._-]+$/),region:z.string().trim().min(1).max(40).default("auto"),accessKey:z.string().trim().min(4).max(300),secretKey:z.string().min(8).max(500),capacityGb:z.number().positive().max(1000000).optional()}))
-.handler(async({data,context})=>{
-  safeAdmin(context); const endpoint=new URL(data.endpoint); if(endpoint.protocol!=="https:")throw new Error("The storage endpoint must use HTTPS.");
-  const credentials={accessKey:data.accessKey,secretKey:data.secretKey};
-  const connection={...data,endpoint:endpoint.origin+endpoint.pathname.replace(/\/$/,"")};
-  await verifyCredentials({...connection,...credentials});
-  const id=crypto.randomUUID(),now=new Date().toISOString();
-  const publicData={id,provider:data.provider,name:data.name,endpoint:connection.endpoint,bucket:data.bucket,region:data.region,capacityGb:data.capacityGb||null,usedBytes:0,enabled:true,verifiedAt:now,createdAt:now};
-  const row=await context.getBase44().asServiceRole.entities.SiteSetting.create({setting_key:PREFIX+id,setting_value:JSON.stringify({public:publicData,credentials:await encrypt(credentials)}),is_public:false,updated_by:context.user.id});
-  return {...publicConnection(publicData),saved:!!row.id};
-});
-export const testStorageConnection = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({connectionId:z.string().min(1)})).handler(async({data,context})=>{
-  safeAdmin(context); const entities=context.getBase44().asServiceRole.entities;
-  const row=(await allConnectionRows(entities)).find(item=>item.setting_key===PREFIX+data.connectionId);
-  if(!row)throw Object.assign(new Error("Storage connection not found."),{status:404});
-  const connection=await readConnection(row); await verifyCredentials(connection);
-  const parsed=JSON.parse(row.setting_value||"{}"); parsed.public.verifiedAt=new Date().toISOString();
-  await entities.SiteSetting.update(row.id,{setting_value:JSON.stringify(parsed),updated_by:context.user.id});
-  return {ok:true,verifiedAt:parsed.public.verifiedAt};
-});
-export const disableStorageConnection = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({connectionId:z.string().min(1)})).handler(async({data,context})=>{
-  safeAdmin(context); const entities=context.getBase44().asServiceRole.entities;
-  const row=(await allConnectionRows(entities)).find(item=>item.setting_key===PREFIX+data.connectionId);
-  if(!row)throw Object.assign(new Error("Storage connection not found."),{status:404});
-  const parsed=JSON.parse(row.setting_value||"{}"); parsed.public.enabled=false;
-  await entities.SiteSetting.update(row.id,{setting_value:JSON.stringify(parsed),updated_by:context.user.id}); return {ok:true};
-});
+export async function listStorageConnections(entities) {
+  const rows = await allConnectionRows(entities);
+  const connections = await Promise.all(rows.map(readConnection));
+  return connections.map(publicConnection);
+}
+export async function addStorageConnection({ entities, data, userId }) {
+  const endpoint = new URL(data.endpoint);
+  if (endpoint.protocol !== "https:") throw new Error("The storage endpoint must use HTTPS.");
+  const credentials = { accessKey: data.accessKey, secretKey: data.secretKey };
+  const endpointPath = endpoint.pathname.endsWith("/") ? endpoint.pathname.slice(0, -1) : endpoint.pathname;
+  const connection = { ...data, endpoint: endpoint.origin + endpointPath };
+  await verifyCredentials({ ...connection, ...credentials });
+  const id = crypto.randomUUID(), now = new Date().toISOString();
+  const publicData = { id, provider: data.provider, name: data.name, endpoint: connection.endpoint, bucket: data.bucket, region: data.region, capacityGb: data.capacityGb || null, usedBytes: 0, enabled: true, verifiedAt: now, createdAt: now };
+  const row = await entities.SiteSetting.create({
+    setting_key: PREFIX + id,
+    setting_value: JSON.stringify({ public: publicData, credentials: await encrypt(credentials) }),
+    is_public: false, updated_by: userId,
+  });
+  return { ...publicConnection(publicData), saved: !!row.id };
+}
+export async function verifyStorageConnection({ entities, connectionId, userId }) {
+  const row = (await allConnectionRows(entities)).find(item => item.setting_key === PREFIX + connectionId);
+  if (!row) throw Object.assign(new Error("Storage connection not found."), { status: 404 });
+  const connection = await readConnection(row);
+  await verifyCredentials(connection);
+  const parsed = JSON.parse(row.setting_value || "{}");
+  parsed.public.verifiedAt = new Date().toISOString();
+  await entities.SiteSetting.update(row.id, { setting_value: JSON.stringify(parsed), updated_by: userId });
+  return { ok: true, verifiedAt: parsed.public.verifiedAt };
+}
+export async function turnOffStorageConnection({ entities, connectionId, userId }) {
+  const row = (await allConnectionRows(entities)).find(item => item.setting_key === PREFIX + connectionId);
+  if (!row) throw Object.assign(new Error("Storage connection not found."), { status: 404 });
+  const parsed = JSON.parse(row.setting_value || "{}");
+  parsed.public.enabled = false;
+  await entities.SiteSetting.update(row.id, { setting_value: JSON.stringify(parsed), updated_by: userId });
+  return { ok: true };
+}
 export async function issueStorageUploadUrl({entities,contentType,fileSize,reservedBytes=0,assetVariant,connectionId}) {
   const rows=await allConnectionRows(entities), connections=await Promise.all(rows.map(readConnection));
   let connection=connectionId?connections.find(item=>item.id===connectionId):null;
