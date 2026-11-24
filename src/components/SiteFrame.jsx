@@ -59,19 +59,20 @@ function NotificationBell({isAuthenticated}) {
   if(!isAuthenticated)return null;
   const enable=async()=>{
     try{
-      if(typeof Notification==="undefined"||!("serviceWorker" in navigator)||!("PushManager" in window))throw new Error("Web push is not supported by this browser.");
-      const config=await getPushNotificationConfig();
-      if(!config.available||!config.publicKey)throw new Error("Server push keys are not configured yet.");
+      if(typeof Notification==="undefined")throw new Error("Browser notifications are not supported.");
       const granted=await Notification.requestPermission();
       setPermission(granted);
       if(granted!=="granted")return;
+      const config=await getPushNotificationConfig();
+      if(!config.available||!config.publicKey){setPushMessage("Browser alerts are enabled while VICEHUB is open. Background push awaits server VAPID keys.");return;}
+      if(!("serviceWorker" in navigator)||!("PushManager" in window))throw new Error("Background push is not supported by this browser.");
       const registration=await navigator.serviceWorker.ready;
       let subscription=await registration.pushManager.getSubscription();
       if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decodeVapidKey(config.publicKey)});
       const payload=subscription.toJSON();
       if(!payload.endpoint||!payload.keys?.p256dh||!payload.keys?.auth)throw new Error("The browser returned an incomplete push subscription.");
       await savePushSubscription({data:{endpoint:payload.endpoint,p256dh:payload.keys.p256dh,auth:payload.keys.auth,expirationTime:payload.expirationTime||undefined}});
-      setPushMessage("Push alerts enabled on this device.");
+      setPushMessage("Background push alerts enabled on this device.");
     }catch(error){setPushMessage(error?.message||"Push alerts could not be enabled.");}
   };
   return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">🔔</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable push notifications" title="Enable push notifications">+</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
