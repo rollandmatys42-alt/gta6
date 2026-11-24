@@ -5,6 +5,7 @@ import { getNewsFeed, createContentReport } from "@/lib/server-fns";
 import { useLocale, translate } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/newsroom.css";
+import "@/styles/vicehub-2026-redesign.css";
 
 const stamp = value => value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "VICEHUB NEWS DESK";
 const confidenceLabel = value => ({ official: "OFFICIAL", confirmed: "CONFIRMED", reported: "REPORTED", rumour: "RUMOUR", theory: "THEORY", community: "COMMUNITY" }[value] || String(value || "NEWS").toUpperCase());

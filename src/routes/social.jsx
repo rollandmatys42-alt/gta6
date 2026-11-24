@@ -8,6 +8,7 @@ import {
   processMyDueSocialPosts, generateStudioDraft, createSocialMediaUploadUrl,
 } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
+import "@/styles/vicehub-2026-redesign.css";
 
 export const Route = createFileRoute("/social")({
   ssr: false,
