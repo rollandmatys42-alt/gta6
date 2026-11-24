@@ -11,9 +11,16 @@ const safeAdmin = context => {
 const b64 = bytes => { let binary = ""; for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte); return btoa(binary); };
 const unb64 = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
 async function encryptionKey() {
-  const secret = secrets.get("VIDEO_STORAGE_ENCRYPTION_KEY");
-  if (!secret) throw Object.assign(new Error("Storage encryption is not configured. Contact the VICEHUB administrator."), { status: 503, code: "STORAGE_ENCRYPTION_NOT_CONFIGURED" });
-  return crypto.subtle.importKey("raw", await crypto.subtle.digest("SHA-256", enc.encode(secret)), "AES-GCM", false, ["encrypt", "decrypt"]);
+  const masterSecret = secrets.get("SOCIAL_TOKEN_ENCRYPTION_KEY");
+  if (!masterSecret || masterSecret.length < 32) throw Object.assign(new Error("The platform encryption key is not configured. Contact the VICEHUB administrator."), { status: 503, code: "STORAGE_ENCRYPTION_NOT_CONFIGURED" });
+  const material = await crypto.subtle.importKey("raw", enc.encode(masterSecret), "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: enc.encode("VICEHUB_STORAGE"), info: enc.encode("STORAGE_CONNECTIONS_V1") },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
 }
 async function encrypt(value) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
