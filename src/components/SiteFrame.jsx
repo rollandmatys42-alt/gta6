@@ -14,12 +14,11 @@ const links = [["/", "nav.home"], ["/library", "nav.library"], ["/news", "nav.ne
 const workspaceLinks = [
   ["/dashboard", "⌂", "overview"],
   ["/library", "▤", "library"],
-  ["/social", "↗", "social"],
-  ["/studio", "✦", "studio"],
+  ["/news", "▧", "news"],
+  ["/creators", "◎", "profile"],
   ["/messages", "✉", "messages"],
   ["/notifications", "◉", "notifications"],
-  ["/creators", "◎", "profile"],
-  ["/news", "▧", "news"],
+  ["/social", "↗", "social"],
 ];
 const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Biblioteca de vídeos", pt: "Biblioteca de vídeos", it: "Libreria video", de: "Videobibliothek" };
 
@@ -27,16 +26,16 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
   const locale = useLocale();
   const { isAuthenticated, logout } = useAuth();
   const [open, setOpen] = useState(false);
-  const label = (key) => key === "nav.library" ? (libraryLabels[locale] || libraryLabels.en) : translate(locale, key);
+  const label = key => key === "nav.library" ? (libraryLabels[locale] || libraryLabels.en) : translate(locale, key);
   const tx = key => translate(locale, key);
   const close = () => setOpen(false);
   const activeLabel = workspaceLinks.find(([, , key]) => key === activeKey);
   return <div className={"platform-shell fh-shell" + (workspace ? " vh-workspace-mode" : "")}>
     {workspace ? <>
       <aside className="vh-workspace-sidebar">
-        <Link to="/dashboard" className="vh-workspace-brand"><span className="vh-workspace-mark">V</span><span>VICE<b>HUB</b><small>CREATOR HQ / LEONIDA</small></span></Link>
-        <div className="vh-workspace-caption">{tx("dashboard.workspace")}</div>
-        <nav className="vh-workspace-nav" aria-label="Creator workspace navigation">
+        <Link to="/dashboard" className="vh-workspace-brand"><span className="vh-workspace-mark">V</span><span>VICE<b>HUB</b><small>MEMBER HQ / LEONIDA</small></span></Link>
+        <div className="vh-workspace-caption">MEMBER NAVIGATION</div>
+        <nav className="vh-workspace-nav" aria-label="Member workspace navigation">
           {workspaceLinks.map(([href, icon, key]) => <Link key={href} to={href} className={activeKey === key ? "active" : ""} aria-current={activeKey === key ? "page" : undefined}>
             <span className="vh-workspace-icon">{icon}</span><span>{tx("dashboard.nav." + key)}</span>
           </Link>)}
@@ -48,10 +47,10 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
       </aside>
       <div className="vh-workspace-content">
         <header className="vh-workspace-topbar">
-          <div><small>VICEHUB / CREATOR WORKSPACE</small><b>{activeLabel ? tx("dashboard.nav." + activeLabel[2]) : "Creator workspace"}</b></div>
+          <div><small>VICEHUB / MEMBER AREA</small><b>{activeLabel ? tx("dashboard.nav." + activeLabel[2]) : "Member dashboard"}</b></div>
           <div className="vh-workspace-actions">
             <label><span className="sr-only">Language</span><select aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select></label>
-            <Link to="/dashboard" className="vh-workspace-account">MY ACCOUNT ↗</Link>
+            <Link to="/dashboard" className="vh-workspace-account">MY DASHBOARD ↗</Link>
           </div>
         </header>
         <main className="platform-main vh-workspace-page"><div className="eyebrow">{eyebrow}</div>{children}</main>
