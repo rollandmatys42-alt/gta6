@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead } from "@/lib/server-fns";
+import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyReferralDashboard, applyReferralWalletCredit } from "@/lib/server-fns";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/client-dashboard.css";
+import "@/styles/vicehub-growth.css";
 
 export const Route = createFileRoute("/_authed/dashboard")({
   ssr: false,
@@ -26,6 +27,9 @@ function DashboardPage() {
   const [error, setError] = useState("");
   const [busyVideo, setBusyVideo] = useState("");
   const [billingBusy, setBillingBusy] = useState(false);
+  const [referral, setReferral] = useState(null);
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralNotice, setReferralNotice] = useState("");
 
   const refresh = async () => {
     setLoading(true);
@@ -52,6 +56,7 @@ function DashboardPage() {
   };
 
   useEffect(() => { refresh(); }, [locale]);
+  useEffect(() => { getMyReferralDashboard().then(setReferral).catch(err => setReferralNotice(err?.message || "Referral dashboard is unavailable.")); }, []);
 
   const firstName = "CREATOR";
   const used = Number(account?.downloadsUsed || 0);
@@ -104,6 +109,17 @@ function DashboardPage() {
       <section className="member-notification-hq">
         <div className="member-notification-heading"><div><span className="member-section-kicker">VICEHUB / LIVE DISPATCH</span><h2>MISSION <em>UPDATES.</em></h2><p>Your account activity, messages and important alerts.</p></div><span className="member-alert-count">{notifications.filter(n => !n.read_at).length} NEW</span></div>
         <div className="member-notification-layout"><div className="member-notification-list">{notifications.length ? notifications.map(item => <button type="button" className={"member-notification-item" + (!item.read_at ? " unread" : "")} key={item.id} onClick={() => openNotification(item)}><span className="member-notification-glyph">VI</span><span className="member-notification-copy"><b>{item.title}</b><small>{item.body}</small><time>{dateLabel(item.created_date, locale)}</time></span><i>↗</i></button>) : <div className="member-notification-empty">NO NEW DISPATCHES. IMPORTANT ACCOUNT UPDATES WILL APPEAR HERE.</div>}</div><Link to="/messages" className="member-message-shortcut"><span className="member-message-glyph">✉</span><b>PRIVATE MESSAGES</b><small>Open your creator inbox</small><i>OPEN INBOX ↗</i></Link></div>
+      </section>
+      <section className="member-referral-card">
+        <div className="member-referral-head"><div><span className="member-section-kicker">VICEHUB / CREATOR REWARDS</span><h2>INVITE CREATORS. <em>EARN CREDIT.</em></h2><p>Give a new member 5% off their first payment. Earn 20% of that first paid subscription as VICEHUB credit after a 30-day validation period.</p></div><span className="member-referral-mark">20%</span></div>
+        {referral ? <div className="member-referral-grid">
+          <div className="member-referral-link"><small>YOUR PERSONAL REFERRAL LINK</small><code>{typeof window !== "undefined" ? window.location.origin : "https://gta6-creator-hub-c26cc578.base44.app"}/?ref={referral.code}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(window.location.origin+"/?ref="+referral.code);setReferralNotice("Referral link copied.");}catch{setReferralNotice("Copy failed. Select and copy the link manually.");}}}>COPY LINK ↗</button><p>Affiliate disclosure: you may receive VICEHUB membership credit if someone subscribes through this link.</p></div>
+          <div className="member-referral-stat"><small>PAID REFERRALS</small><b>{referral.referralCount}</b></div>
+          <div className="member-referral-stat"><small>AVAILABLE CREDIT</small><b>{new Intl.NumberFormat("en-GB",{style:"currency",currency:referral.currency||"GBP"}).format((referral.availableCents||0)/100)}</b></div>
+          <div className="member-referral-stat"><small>TOTAL EARNED</small><b>{new Intl.NumberFormat("en-GB",{style:"currency",currency:referral.currency||"GBP"}).format((referral.earnedCents||0)/100)}</b></div>
+        </div> : <p className="member-referral-loading">Preparing your personal referral link…</p>}
+        <div className="member-referral-actions"><button type="button" disabled={referralBusy || !referral?.isSubscribed || (referral?.availableCents||0)<=0} onClick={async()=>{setReferralBusy(true);setReferralNotice("");try{const result=await applyReferralWalletCredit();setReferralNotice(result?.message||"Credit applied to your next invoice.");const updated=await getMyReferralDashboard();setReferral(updated);}catch(err){setReferralNotice(err?.message||"Credit could not be applied.");}finally{setReferralBusy(false);}}}>{referralBusy?"APPLYING CREDIT…":"APPLY CREDIT TO NEXT INVOICE ↗"}</button><span>Credits stay in your wallet, carry over and can cover up to 100% of a future monthly invoice. No cash withdrawals.</span></div>
+        {referralNotice && <p className="member-referral-notice" role="status">{referralNotice}</p>}
       </section>
       <section className="member-social-connect">
         <div className="member-social-head"><div><span className="member-section-kicker">VICEHUB / ACCOUNT LINKS</span><h2>CONNECT YOUR <em>CHANNELS.</em></h2><p>Securely authorise your own social accounts. VICEHUB never asks for your passwords.</p></div><Link to="/social">OPEN SOCIAL CONTROL ROOM ↗</Link></div>
