@@ -17,6 +17,7 @@
     },
     "language": { "type": "string", "enum": ["en", "fr", "es", "pt", "it", "de"], "default": "en" },
     "is_featured": { "type": "boolean", "default": false },
+    "is_free_sample": { "type": "boolean", "default": false },
     "tags": {
       "type": "array",
       "items": {
