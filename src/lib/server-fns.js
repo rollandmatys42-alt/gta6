@@ -1032,6 +1032,45 @@ export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([
  return {categoriesCreated:categoryCount,pagesCreated:pageCount,sourcesCreated,agentsCreated,legalPagesRequireReview:true};
 });
 
+export const runScheduledGrowthAgents = createServerFn({method:"POST"})
+ .validator(z.object({cronSecret:z.string().min(32).max(256)}))
+ .handler(async({data,context})=>{
+  const expected=secrets.get("GTA_NEWS_SYNC_CRON_SECRET")||"";
+  if(expected.length<32||data.cronSecret.length!==expected.length)throw Object.assign(new Error("Growth scheduler is not configured."),{status:503,code:"GROWTH_SCHEDULER_NOT_CONFIGURED"});
+  let diff=0;for(let i=0;i<expected.length;i++)diff|=expected.charCodeAt(i)^data.cronSecret.charCodeAt(i);
+  if(diff!==0)throw Object.assign(new Error("Unauthorized growth scheduler request."),{status:401,code:"UNAUTHORIZED"});
+  const db=context.getBase44().asServiceRole.entities;
+  const [agents,articles,videos,users]=await Promise.all([
+    db.AIAgentConfig.filter({enabled:true,agent_key:{$in:["seo_agent","geo_agent","platform_analyst"]}},"-created_date",10,0),
+    db.NewsArticle.filter({status:"published"},"-published_at",20,0,["title","slug","summary","source_name","source_url","published_at"]),
+    db.Video.filter({status:"published",license_status:"verified"},"-published_at",20,0,["title","category","tags","published_at"]),
+    db.User.list("-created_date",5000,0)
+  ]);
+  const admin=users.find(user=>user.role==="admin");
+  if(!admin)throw new Error("No administrator account is available to own growth drafts.");
+  const results=[];
+  for(const agent of agents){
+    const type=agent.agent_key==="seo_agent"?"SEO":agent.agent_key==="geo_agent"?"GEO":"Description";
+    const focus=agent.agent_key==="seo_agent"
+      ?"Produce a prioritized technical/content SEO action plan for VICEHUB. Include search intent clusters, page titles/meta, internal links, article freshness, image/video SEO, Core Web Vitals and a 30-day execution backlog. Use the supplied published content only. Do not invent Search Console metrics or claim rankings."
+      :agent.agent_key==="geo_agent"
+      ?"Produce a Generative Engine Optimization plan: clear entity facts, concise sourced answers, transparent citations, structured data opportunities, author/source attribution, factual consistency and questions users ask about GTA VI. Do not create fake facts, fake experts, fake reviews or fabricated citations."
+      :"Act as the growth chief-of-staff. Synthesize the latest SEO and GEO drafts into a prioritized plan to grow toward 10,000 daily visits. Treat 10,000/day as a target, not a forecast. Identify dependencies, experiments, owners and KPIs; never fabricate traffic data.";
+    const prompt={publishedArticles:articles.map(a=>({title:a.title,slug:a.slug,summary:a.summary,source:a.source_name,url:a.source_url,publishedAt:a.published_at})),publishedVideos:videos.map(v=>({title:v.title,category:v.category,tags:v.tags,publishedAt:v.published_at})),measurementStatus:{googleSearchConsoleConnected:!!secrets.get("GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN"),analyticsConnected:!!secrets.get("GA4_REFRESH_TOKEN"),note:"No traffic or ranking metrics are supplied when measurement connectors are not connected."},goal:"Build a credible, measurable acquisition system targeting 10,000 visits per day without guaranteeing the result."};
+    try{
+      const generated=await omniRouteChat({model:agent.provider_model||undefined,messages:[{role:"system",content:agent.instructions||focus},{role:"user",content:focus+"\\n\\nCURRENT VERIFIED SITE DATA\\n"+JSON.stringify(prompt)}],temperature:0.25,maxTokens:2600,title:"VICEHUB Growth Orchestrator"});
+      const saved=await db.AIContentDraft.create({user_id:admin.id,platform:"General",content_type:type,topic:"Scheduled "+agent.display_name+" report — "+new Date().toISOString().slice(0,10),output:generated.output,status:"draft",provider:generated.model});
+      await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Completed — draft "+saved.id});
+      results.push({agent:agent.agent_key,status:"completed",draftId:saved.id});
+    }catch(error){
+      const message=(error instanceof Error?error.message:String(error)).slice(0,240);
+      await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Failed — "+message});
+      results.push({agent:agent.agent_key,status:"error",error:message});
+    }
+  }
+  return {success:results.every(x=>x.status==="completed"),agentsRun:results.length,results,ranAt:new Date().toISOString()};
+ });
+
 export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({agentId:z.string().min(1),taskInput:z.string().min(5).max(3000)}))
  .handler(async({data,context})=>{
