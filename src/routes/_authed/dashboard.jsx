@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed } from "@/lib/server-fns";
+import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession } from "@/lib/server-fns";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/client-dashboard.css";
@@ -24,6 +24,7 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyVideo, setBusyVideo] = useState("");
+  const [billingBusy, setBillingBusy] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -33,7 +34,7 @@ function DashboardPage() {
       const [accountResult, videoResult, newsResult] = await Promise.allSettled([
         getMyAccount(),
         listPublishedVideosPage({ data: { offset: 0, limit: 6 } }),
-        getNewsFeed({ data: { locale, limit: 4 } }),
+        (async () => { const localized = await getNewsFeed({ data: { locale, limit: 4 } }); return Array.isArray(localized) && localized.length ? localized : locale === "en" ? [] : getNewsFeed({ data: { locale: "en", limit: 4 } }); })(),
       ]);
       if (accountResult.status === "fulfilled") setAccount(accountResult.value);
       else setError(accountResult.reason?.message || "Account information could not be loaded.");
@@ -55,6 +56,13 @@ function DashboardPage() {
   const percent = limit ? Math.min(100, Math.round(used / limit * 100)) : 0;
   const planName = account?.planName || (account?.tier === "free" ? "Free member" : "Membership");
   const newest = useMemo(() => [...videos].sort((a,b) => new Date(b.published_at || 0) - new Date(a.published_at || 0)), [videos]);
+
+  const manageBilling = async () => {
+    setBillingBusy(true);
+    setError("");
+    try { const result = await createStripePortalSession(); window.location.assign(result.url); }
+    catch (err) { setError(err?.message || "Billing portal could not be opened."); setBillingBusy(false); }
+  };
 
   const download = async video => {
     setBusyVideo(video.id);
@@ -92,7 +100,7 @@ function DashboardPage() {
           <p>{account?.tier === "free" ? "Your free access includes a limited monthly download allowance." : "Your downloads are included with your current membership."}</p>
           <div className="member-download-numbers"><strong>{remaining}<small>LEFT</small></strong><span><b>{used}</b> used of {limit || "—"} this month</span></div>
           <div className="member-progress"><i style={{width: percent + "%"}}/></div>
-          <div className="member-plan-actions"><Link to="/library">DOWNLOAD VIDEOS ↗</Link>{account?.hasBillingCustomer && <button type="button" onClick={() => window.location.assign("/#plans")}>MANAGE PLAN</button>}</div>
+          <div className="member-plan-actions"><Link to="/library">DOWNLOAD VIDEOS ↗</Link>{account?.hasBillingCustomer ? <button type="button" onClick={manageBilling} disabled={billingBusy}>{billingBusy ? "OPENING BILLING…" : "MANAGE / CANCEL PLAN ↗"}</button> : <Link to="/#plans">VIEW MEMBERSHIPS ↗</Link>}</div>
         </article>
         <div className="member-shortcuts">
           <Link to="/library"><span>01</span><b>VIDEO LIBRARY</b><small>Browse and download new drops</small><i>↗</i></Link>
