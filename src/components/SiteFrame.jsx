@@ -43,12 +43,12 @@ function NotificationBell({isAuthenticated}) {
       const ordered=[...(rows||[])].sort((a,b)=>new Date(b.created_date||0)-new Date(a.created_date||0));
       setUnread(ordered.filter(n=>!n.read_at).length);
       const newest=ordered[0];
-      if(newestId.current && newest && newest.id!==newestId.current && typeof Notification!=="undefined" && Notification.permission==="granted"){
+      if(newestId.current!==null && newest && newest.id!==newestId.current && typeof Notification!=="undefined" && Notification.permission==="granted"){
         const notice={title:newest.title||"VICEHUB update",body:newest.body||"A new update is available.",data:{url:newest.target_url||"/notifications"},tag:"vicehub-"+newest.id};
         if("serviceWorker" in navigator)navigator.serviceWorker.ready.then(reg=>reg.showNotification(notice.title,notice)).catch(()=>{});
         else new Notification(notice.title,{body:notice.body});
       }
-      if(newest?.id)newestId.current=newest.id;
+      newestId.current=newest?.id || "__none__";
     }).catch(()=>{});
     load();
     const timer=window.setInterval(load,60000);
