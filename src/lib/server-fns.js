@@ -515,8 +515,8 @@ export const createMarketplaceInquiry = createServerFn({method:"POST"}).middlewa
  });
 
 export const getShopProducts = createServerFn({method:"GET"}).handler(async({context})=>{
- const rows=await context.getBase44().asServiceRole.entities.ShopProduct.filter({status:"published"},"-is_featured -created_date",100,0);
- return rows.filter(p=>["original","licensed","official_external"].includes(p.rights_status||""));
+ const rows=await context.getBase44().asServiceRole.entities.ShopProduct.filter({status:"published"},"-created_date",100,0);
+ return rows.filter(p=>["original","licensed","official_external"].includes(p.rights_status||"")).sort((a,b)=>Number(!!b.is_featured)-Number(!!a.is_featured));
 });
 export const getAdminShopProducts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);return context.getBase44().asServiceRole.entities.ShopProduct.list("-created_date",200,0);
@@ -549,6 +549,9 @@ export const saveShopProduct = createServerFn({method:"POST"}).middleware([requi
   };
   return data.id?db.update(data.id,p):db.create(p);
  });
+export const getShopPaymentReadiness = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);return {stripeConfigured:!!secrets.get("STRIPE_SECRET_KEY")};
+});
 export const getMyShopOrders = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  return context.getBase44().asServiceRole.entities.ShopOrder.filter({user_id:context.user.id},"-created_date",30,0);
 });
