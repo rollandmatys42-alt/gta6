@@ -97,7 +97,7 @@ function DashboardPage() {
           <p>{account?.tier === "free" ? "Your free access includes a limited monthly download allowance." : "Your downloads are included with your current membership."}</p>
           <div className="member-download-numbers"><strong>{remaining}<small>LEFT</small></strong><span><b>{used}</b> used of {limit || "—"} this month</span></div>
           <div className="member-progress"><i style={{width: percent + "%"}}/></div>
-          <div className="member-plan-actions"><Link to="/library">DOWNLOAD VIDEOS ↗</Link>{account?.hasBillingCustomer && <button type="button" onClick={() => window.location.assign("/account")}>MANAGE PLAN</button>}</div>
+          <div className="member-plan-actions"><Link to="/library">DOWNLOAD VIDEOS ↗</Link>{account?.hasBillingCustomer && <button type="button" onClick={() => window.location.assign("/#plans")}>MANAGE PLAN</button>}</div>
         </article>
         <div className="member-shortcuts">
           <Link to="/library"><span>01</span><b>VIDEO LIBRARY</b><small>Browse and download new drops</small><i>↗</i></Link>
