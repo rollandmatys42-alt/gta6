@@ -28,4 +28,4 @@ jobs:
         with:
           deno-version: v2.x
       - name: Type-check Deno automation
-        run: deno check base44/functions/social-publisher/index.ts base44/functions/gta-news-sync/index.ts
+        run: deno check base44/functions/social-publisher/index.ts base44/functions/gta-news-sync/index.ts base44/functions/vicehub-send-push/index.ts
