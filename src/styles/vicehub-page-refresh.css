@@ -117,3 +117,24 @@
 .vh-lib2-card-actions button,.vh-lib2-modal-actions button{border-radius:8px}
 @media(max-width:760px){.social-hero,.cr-directory-heading,.nr-feed-heading{align-items:flex-start;flex-direction:column}.social-hero-stamp{width:72px;height:72px;font-size:34px}.social-hero-actions{flex-wrap:wrap}.cr-hero,.nr-hero{min-height:240px}.cr-grid,.nr-story-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.cr-grid,.nr-story-grid{grid-template-columns:1fr}.social-hero{padding:20px 16px}.social-hero-stamp{display:none}.cr-hero-copy,.nr-hero-content{padding:20px 16px}.vh-lib2-catalog{padding:12px}}
+
+/* Vice City dispatch emblem and responsive member-page refinements */
+.vh-notification-dispatch{overflow:visible;transform:none;border-radius:11px;clip-path:polygon(14% 0,86% 0,100% 16%,100% 84%,86% 100%,14% 100%,0 84%,0 16%)}
+.vh-notification-mark{width:31px;height:31px;border:0;border-radius:0;transform:none;box-shadow:none}
+.vh-notification-mark svg{width:100%;height:100%;overflow:visible}
+.vh-notification-mark svg path:first-child{fill:#171326;stroke:#ff5b9e;stroke-width:1.4}
+.vh-notification-mark svg path:nth-child(2){fill:none;stroke:#71e4e2;stroke-width:.8}
+.vh-notification-mark svg text{fill:#fff;font:900 12px Impact,sans-serif;letter-spacing:-1px}
+.vh-notification-mark svg path:last-child{fill:#71e4e2}
+.vh-notification-enable{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;color:#ff8dbd;font-size:15px}
+.member-notification-glyph{display:grid!important;place-items:center;flex:none;width:38px;height:38px;border:1px solid #70e3e277;border-radius:10px;background:linear-gradient(145deg,#24162e,#0d1420);color:#ff79b2;font-size:22px;font-weight:900;box-shadow:0 0 18px #ff4f9a20}
+.member-video-image,.member-free-sample-image{overflow:hidden;background:#111827}
+.member-video-image img,.member-free-sample-image img{display:block;width:100%;height:100%;min-height:100%;object-fit:cover;transition:transform .35s ease}
+.member-video-card:hover .member-video-image img,.member-free-sample-item:hover .member-free-sample-image img{transform:scale(1.045)}
+.vh-lib2-poster{overflow:hidden;background:#111827}
+.vh-lib2-poster>img{display:block;width:100%;height:100%;object-fit:cover}
+.notification-row{gap:16px;min-width:0}
+.notification-row>div:first-child{min-width:0;flex:1}
+.notification-row p{overflow-wrap:anywhere}
+@media(max-width:760px){.notification-row{padding:14px}.message-columns{gap:10px}.vh-workspace-nav a{min-height:46px}.member-video-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.member-video-grid{grid-template-columns:1fr}.member-video-image{aspect-ratio:16/9}.member-notification-layout{grid-template-columns:1fr}.vh-notification-control{gap:4px}}
