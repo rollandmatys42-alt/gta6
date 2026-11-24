@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import "@/styles/video-library.css";
-import { getVideoPreviewUrl, listPublishedVideosPage, requestVideoDownload, getPublicFreeSamplePack } from "@/lib/server-fns";
+import { getVideoPreviewUrl, listPublishedVideosPage, getPublicFreeSamplePack } from "@/lib/server-fns";
+import { downloadCleanVideo } from "@/lib/video-download";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale } from "@/lib/i18n";
 import "@/styles/vicehub-2026-redesign.css";
@@ -113,10 +114,14 @@ function VideoLibraryPage() {
     }
   };
   const download = async video => {
-    setDownloadMessage("");
+    setDownloadMessage("Authorising secure download…");
     try {
-      const result = await requestVideoDownload({ data: { videoId: video.id } });
-      window.location.assign(result.downloadUrl);
+      await downloadCleanVideo({
+        videoId: video.id,
+        title: video.title,
+        onProgress: setDownloadMessage,
+      });
+      setDownloadMessage("Clean video verified. Your download has started.");
     } catch (err) {
       setDownloadMessage(err?.message || t.downloadError);
     }
