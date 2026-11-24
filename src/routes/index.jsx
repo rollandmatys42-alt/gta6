@@ -65,7 +65,7 @@ function HomePage() {
   const [loadingVideos, setLoadingVideos] = useState(true);
   const [news, setNews] = useState([]);
   const [plans, setPlans] = useState([]);
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("GBP");
   const [plansLoading, setPlansLoading] = useState(true);
   const [creators, setCreators] = useState([]);
   const [products, setProducts] = useState([]);
