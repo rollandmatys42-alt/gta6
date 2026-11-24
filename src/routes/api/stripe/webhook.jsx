@@ -158,6 +158,34 @@ export const Route = createFileRoute("/api/stripe/webhook")({
               price_cents: Number(object.metadata?.monthly_price_cents || 0),
               discount_percent: Number(object.metadata?.discount_percent || 0),
             });
+          } else if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type) && object.mode === "payment" && object.payment_status === "paid" && object.metadata?.order_id) {
+            const order = await db.ShopOrder.get(object.metadata.order_id).catch(() => null);
+            if (!order || order.user_id !== (object.metadata.user_id || object.client_reference_id) || order.stripe_session_id !== object.id) {
+              throw new Error("Shop order metadata does not match the completed Stripe session.");
+            }
+            if (!["paid", "paid_stock_issue", "processing", "shipped", "delivered", "refunded"].includes(order.status)) {
+              let stockIssue = false;
+              for (const item of order.items || []) {
+                if (item.product_type !== "physical") continue;
+                const reservation = await db.ShopProduct.updateMany(
+                  { id: item.product_id, stock_quantity: { $gte: Number(item.quantity) } },
+                  { $inc: { stock_quantity: -Number(item.quantity) } },
+                );
+                if (!reservation?.updated) stockIssue = true;
+              }
+              const address = object.shipping_details?.address || object.customer_details?.address || {};
+              await db.ShopOrder.update(order.id, {
+                status: stockIssue ? "paid_stock_issue" : "paid",
+                paid_at: new Date().toISOString(),
+                stripe_payment_intent_id: typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id || "",
+                customer_email: object.customer_details?.email || order.customer_email,
+                customer_name: object.shipping_details?.name || object.customer_details?.name || order.customer_name,
+                shipping_address: address,
+              });
+            }
+          } else if (event.type === "checkout.session.expired" && object.mode === "payment") {
+            const rows = await db.ShopOrder.filter({ stripe_session_id: object.id, status: "pending_payment" }, "-created_date", 1, 0);
+            if (rows[0]) await db.ShopOrder.update(rows[0].id, { status: "payment_failed" });
           } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
             await saveStripeSubscription(db, object);
           } else if (event.type === "invoice.payment_failed" || event.type === "invoice.paid") {
@@ -169,14 +197,25 @@ export const Route = createFileRoute("/api/stripe/webhook")({
               await saveInvoiceLedger(db, object, event.type === "invoice.paid" ? "paid" : "failed", event.id);
               if (event.type === "invoice.paid") await applyLoyaltyRenewal(db, stripeSub);
             } else await saveInvoiceLedger(db, object, event.type === "invoice.paid" ? "paid" : "failed", event.id);
-          } else if (event.type === "charge.refunded" && object.invoice) {
-            const invoiceId = typeof object.invoice === "string" ? object.invoice : object.invoice.id;
-            const rows = await db.PaymentLedgerEntry.filter({ stripe_invoice_id: invoiceId }, "-created_date", 1, 0);
-            if (rows[0]) await db.PaymentLedgerEntry.update(rows[0].id, {
-              status: Number(object.amount_refunded || 0) >= Number(object.amount || 0) ? "refunded" : rows[0].status,
-              refund_amount_cents: Number(object.amount_refunded || 0),
-              source_event_id: event.id,
-            });
+          } else if (event.type === "charge.refunded") {
+            const paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id || "";
+            const shopOrders = paymentIntentId ? await db.ShopOrder.filter({ stripe_payment_intent_id: paymentIntentId }, "-created_date", 1, 0) : [];
+            if (shopOrders[0]) {
+              const fullyRefunded = Number(object.amount_refunded || 0) >= Number(object.amount || 0);
+              await db.ShopOrder.update(shopOrders[0].id, {
+                status: fullyRefunded ? "refunded" : shopOrders[0].status,
+                refunded_at: fullyRefunded ? new Date().toISOString() : shopOrders[0].refunded_at,
+                stripe_refund_id: object.refunds?.data?.[0]?.id || shopOrders[0].stripe_refund_id || "",
+              });
+            } else if (object.invoice) {
+              const invoiceId = typeof object.invoice === "string" ? object.invoice : object.invoice.id;
+              const rows = await db.PaymentLedgerEntry.filter({ stripe_invoice_id: invoiceId }, "-created_date", 1, 0);
+              if (rows[0]) await db.PaymentLedgerEntry.update(rows[0].id, {
+                status: Number(object.amount_refunded || 0) >= Number(object.amount || 0) ? "refunded" : rows[0].status,
+                refund_amount_cents: Number(object.amount_refunded || 0),
+                source_event_id: event.id,
+              });
+            }
           }
           await db.StripeWebhookEvent.create({ event_id: event.id, event_type: event.type, processed_at: new Date().toISOString() });
           return Response.json({ received: true });
