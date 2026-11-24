@@ -42,11 +42,11 @@ function safeImageUrl(value: string) {
 }
 function readImage(block: string) {
   const candidates = [
-    block.match(/<(?:media:)?thumbnail\\b[^>]*url=["']([^"']+)["']/i)?.[1],
-    block.match(/<media:content\\b[^>]*url=["']([^"']+)["'][^>]*type=["']image\\//i)?.[1],
-    block.match(/<enclosure\\b[^>]*url=["']([^"']+)["'][^>]*type=["']image\\//i)?.[1],
-    block.match(/<itunes:image\\b[^>]*href=["']([^"']+)["']/i)?.[1],
-    block.match(/<img\\b[^>]*src=["']([^"']+)["']/i)?.[1],
+    block.match(/<(?:media:)?thumbnail\b[^>]*url=["']([^"']+)["']/i)?.[1],
+    block.match(/<media:content\b[^>]*url=["']([^"']+)["'][^>]*type=["']image\//i)?.[1],
+    block.match(/<enclosure\b[^>]*url=["']([^"']+)["'][^>]*type=["']image\//i)?.[1],
+    block.match(/<itunes:image\b[^>]*href=["']([^"']+)["']/i)?.[1],
+    block.match(/<img\b[^>]*src=["']([^"']+)["']/i)?.[1],
   ];
   return safeImageUrl(candidates.find(Boolean) || "");
 }
@@ -121,6 +121,8 @@ async function importRss(source: any, url: URL, db: any) {
       source_type: source.source_type || "media",
       confidence: source.source_type === "official" ? "official" : "reported",
       locale: "en", status: "draft", tags: ["RSS import"],
+      image_url: imageUrl, image_alt: imageUrl ? "Image supplied by " + source.name : "",
+      source_published_at: publishedDate, last_verified_at: new Date().toISOString(),
     });
     created++;
   }
