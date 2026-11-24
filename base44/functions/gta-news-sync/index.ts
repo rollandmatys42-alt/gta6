@@ -66,7 +66,7 @@ async function generateEditorial(source: any, title: string, summary: string, ar
   const base = Deno.env.get("OMNIROUTE_BASE_URL") || "";
   if (!key || !base || !summary.trim()) return fallback;
   try {
-    const response = await fetch(base.replace(/\\/$/, "") + "/chat/completions", {
+    const response = await fetch(base.replace(/\/$/, "") + "/chat/completions", {
       method: "POST",
       headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "X-Title": "VICEHUB Newsroom" },
       body: JSON.stringify({
@@ -80,7 +80,7 @@ async function generateEditorial(source: any, title: string, summary: string, ar
     if (!response.ok) return fallback;
     const payload = await response.json();
     const raw = payload.choices?.[0]?.message?.content || "";
-    const clean = raw.replace(/^\\s*\\x60\\x60\\x60(?:json)?/i,"").replace(/\\x60\\x60\\x60\\s*$/,"").trim();
+    const clean = raw.replace(/^\s*\x60\x60\x60(?:json)?/i,"").replace(/\x60\x60\x60\s*$/,"").trim();
     const result = JSON.parse(clean);
     if (!result.title || !result.summary || !result.body) return fallback;
     return { title: String(result.title).slice(0,180), summary: String(result.summary).slice(0,500), body: String(result.body).slice(0,20000) };
