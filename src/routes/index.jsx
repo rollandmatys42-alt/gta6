@@ -161,8 +161,7 @@ function HomePage() {
         <ul className="fh-stats">
           <li><b>{videos.length}</b><span>videos ready</span></li>
           <li><b>{creators.length}</b><span>creators</span></li>
-          <li><b>9:16</b><span>made for socials</span></li>
-          <li><b>9:16</b><span>social-first format</span></li>
+          <li><b>Weekly</b><span>new creator drops</span></li>
         </ul>
         {notice && <div className="fan-notice" role="status">{notice}</div>}
       </div>
@@ -290,17 +289,17 @@ function HomePage() {
               </div>
               <h3>{p.display_name || p.tier_code}</h3>
               <p className="fh-membership-description">Everything in VICEHUB, under one simple monthly membership.</p>
-              <div className="fh-membership-price"><strong>{formatMoney(startingPrice, currency)}</strong><span>per month · first billing step</span></div>
+              <div className="fh-membership-price"><strong>{formatMoney(startingPrice, currency)}</strong><span>per month · one simple price</span></div>
               <div className="fh-membership-allowance"><b>{Number(p.monthly_download_limit || 0).toLocaleString("en")}</b><span>downloads included each month</span></div>
               <ul className="fh-membership-features">
                 <li>{p.clean_downloads ? "Clean downloads without a VICEHUB watermark" : "Watermarked downloads"}</li>
                 <li>Access to videos published in the VICEHUB library</li>
                 <li>Creator tools, community and new drops</li>
               </ul>
-              <button type="button" className="fh-btn solid big fh-membership-select" onClick={() => subscribe(p)} disabled={busy}>
-                {busy ? "Opening checkout…" : `Choose ${p.display_name || p.tier_code}`}
+              <button type="button" className="fh-btn solid big fh-membership-select" onClick={() => subscribe(p)} disabled={busy || !p.catalogueReady}>
+                {busy ? "Opening checkout…" : p.catalogueReady ? "Get Creator Membership" : "Membership opening soon"}
               </button>
-              <small className="fh-membership-foot">Cancel any time. If you cancel and subscribe again later, loyalty pricing restarts at step one.</small>
+              <small className="fh-membership-foot">{p.catalogueReady ? "Cancel any time. Referral credit can reduce a future invoice." : `${Number(p.publishedAssetCount || 0)} rights-cleared downloads live. Checkout opens when at least 5 are published.`}</small>
             </article>;
           })}
         {!plansLoading && !plans.some(p => p.tier_code === "pro") && <div className="fh-membership-card fh-pending-card"><h3>Membership setup in progress</h3><p className="fh-membership-description">The paid membership is not available in this currency yet. No payment will be taken.</p></div>}
