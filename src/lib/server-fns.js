@@ -1234,6 +1234,7 @@ export const applyReferralWalletCredit = createServerFn({method:"POST"}).middlew
   const currency=String(sub.currency||"GBP").toUpperCase();
   const pendingRows=await db.ReferralRedemption.filter({user_id:user.id,status:"pending"},"-created_date",1,0);
   let redemption=pendingRows[0];
+  if(redemption&&(redemption.currency!==currency||redemption.stripe_customer_id!==sub.stripe_customer_id))throw Object.assign(new Error("A previous wallet-credit application must be reconciled before changing billing currency or customer."),{status:409,code:"REFERRAL_REDEMPTION_PENDING"});
   if(!redemption){
     const credits=await db.ReferralCredit.filter({referrer_user_id:user.id,currency,status:{$in:["available","pending"]}},"created_date",1000,0);
     const now=Date.now(),allocations=[];let available=0;
@@ -1250,9 +1251,10 @@ export const applyReferralWalletCredit = createServerFn({method:"POST"}).middlew
     for(const allocation of allocations){const used=Math.min(allocation.amount_cents,remaining);allocation.amount_cents=used;const creditRow=await db.ReferralCredit.get(allocation.credit_id);allocation.remaining_after_cents=Number(creditRow.available_cents??creditRow.amount_cents??0)-used;allocation.redeemed_after_cents=Number(creditRow.redeemed_cents||0)+used;remaining-=used;if(remaining<=0)break;}
     redemption=await db.ReferralRedemption.create({user_id:user.id,amount_cents:redeemCents,currency,stripe_customer_id:sub.stripe_customer_id,idempotency_key:crypto.randomUUID(),allocations:allocations.filter(x=>x.amount_cents>0),status:"pending"});
   }
-  const form=new URLSearchParams();form.set("amount",String(-Number(redemption.amount_cents)));form.set("currency",currency.toLowerCase());form.set("description","VICEHUB referral membership credit");form.set("metadata[user_id]",user.id);form.set("metadata[referral_redemption_id]",redemption.id);
+  const redemptionCurrency=String(redemption.currency||currency).toUpperCase();
+  const form=new URLSearchParams();form.set("amount",String(-Number(redemption.amount_cents)));form.set("currency",redemptionCurrency.toLowerCase());form.set("description","VICEHUB referral membership credit");form.set("metadata[user_id]",user.id);form.set("metadata[referral_redemption_id]",redemption.id);
   try{
-    const transaction=await stripeApi("customers/"+encodeURIComponent(sub.stripe_customer_id)+"/balance_transactions","POST",form,redemption.idempotency_key);
+    const transaction=await stripeApi("customers/"+encodeURIComponent(redemption.stripe_customer_id)+"/balance_transactions","POST",form,redemption.idempotency_key);
     for(const allocation of redemption.allocations||[]){
       const credit=await db.ReferralCredit.get(allocation.credit_id);
       const remaining=Number(allocation.remaining_after_cents||0);
