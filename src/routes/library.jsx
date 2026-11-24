@@ -50,6 +50,8 @@ function VideoLibraryPage() {
   const [previewMessage, setPreviewMessage] = useState("");
   const [downloadMessage, setDownloadMessage] = useState("");
 
+  useEffect(() => { getPublicFreeSamplePack().then(setSamplePack).catch(() => setSamplePack({ready:false,videos:[]})); }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => window.clearTimeout(timer);
