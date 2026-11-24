@@ -7,7 +7,7 @@
     "currency": { "type": "string", "enum": ["GBP", "EUR", "USD"] },
     "stripe_customer_id": { "type": "string" },
     "idempotency_key": { "type": "string" },
-    "allocations": { "type": "array", "items": { "type": "object", "properties": { "credit_id": { "type": "string" }, "amount_cents": { "type": "integer" }, "remaining_after_cents": { "type": "integer" } }, "required": ["credit_id", "amount_cents", "remaining_after_cents"] } },
+    "allocations": { "type": "array", "items": { "type": "object", "properties": { "credit_id": { "type": "string" }, "amount_cents": { "type": "integer" }, "remaining_after_cents": { "type": "integer" }, "redeemed_after_cents": { "type": "integer" } }, "required": ["credit_id", "amount_cents", "remaining_after_cents", "redeemed_after_cents"] } },
     "stripe_balance_transaction_id": { "type": "string" },
     "status": { "type": "string", "enum": ["pending", "applied", "failed"], "default": "pending" },
     "applied_at": { "type": "string", "format": "date-time" },
