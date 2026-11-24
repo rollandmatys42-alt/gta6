@@ -199,8 +199,8 @@ Deno.serve(async (req) => {
       try {
         const url = validateSourceUrl(source.feed_url);
         const created = url.hostname === "api.x.com" || url.hostname === "api.twitter.com"
-          ? await importX(source, url, db)
-          : await importRss(source, url, db);
+          ? await importX(source, url, db, base44.asServiceRole)
+          : await importRss(source, url, db, base44.asServiceRole);
         await db.NewsSource.update(source.id, {
           last_checked_at: new Date().toISOString(),
           last_status: "OK — " + created + " new drafts",
