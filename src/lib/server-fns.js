@@ -121,6 +121,11 @@ export const getVideoPreviewUrl = createServerFn({ method: "GET" })
     return { previewUrl, expiresInSeconds: 180, watermarkApplied: true };
   });
 
+export const getPublicFreeSamplePack = createServerFn({method:"GET"}).handler(async({context})=>{
+  const rows=await context.getBase44().asServiceRole.entities.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"published_at",4,0);
+  return {ready:rows.length===3,videos:rows.slice(0,3).map(v=>({id:v.id,title:v.title,description:v.description||"",category:v.category,language:v.language||"en",thumbnail_url:v.thumbnail_url||"",duration_seconds:v.duration_seconds||0}))};
+});
+
 export const getFreeSamplePack = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
   const db=context.getBase44().asServiceRole.entities,user=context.user;
   const claims=await db.FreeSamplePackClaim.filter({user_id:user.id},"-created_date",1,0);
