@@ -1,0 +1,7 @@
+.vh-notification-bell{position:relative;width:36px;height:36px;display:inline-grid;place-items:center;border:1px solid rgba(255,255,255,.2);border-radius:50%;color:#fff;text-decoration:none;font-size:21px;flex:none}
+.vh-notification-bell b{position:absolute;right:-5px;top:-5px;min-width:16px;height:16px;padding:0 4px;display:grid;place-items:center;border-radius:20px;background:#f45aa7;color:white;font-size:9px;font-weight:900}
+.vh-pwa-install-wrap{position:relative;display:inline-flex;align-items:center}
+.vh-pwa-install{border:1px solid rgba(103,227,220,.55);background:rgba(103,227,220,.08);border-radius:5px;padding:8px 10px;color:#a6f4ee;font-size:9px;font-weight:900;letter-spacing:.7px;white-space:nowrap}
+.vh-pwa-install-message{position:absolute;z-index:20;top:calc(100% + 8px);right:0;width:230px;padding:10px;border:1px solid #ffffff33;border-radius:8px;background:#15131d;color:#fff;font-size:10px;line-height:1.5;box-shadow:0 8px 25px #0009}
+.vh-workspace-actions .vh-pwa-install{padding:7px 8px}
+@media(max-width:760px){.vh-pwa-install{font-size:8px;padding:7px 8px}.vh-notification-bell{width:32px;height:32px}}
