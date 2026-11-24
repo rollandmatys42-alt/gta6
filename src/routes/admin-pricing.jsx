@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
+import "@/styles/fan-admin.css";
 import { requireSignedIn, AuthGateError } from "@/components/auth/AuthGate";
 import { getAdminLadderPlans, saveAdminPlanLadder } from "@/lib/loyalty-fns";
 import { DEFAULT_STEP_MONTHS, getLadder, getStepMonths } from "@/lib/loyalty";
@@ -18,12 +19,12 @@ function AdminPricing() {
   const load = () => getAdminLadderPlans().then(r => setPlans(Array.isArray(r) ? r : [])).catch(e => setMsg(e.message || "Could not load plans."));
   useEffect(() => { if (user?.role === "admin") load(); }, [user?.id]);
   if (user?.role !== "admin") return <SiteFrame eyebrow="VICEHUB / RESTRICTED"><h1>ACCESS DENIED.</h1></SiteFrame>;
-  return <SiteFrame eyebrow="ADMIN / DEGRESSIVE PRICING">
+  return <SiteFrame eyebrow="ADMIN / DEGRESSIVE PRICING"><div className="vh-admin-pricing">
     <h1>Pricing ladder</h1>
     <p>Configure each tier and currency separately. A plan is shown to members only when it is active and has a positive monthly price and download allowance. No sample prices are pre-filled. A cancellation followed by a new subscription restarts at step 1.</p>
     {msg && <div className="fan-notice" role="status">{msg}</div>}
     <div className="fan-grid">{plans.map(p => <PlanLadder key={p.id} plan={p} onSaved={() => { setMsg("Saved."); load(); }} onError={setMsg} />)}</div>
-  </SiteFrame>;
+  </div></SiteFrame>;
 }
 
 function PlanLadder({ plan, onSaved, onError }) {
