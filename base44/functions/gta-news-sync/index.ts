@@ -97,7 +97,8 @@ async function notifyPublished(entities: any, title: string) {
 async function importX(source: any, url: URL, db: any) {
   const token = Deno.env.get("X_BEARER_TOKEN") || "";
   if (!token) throw new Error("X_BEARER_TOKEN is missing from Base44 secrets.");
-  if (source.last_external_id) url.searchParams.set("since_id", source.last_external_id);\n  const response = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+  if (source.last_external_id) url.searchParams.set("since_id", source.last_external_id);
+  const response = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
   if (!response.ok) throw new Error("X API returned HTTP " + response.status);
   const payload = await response.json();
   const users = new Map((payload.includes?.users || []).map((u: any) => [u.id, u]));
