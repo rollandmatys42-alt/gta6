@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import "@/styles/fan-theme.css";
 import "@/styles/fan-pages.css";
@@ -9,6 +9,7 @@ import "@/styles/fan-home.css";
 import "@/styles/client-workspace.css";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
+import { getMyNotifications } from "@/lib/server-fns";
 
 const links = [["/", "nav.home"], ["/library", "nav.library"], ["/news", "nav.news"], ["/creators", "nav.creators"]];
 const workspaceLinks = [
@@ -21,7 +22,42 @@ const workspaceLinks = [
 ];
 const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Biblioteca de vídeos", pt: "Biblioteca de vídeos", it: "Libreria video", de: "Videobibliothek" };
 
-export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ", workspace = false, activeKey = "" }) {
+
+function NotificationBell({isAuthenticated}) {
+  const [unread,setUnread]=useState(0);
+  useEffect(()=>{
+    if(!isAuthenticated){setUnread(0);return;}
+    let active=true;
+    const load=()=>getMyNotifications().then(rows=>{if(active)setUnread((rows||[]).filter(n=>!n.read_at).length);}).catch(()=>{});
+    load();
+    const timer=window.setInterval(load,60000);
+    const onFocus=()=>load();
+    window.addEventListener("focus",onFocus);
+    return()=>{active=false;window.clearInterval(timer);window.removeEventListener("focus",onFocus);};
+  },[isAuthenticated]);
+  if(!isAuthenticated)return null;
+  return <Link to="/notifications" className="vh-notification-bell" aria-label={unread?unread+" unread notifications":"Notifications"} title="Notifications"><span aria-hidden="true">♢</span>{unread>0&&<b>{unread>99?"99+":unread}</b>}</Link>;
+}
+
+function PwaInstallButton() {
+  const [prompt,setPrompt]=useState(null),[installed,setInstalled]=useState(false),[message,setMessage]=useState("");
+  useEffect(()=>{
+    const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
+    setInstalled(standalone);
+    const capture=e=>{e.preventDefault();setPrompt(e);};
+    const done=()=>{setInstalled(true);setPrompt(null);setMessage("");};
+    window.addEventListener("beforeinstallprompt",capture);
+    window.addEventListener("appinstalled",done);
+    return()=>{window.removeEventListener("beforeinstallprompt",capture);window.removeEventListener("appinstalled",done);};
+  },[]);
+  if(installed)return null;
+  const install=async()=>{
+    if(prompt){prompt.prompt();const result=await prompt.userChoice;setPrompt(null);if(result?.outcome!=="accepted")setMessage("You can install VICEHUB later from your browser menu.");return;}
+    setMessage(/iphone|ipad|ipod/i.test(navigator.userAgent)?"On iPhone: tap Share, then Add to Home Screen.":"Open your browser menu and choose Install app or Add to Home Screen.");
+  };
+  return <span className="vh-pwa-install-wrap"><button type="button" className="vh-pwa-install" onClick={install}>↓ INSTALL APP</button>{message&&<span className="vh-pwa-install-message" role="status">{message}</span>}</span>;
+}
+\nexport default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ", workspace = false, activeKey = "" }) {
   const locale = useLocale();
   const { isAuthenticated, logout } = useAuth();
   const [open, setOpen] = useState(false);
@@ -47,7 +83,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
       <div className="vh-workspace-content">
         <header className="vh-workspace-topbar">
           <div><small>VICEHUB / MEMBER AREA</small><b>{activeLabel ? tx("dashboard.nav." + activeLabel[2]) : "Member dashboard"}</b></div>
-          <div className="vh-workspace-actions">
+          <div className="vh-workspace-actions"><NotificationBell isAuthenticated={isAuthenticated}/><PwaInstallButton/>
             <label><span className="sr-only">Language</span><select aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select></label>
             <Link to="/dashboard" className="vh-workspace-account">MY DASHBOARD ↗</Link>
           </div>
@@ -62,7 +98,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
           <nav className={"fh-nav" + (open ? " open" : "")} aria-label="Main">
             {links.map(([href, key]) => <Link key={href} to={href} className="fh-nav-link" activeProps={{ className: "fh-nav-link active" }} activeOptions={{ exact: href === "/" }} onClick={close}>{label(key)}</Link>)}
             <a href="/#plans" className="fh-nav-link" onClick={close}>Pricing</a>
-            <div className="fh-nav-actions">
+            <div className="fh-nav-actions"><NotificationBell isAuthenticated={isAuthenticated}/><PwaInstallButton/>
               <select className="fh-lang" aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select>
               {isAuthenticated
                 ? <><Link to="/dashboard" className="fh-btn solid" onClick={close}>My account</Link><button type="button" className="fh-btn ghost" onClick={() => { close(); logout(); }}>Sign out</button></>
