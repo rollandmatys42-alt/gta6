@@ -620,7 +620,7 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
   const shipping=cart.reduce((sum,x)=>sum+(x.product.product_type==="physical"&&x.product.shipping_required?Number(x.product.shipping_price_cents||0)*x.line.quantity:0),0);
   const total=subtotal+shipping;
   if(total<1)throw Object.assign(new Error("The order total must be greater than zero."),{status:400});
-  const order=await db.ShopOrder.create({user_id:user.id,customer_email:user.email||"",customer_name:user.full_name||user.name||"",currency,items,subtotal_cents:subtotal,shipping_cents:shipping,total_cents:total,status:"pending_payment"});
+  const order=await db.ShopOrder.create({user_id:user.id,customer_email:user.email||"",customer_name:user.full_name||user.name||"",currency,items,subtotal_cents:subtotal,shipping_cents:shipping,tax_cents:0,total_cents:total,status:"pending_payment"});
   try{
    const form=new URLSearchParams();form.set("mode","payment");
    form.set("success_url",STRIPE_SITE_URL+"/shop?session_id={CHECKOUT_SESSION_ID}");
@@ -680,7 +680,7 @@ export const confirmShopCheckoutSession = createServerFn({method:"POST"}).middle
   }
   const shipping=session.shipping_details?.address||session.customer_details?.address||null;
   const updated=await db.ShopOrder.update(order.id,{
-   status:stockIssue?"paid_stock_issue":"paid",paid_at:new Date().toISOString(),
+   status:stockIssue?"paid_stock_issue":"paid",paid_at:new Date().toISOString(),total_cents:Number(session.amount_total||order.total_cents),tax_cents:Number(session.total_details?.amount_tax||0),
    stripe_payment_intent_id:typeof session.payment_intent==="string"?session.payment_intent:session.payment_intent?.id||"",
    customer_email:session.customer_details?.email||order.customer_email,
    customer_name:session.shipping_details?.name||session.customer_details?.name||order.customer_name,
