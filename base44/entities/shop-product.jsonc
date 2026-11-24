@@ -114,6 +114,14 @@
     "is_featured": {
       "type": "boolean",
       "default": false
+    },
+    "rights_evidence_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "rights_note": {
+      "type": "string",
+      "maxLength": 1000
     }
   },
   "required": [
