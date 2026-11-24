@@ -33,6 +33,23 @@ function readTag(block: string, tag: string) {
   const match = block.match(new RegExp("<(?:[a-z0-9_-]+:)?"+tag+"\\b[^>]*>([\\s\\S]*?)<\\/(?:[a-z0-9_-]+:)?"+tag+">", "i"));
   return match ? decodeXml(match[1]) : "";
 }
+function safeImageUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return "";
+    return url.toString().slice(0, 1800);
+  } catch { return ""; }
+}
+function readImage(block: string) {
+  const candidates = [
+    block.match(/<(?:media:)?thumbnail\\b[^>]*url=["']([^"']+)["']/i)?.[1],
+    block.match(/<media:content\\b[^>]*url=["']([^"']+)["'][^>]*type=["']image\\//i)?.[1],
+    block.match(/<enclosure\\b[^>]*url=["']([^"']+)["'][^>]*type=["']image\\//i)?.[1],
+    block.match(/<itunes:image\\b[^>]*href=["']([^"']+)["']/i)?.[1],
+    block.match(/<img\\b[^>]*src=["']([^"']+)["']/i)?.[1],
+  ];
+  return safeImageUrl(candidates.find(Boolean) || "");
+}
 function validateSourceUrl(value: string) {
   const url = new URL(value);
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) {
@@ -50,6 +67,7 @@ async function importX(source: any, url: URL, db: any) {
   if (!response.ok) throw new Error("X API returned HTTP " + response.status);
   const payload = await response.json();
   const users = new Map((payload.includes?.users || []).map((u: any) => [u.id, u]));
+  const media = new Map((payload.includes?.media || []).map((m: any) => [m.media_key, m]));
   let created = 0;
   for (const tweet of (payload.data || []).slice(0, 20)) {
     const text = String(tweet.text || "").replace(/\s+/g, " ").trim();
@@ -60,11 +78,16 @@ async function importX(source: any, url: URL, db: any) {
     const exists = await db.NewsArticle.filter({ source_url: articleUrl }, "-created_date", 1, 0);
     if (exists.length) continue;
     const title = text.slice(0, 170) || "GTA VI social update";
+    const mediaKey = tweet.attachments?.media_keys?.[0];
+    const mediaItem: any = mediaKey ? media.get(mediaKey) : null;
+    const imageUrl = safeImageUrl(mediaItem?.url || mediaItem?.preview_image_url || "");
     const slug = title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 150) + "-" + crypto.randomUUID().slice(0, 6);
     await db.NewsArticle.create({
       title, slug, summary: text.slice(0, 500), body: text.slice(0, 2000),
       source_name: "@" + username, source_url: articleUrl, source_type: "social",
       confidence: "reported", locale: "en", status: "draft", tags: ["X import"],
+      image_url: imageUrl, image_alt: imageUrl ? "Image attached to the original X post by @" + username : "",
+      source_published_at: tweet.created_at || new Date().toISOString(), last_verified_at: new Date().toISOString(),
     });
     created++;
   }
@@ -85,6 +108,9 @@ async function importRss(source: any, url: URL, db: any) {
     const atomLink = block.match(/<(?:[a-z0-9_-]+:)?link\b[^>]*href=["']([^"']+)["'][^>]*\/?>/i);
     const articleUrl = readTag(block, "link") || atomLink?.[1] || "";
     const summary = (readTag(block, "description") || readTag(block, "summary") || readTag(block, "content")).slice(0, 500);
+    const imageUrl = readImage(block);
+    const publishedText = readTag(block, "pubDate") || readTag(block, "published") || readTag(block, "updated");
+    const publishedDate = publishedText && Number.isFinite(new Date(publishedText).getTime()) ? new Date(publishedText).toISOString() : new Date().toISOString();
     if (!title || !articleUrl.startsWith("https://") || !GTA_PATTERN.test(title + " " + summary)) continue;
     const exists = await db.NewsArticle.filter({ source_url: articleUrl }, "-created_date", 1, 0);
     if (exists.length) continue;
