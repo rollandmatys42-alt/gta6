@@ -541,6 +541,7 @@ export const saveShopProduct = createServerFn({method:"POST"}).middleware([requi
   if(data.externalUrl&&!data.externalUrl.startsWith("https://"))throw Object.assign(new Error("External retailer links must use HTTPS."),{status:400});
   if(data.productType==="external"&&(!data.externalUrl||data.rightsStatus!=="official_external"||data.vendorType!=="official_external"))throw Object.assign(new Error("External official listings need an external URL and the official external classification."),{status:400,code:"SHOP_EXTERNAL_LINK_REQUIRED"});
   if(data.productType!=="external"&&data.vendorType==="official_external")throw Object.assign(new Error("Official external products must use the external link product type."),{status:400});
+  if(data.rightsStatus==="official_external"&&(data.productType!=="external"||data.vendorType!=="official_external"))throw Object.assign(new Error("Official external listings must be marked as external retailer links."),{status:400,code:"SHOP_EXTERNAL_CLASSIFICATION_MISMATCH"});
   const db=context.getBase44().asServiceRole.entities.ShopProduct;
   const p={
    title:data.title,description:data.description,product_type:data.productType,price_cents:data.priceCents,currency:data.currency,
