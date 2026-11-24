@@ -163,7 +163,9 @@ export const Route = createFileRoute("/api/stripe/webhook")({
             if (!order || order.user_id !== (object.metadata.user_id || object.client_reference_id) || order.stripe_session_id !== object.id) {
               throw new Error("Shop order metadata does not match the completed Stripe session.");
             }
-            if (!["paid", "paid_stock_issue", "processing", "shipped", "delivered", "refunded"].includes(order.status)) {
+            if (!["paid", "paid_stock_issue", "processing", "shipped", "delivered", "refunded", "payment_verifying"].includes(order.status)) {
+              const claim = await db.ShopOrder.updateMany({ id: order.id, status: "pending_payment" }, { $set: { status: "payment_verifying" } });
+              if (claim?.updated) {
               let stockIssue = false;
               for (const item of order.items || []) {
                 if (item.product_type !== "physical") continue;
@@ -182,6 +184,7 @@ export const Route = createFileRoute("/api/stripe/webhook")({
                 customer_name: object.shipping_details?.name || object.customer_details?.name || order.customer_name,
                 shipping_address: address,
               });
+              }
             }
           } else if (event.type === "checkout.session.expired" && object.mode === "payment") {
             const rows = await db.ShopOrder.filter({ stripe_session_id: object.id, status: "pending_payment" }, "-created_date", 1, 0);
