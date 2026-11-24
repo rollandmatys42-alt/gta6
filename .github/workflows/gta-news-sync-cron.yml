@@ -2,7 +2,7 @@ name: VICEHUB GTA news and source ingestion
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ jobs:
   sync-public-sources:
     name: Ingest public GTA VI sources
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Call the protected VICEHUB source collector
         env:

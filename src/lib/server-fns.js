@@ -121,87 +121,113 @@ export const getVideoPreviewUrl = createServerFn({ method: "GET" })
     return { previewUrl, expiresInSeconds: 180, watermarkApplied: true };
   });
 
+export const getPublicFreeSamplePack = createServerFn({method:"GET"}).handler(async({context})=>{
+  const rows=await context.getBase44().asServiceRole.entities.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"published_at",4,0);
+  return {ready:rows.length===3,videos:rows.slice(0,3).map(v=>({id:v.id,title:v.title,description:v.description||"",category:v.category,language:v.language||"en",thumbnail_url:v.thumbnail_url||"",duration_seconds:v.duration_seconds||0}))};
+});
+
+export const getFreeSamplePack = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  const db=context.getBase44().asServiceRole.entities,user=context.user;
+  const claims=await db.FreeSamplePackClaim.filter({user_id:user.id},"-created_date",1,0);
+  const claim=claims[0];
+  const ids=claim?.video_ids||[];
+  const rows=claim
+    ? await Promise.all(ids.map(id=>db.Video.get(id).catch(()=>null)))
+    : await db.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"published_at",3,0);
+  const videos=rows.filter(v=>v&&v.status==="published"&&v.license_status==="verified").map(v=>({
+    id:v.id,title:v.title,description:v.description||"",category:v.category,language:v.language||"en",
+    thumbnail_url:v.thumbnail_url||"",duration_seconds:v.duration_seconds||0,creator_name:v.creator_name||"VICEHUB"
+  }));
+  const downloaded=claim?.downloaded_video_ids||[];
+  return {packReady:videos.length===3,claimed:!!claim,videoCount:videos.length,videos,downloadedVideoIds:downloaded,downloadsRemaining:Math.max(0,3-downloaded.length)};
+});
+
 export const requestVideoDownload = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({ videoId: z.string().min(1).max(128) }))
   .handler(async ({ data, context }) => {
     const base44 = context.getBase44();
+    const db = base44.asServiceRole.entities;
     const user = context.user;
-    const video = await base44.asServiceRole.entities.Video.get(data.videoId).catch(() => null);
+    const video = await db.Video.get(data.videoId).catch(() => null);
     if (!video || video.status !== "published" || video.license_status !== "verified") {
       throw Object.assign(new Error("This video is not available for download."), { status: 404, code: "VIDEO_NOT_AVAILABLE" });
     }
 
-    const subscriptions = await base44.asServiceRole.entities.UserSubscription.filter(
-      { user_id: user.id }, "-created_date", 1, 0,
-    );
+    const subscriptions = await db.UserSubscription.filter({ user_id: user.id }, "-created_date", 1, 0);
     const subscription = subscriptions[0];
     let tier = subscription?.tier_code || "free";
     if (tier !== "free" && subscription?.status !== "active" && !(subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date())) tier = "free";
-    let limit = MONTHLY_FREE_LIMIT;
-    let cleanDownloads = false;
-    if (tier !== "free") {
-      const plans = await base44.asServiceRole.entities.SubscriptionPlan.filter(
-        { tier_code: tier, currency: subscription?.currency || "USD", status: "active" }, "-created_date", 1, 0,
+
+    if (tier === "free") {
+      let claims = await db.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
+      let claim = claims[0];
+      if (!claim) {
+        const pack = await db.Video.filter({ is_free_sample: true, status: "published", license_status: "verified" }, "published_at", 4, 0);
+        if (pack.length !== 3) throw Object.assign(new Error("The three-video free trial pack is being prepared. Please check back soon."), { status: 409, code: "FREE_SAMPLE_PACK_NOT_READY" });
+        try {
+          claim = await db.FreeSamplePackClaim.create({ user_id: user.id, video_ids: pack.map(v=>v.id), downloaded_video_ids: [], claimed_at: new Date().toISOString() });
+        } catch {
+          claims = await db.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
+          claim = claims[0];
+          if (!claim) throw new Error("Your free sample pack could not be reserved. Please retry.");
+        }
+      }
+      if (!(claim.video_ids||[]).includes(video.id)) throw Object.assign(new Error("Free accounts can download only the three videos in the fixed VICEHUB sample pack. Upgrade for the full catalogue."), { status: 403, code: "FREE_SAMPLE_ONLY" });
+      const reserved = await db.FreeSamplePackClaim.updateMany(
+        { id: claim.id, downloaded_video_ids: { $nin: [video.id] } },
+        { $addToSet: { downloaded_video_ids: video.id }, $set: { last_download_at: new Date().toISOString() } },
       );
-      const plan = plans[0];
-      if (!plan) throw Object.assign(new Error("This subscription plan is not configured yet."), { status: 403, code: "PLAN_NOT_CONFIGURED" });
-      limit = Number(plan.monthly_download_limit || 0);
-      cleanDownloads = !!plan.clean_downloads;
+      if (!reserved?.updated) throw Object.assign(new Error("This sample video has already been downloaded from your account. The three free videos are available once per account."), { status: 409, code: "FREE_SAMPLE_ALREADY_DOWNLOADED" });
+      try {
+        if (!video.watermarked_storage_key) throw Object.assign(new Error("The watermarked sample video is not ready yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
+        const downloadUrl = await presignR2({ method: "GET", objectKey: video.watermarked_storage_key, expiresIn: DOWNLOAD_URL_TTL });
+        await db.DownloadEvent.create({
+          user_id: user.id, video_id: video.id, month_key: new Date().toISOString().slice(0,7),
+          tier_code: "free", watermark_applied: true, status: "signed",
+          delivery_expires_at: new Date(Date.now() + DOWNLOAD_URL_TTL * 1000).toISOString(),
+        });
+        const current = await db.FreeSamplePackClaim.get(claim.id);
+        return { downloadUrl, expiresInSeconds: DOWNLOAD_URL_TTL, watermarkApplied: true, freeSample: true, downloadsLimit: 3, downloadsUsed: (current.downloaded_video_ids||[]).length, downloadsRemaining: Math.max(0,3-(current.downloaded_video_ids||[]).length) };
+      } catch (error) {
+        await db.FreeSamplePackClaim.updateMany({ id: claim.id }, { $pull: { downloaded_video_ids: video.id } }).catch(()=>null);
+        throw error;
+      }
     }
+
+    let limit = 0;
+    let cleanDownloads = false;
+    const plans = await db.SubscriptionPlan.filter(
+      { tier_code: tier, currency: subscription?.currency || "GBP", status: "active" }, "-created_date", 1, 0,
+    );
+    const plan = plans[0];
+    if (!plan) throw Object.assign(new Error("This subscription plan is not configured yet."), { status: 403, code: "PLAN_NOT_CONFIGURED" });
+    limit = Number(plan.monthly_download_limit || 0);
+    cleanDownloads = !!plan.clean_downloads;
     if (!Number.isInteger(limit) || limit < 1) {
       throw Object.assign(new Error("Your plan does not currently include video downloads."), { status: 403, code: "DOWNLOADS_NOT_INCLUDED" });
     }
 
-    const watermarkApplied = tier === "free" || !cleanDownloads;
+    const watermarkApplied = !cleanDownloads;
     const objectKey = watermarkApplied ? video.watermarked_storage_key : video.storage_key;
-    if (!objectKey) {
-      throw Object.assign(new Error(watermarkApplied
-        ? "The watermarked video version has not been prepared yet."
-        : "The clean video version is not available yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
-    }
+    if (!objectKey) throw Object.assign(new Error(watermarkApplied ? "The watermarked video version has not been prepared yet." : "The clean video version is not available yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
     const downloadUrl = await presignR2({ method: "GET", objectKey, expiresIn: DOWNLOAD_URL_TTL });
-
-    const now = new Date();
-    const monthKey = now.toISOString().slice(0, 7);
-    let quotas = await base44.asServiceRole.entities.DownloadQuota.filter(
-      { user_id: user.id, month_key: monthKey }, "-created_date", 2, 0,
-    );
+    const now = new Date(), monthKey = now.toISOString().slice(0, 7);
+    let quotas = await db.DownloadQuota.filter({ user_id: user.id, month_key: monthKey }, "-created_date", 2, 0);
     let quota = quotas[0];
-    if (!quota) {
-      quota = await base44.asServiceRole.entities.DownloadQuota.create({
-        user_id: user.id, month_key: monthKey, downloads_used: 0,
-        downloads_limit: limit, tier_code: tier,
-      });
-    }
-    // Atomic conditional increment protects the established monthly quota row.
-    const reservation = await base44.asServiceRole.entities.DownloadQuota.updateMany(
+    if (!quota) quota = await db.DownloadQuota.create({ user_id: user.id, month_key: monthKey, downloads_used: 0, downloads_limit: limit, tier_code: tier });
+    const reservation = await db.DownloadQuota.updateMany(
       { id: quota.id, downloads_used: { $lt: limit } },
       { $inc: { downloads_used: 1 }, $set: { downloads_limit: limit, tier_code: tier, last_download_at: now.toISOString() } },
     );
-    if (!reservation?.updated) {
-      throw Object.assign(new Error("You have reached your monthly download allowance."), { status: 429, code: "MONTHLY_DOWNLOAD_LIMIT_REACHED", limit });
-    }
+    if (!reservation?.updated) throw Object.assign(new Error("You have reached your monthly download allowance."), { status: 429, code: "MONTHLY_DOWNLOAD_LIMIT_REACHED", limit });
     try {
-      await base44.asServiceRole.entities.DownloadEvent.create({
-        user_id: user.id, video_id: video.id, month_key: monthKey, tier_code: tier,
-        watermark_applied: watermarkApplied, status: "signed",
-        delivery_expires_at: new Date(now.getTime() + DOWNLOAD_URL_TTL * 1000).toISOString(),
-      });
+      await db.DownloadEvent.create({ user_id: user.id, video_id: video.id, month_key: monthKey, tier_code: tier, watermark_applied: watermarkApplied, status: "signed", delivery_expires_at: new Date(now.getTime() + DOWNLOAD_URL_TTL * 1000).toISOString() });
     } catch (error) {
-      await base44.asServiceRole.entities.DownloadQuota.updateMany(
-        { id: quota.id }, { $inc: { downloads_used: -1 } },
-      );
+      await db.DownloadQuota.updateMany({ id: quota.id }, { $inc: { downloads_used: -1 } });
       throw error;
     }
-    return {
-      downloadUrl,
-      expiresInSeconds: DOWNLOAD_URL_TTL,
-      watermarkApplied,
-      downloadsLimit: limit,
-      downloadsUsed: Number(quota.downloads_used || 0) + 1,
-      downloadsRemaining: Math.max(0, limit - Number(quota.downloads_used || 0) - 1),
-    };
+    return { downloadUrl, expiresInSeconds: DOWNLOAD_URL_TTL, watermarkApplied, downloadsLimit: limit, downloadsUsed: Number(quota.downloads_used || 0) + 1, downloadsRemaining: Math.max(0, limit - Number(quota.downloads_used || 0) - 1) };
   });
 
 export const createVideoUploadUrl = createServerFn({ method: "POST" })
@@ -268,8 +294,38 @@ export const importAdminVideoMetadataCsv = createServerFn({method:"POST"}).middl
  const db=context.getBase44().asServiceRole.entities.Video;let imported=0;for(let i=0;i<records.length;i+=100){const created=await db.bulkCreate(records.slice(i,i+100));imported+=created.length;}return {imported,rejected:rejected.length,errors:rejected.slice(0,30),message:"Imported as metadata-only drafts. No media file or licence has been verified; upload and rights review are still required before publication."};
 });
 export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.Video.list("-created_date",2000,0);});
-export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()})).handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.Video;const current=await db.get(data.videoId);if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});const patch={};for(const [key,value] of Object.entries({title:data.title,description:data.description,category:data.category,language:data.language,is_featured:data.isFeatured,license_status:data.licenseStatus,source_reference:data.sourceReference}))if(value!==undefined)patch[key]=value;return db.update(data.videoId,patch);});
-export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),archived:z.boolean()})).handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.Video;const video=await db.get(data.videoId);if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});return db.update(data.videoId,{status:data.archived?"archived":"draft"});});
+export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const entities=context.getBase44().asServiceRole.entities,db=entities.Video,current=await db.get(data.videoId);
+  if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});
+  if(data.isFreeSample!==undefined&&data.isFreeSample!==!!current.is_free_sample){
+    const claims=await entities.FreeSamplePackClaim.list("-created_date",1,0);
+    if(claims.length)throw Object.assign(new Error("The three-video sample pack is locked because a member has already claimed it. This keeps every account on the same videos."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
+  }
+  if(data.isFreeSample===true){
+    if(current.status!=="published"||current.license_status!=="verified"||!current.storage_key||!current.watermarked_storage_key)throw Object.assign(new Error("Only published videos with verified rights and both renditions can be added to the free sample pack."),{status:409,code:"FREE_SAMPLE_VIDEO_NOT_READY"});
+    const selected=await db.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",10,0);
+    if(!current.is_free_sample&&selected.length>=3)throw Object.assign(new Error("The free sample pack must contain exactly three videos. Remove one before selecting another."),{status:409,code:"FREE_SAMPLE_PACK_FULL"});
+  }
+  const patch={};
+  for(const [key,value] of Object.entries({title:data.title,description:data.description,category:data.category,language:data.language,is_featured:data.isFeatured,is_free_sample:data.isFreeSample,license_status:data.licenseStatus,source_reference:data.sourceReference}))if(value!==undefined)patch[key]=value;
+  return db.update(data.videoId,patch);
+ });
+export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({videoId:z.string().min(1),archived:z.boolean()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const entities=context.getBase44().asServiceRole.entities,db=entities.Video,video=await db.get(data.videoId);
+  if(data.archived&&video.is_free_sample){
+    const claims=await entities.FreeSamplePackClaim.list("-created_date",1,0);
+    if(claims.length)throw Object.assign(new Error("This video belongs to the locked free sample pack and cannot be archived while members have claims."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
+  }
+  if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});
+  return db.update(data.videoId,{status:data.archived?"archived":"draft",...(data.archived?{is_free_sample:false}:{})});
+});
+
 export const publishVideo = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({ videoId: z.string().min(1).max(128) }))
@@ -277,12 +333,19 @@ export const publishVideo = createServerFn({ method: "POST" })
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
     const base44 = context.getBase44();
     const video = await base44.asServiceRole.entities.Video.get(data.videoId);
+    const alreadyPublished = video.status === "published";
     if (video.license_status !== "verified" || !video.source_reference || !video.storage_key || !video.watermarked_storage_key) {
       throw Object.assign(new Error("Record a rights/licence evidence reference, verify the content licence and upload both private renditions before publishing."), { status: 409, code: "PUBLISH_REQUIREMENTS_NOT_MET" });
     }
-    return base44.asServiceRole.entities.Video.update(video.id, {
+    const published = await base44.asServiceRole.entities.Video.update(video.id, {
       status: "published", published_at: new Date().toISOString(),
     });
+    if (!alreadyPublished) await notifyAllMembers(base44.asServiceRole, {
+      type: "system", title: "New VICEHUB video drop",
+      body: video.title + " is now available in the video library.",
+      target_url: "/library",
+    });
+    return published;
   });
 
 export const getMyAccount = createServerFn({ method: "GET" })
@@ -306,11 +369,18 @@ export const getMyAccount = createServerFn({ method: "GET" })
         planName = plans[0].display_name || tier;
       }
     }
-    const monthKey = new Date().toISOString().slice(0, 7);
-    const quotas = await base44.asServiceRole.entities.DownloadQuota.filter(
-      { user_id: user.id, month_key: monthKey }, "-created_date", 1, 0,
-    );
-    const used = Number(quotas[0]?.downloads_used || 0);
+    let used = 0;
+    if (tier === "free") {
+      limit = 3;
+      const claims = await base44.asServiceRole.entities.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
+      used = (claims[0]?.downloaded_video_ids || []).length;
+    } else {
+      const monthKey = new Date().toISOString().slice(0, 7);
+      const quotas = await base44.asServiceRole.entities.DownloadQuota.filter(
+        { user_id: user.id, month_key: monthKey }, "-created_date", 1, 0,
+      );
+      used = Number(quotas[0]?.downloads_used || 0);
+    }
     const history = await base44.asServiceRole.entities.DownloadEvent.filter(
       { user_id: user.id }, "-created_date", 15, 0,
       ["id", "video_id", "month_key", "tier_code", "watermark_applied", "status", "created_date"],
@@ -352,6 +422,14 @@ export const getNewsFeed = createServerFn({ method: "GET" })
     return rows.map(publicArticle);
   });
 
+export const getNewsArticleBySlug = createServerFn({method:"GET"})
+  .validator(z.object({slug:z.string().min(1).max(200)}))
+  .handler(async({data,context})=>{
+    const rows=await context.getBase44().asServiceRole.entities.NewsArticle.filter({slug:data.slug,status:"published"},"-published_at",1,0);
+    if(!rows.length)throw Object.assign(new Error("This article was not found."),{status:404,code:"NEWS_ARTICLE_NOT_FOUND"});
+    return publicArticle(rows[0]);
+  });
+
 export const getAdminNews = createServerFn({ method: "GET" })
   .middleware([requireUser]).handler(async ({ context }) => {
     requireAdmin(context);
@@ -363,7 +441,7 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
   .validator(z.object({
     id: z.string().optional(), title: z.string().min(3).max(180), slug: z.string().min(3).max(200).regex(/^[a-z0-9-]+$/),
     summary: z.string().max(500), body: z.string().min(1).max(20000), sourceName: z.string().min(2).max(100),
-    sourceUrl: z.string().url().max(1000), sourceType: z.enum(["official","media","community","social"]),
+    sourceUrl: z.string().url().max(1000), imageUrl: z.string().url().max(1000).optional().or(z.literal("")), imageAlt: z.string().max(300).optional(), sourceType: z.enum(["official","media","community","social"]),
     confidence: z.enum(["official","confirmed","reported","rumour","theory","opinion"]),
     locale: z.enum(["en","fr","es","de","it","pt"]), tags: z.array(z.string().max(40)).max(15).optional(),
     status: z.enum(["draft","published","archived"])
@@ -371,12 +449,17 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     requireAdmin(context);
     const base44 = context.getBase44();
+    const db = base44.asServiceRole.entities;
     const payload = { title:data.title, slug:data.slug, summary:data.summary, body:data.body, source_name:data.sourceName,
       source_url:data.sourceUrl, source_type:data.sourceType, confidence:data.confidence, locale:data.locale,
-      tags:data.tags||[], status:data.status, created_by:context.user.id,
-      ...(data.status==="published" ? {published_at:new Date().toISOString()} : {}) };
-    if (data.id) return base44.asServiceRole.entities.NewsArticle.update(data.id,payload);
-    return base44.asServiceRole.entities.NewsArticle.create(payload);
+      ...(data.imageUrl ? {image_url:data.imageUrl,image_alt:data.imageAlt||""} : {}), tags:data.tags||[], status:data.status, created_by:context.user.id,
+      ...(data.status==="published" ? {published_at:new Date().toISOString(),last_verified_at:new Date().toISOString()} : {}) };
+    const previous = data.id ? await db.NewsArticle.get(data.id).catch(()=>null) : null;
+    const saved = data.id ? await db.NewsArticle.update(data.id,payload) : await db.NewsArticle.create(payload);
+    if(data.status==="published" && previous?.status!=="published"){
+      await notifyAllMembers(base44.asServiceRole,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news"});
+    }
+    return saved;
   });
 
 export const getNewsSources = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
@@ -982,6 +1065,58 @@ export const seedPlatformDefaults = createServerFn({method:"POST"}).middleware([
  return {categoriesCreated:categoryCount,pagesCreated:pageCount,sourcesCreated,agentsCreated,legalPagesRequireReview:true};
 });
 
+export const getGrowthIntegrationStatus = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  requireAdmin(context);
+  const has=name=>!!secrets.get(name);
+  return [
+    {key:"OmniRoute AI",ready:has("OMNIROUTE_API_KEY")&&has("OMNIROUTE_BASE_URL"),required:["OMNIROUTE_API_KEY","OMNIROUTE_BASE_URL"]},
+    {key:"X API",ready:has("X_BEARER_TOKEN"),required:["X_BEARER_TOKEN"]},
+    {key:"Five-minute scheduler",ready:has("GTA_NEWS_SYNC_CRON_SECRET"),required:["GTA_NEWS_SYNC_CRON_SECRET in Base44 and GitHub Actions"]},
+    {key:"Google Search Console",ready:has("GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN"),required:["Google OAuth/Search Console refresh token"]},
+    {key:"Google Analytics 4",ready:has("GA4_REFRESH_TOKEN"),required:["GA4 refresh token"]},
+    {key:"PWA background push",ready:has("VAPID_PUBLIC_KEY")&&has("VAPID_PRIVATE_KEY")&&has("VAPID_SUBJECT")&&has("PUSH_DISPATCH_SECRET"),required:["VAPID_PUBLIC_KEY","VAPID_PRIVATE_KEY","VAPID_SUBJECT","PUSH_DISPATCH_SECRET"]},
+  ];
+});
+
+export const runScheduledGrowthAgents = createServerFn({method:"POST"})
+ .validator(z.object({cronSecret:z.string().min(32).max(256)}))
+ .handler(async({data,context})=>{
+  const expected=secrets.get("GTA_NEWS_SYNC_CRON_SECRET")||"";
+  if(expected.length<32||data.cronSecret.length!==expected.length)throw Object.assign(new Error("Growth scheduler is not configured."),{status:503,code:"GROWTH_SCHEDULER_NOT_CONFIGURED"});
+  let diff=0;for(let i=0;i<expected.length;i++)diff|=expected.charCodeAt(i)^data.cronSecret.charCodeAt(i);
+  if(diff!==0)throw Object.assign(new Error("Unauthorized growth scheduler request."),{status:401,code:"UNAUTHORIZED"});
+  const db=context.getBase44().asServiceRole.entities;
+  const [agents,articles,videos,users]=await Promise.all([
+    db.AIAgentConfig.filter({enabled:true,agent_key:{$in:["seo_agent","geo_agent","platform_analyst"]}},"-created_date",10,0),
+    db.NewsArticle.filter({status:"published"},"-published_at",20,0,["title","slug","summary","source_name","source_url","published_at"]),
+    db.Video.filter({status:"published",license_status:"verified"},"-published_at",20,0,["title","category","tags","published_at"]),
+    db.User.list("-created_date",5000,0)
+  ]);
+  const admin=users.find(user=>user.role==="admin");
+  if(!admin)throw new Error("No administrator account is available to own growth drafts.");
+  const results=[];
+  for(const agent of agents){
+    const type=agent.agent_key==="seo_agent"?"SEO":agent.agent_key==="geo_agent"?"GEO":"Description";
+    const focus=agent.agent_key==="seo_agent"
+      ?"Produce a prioritized technical/content SEO action plan for VICEHUB. Include search intent clusters, page titles/meta, internal links, article freshness, image/video SEO, Core Web Vitals and a 30-day execution backlog. Use the supplied published content only. Do not invent Search Console metrics or claim rankings."
+      :agent.agent_key==="geo_agent"
+      ?"Produce a Generative Engine Optimization plan: clear entity facts, concise sourced answers, transparent citations, structured data opportunities, author/source attribution, factual consistency and questions users ask about GTA VI. Do not create fake facts, fake experts, fake reviews or fabricated citations."
+      :"Act as the growth chief-of-staff. Synthesize the latest SEO and GEO drafts into a prioritized plan to grow toward 10,000 daily visits. Treat 10,000/day as a target, not a forecast. Identify dependencies, experiments, owners and KPIs; never fabricate traffic data.";
+    const prompt={publishedArticles:articles.map(a=>({title:a.title,slug:a.slug,summary:a.summary,source:a.source_name,url:a.source_url,publishedAt:a.published_at})),publishedVideos:videos.map(v=>({title:v.title,category:v.category,tags:v.tags,publishedAt:v.published_at})),measurementStatus:{googleSearchConsoleConnected:!!secrets.get("GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN"),analyticsConnected:!!secrets.get("GA4_REFRESH_TOKEN"),note:"No traffic or ranking metrics are supplied when measurement connectors are not connected."},goal:"Build a credible, measurable acquisition system targeting 10,000 visits per day without guaranteeing the result."};
+    try{
+      const generated=await omniRouteChat({model:agent.provider_model||undefined,messages:[{role:"system",content:agent.instructions||focus},{role:"user",content:focus+"\\n\\nCURRENT VERIFIED SITE DATA\\n"+JSON.stringify(prompt)}],temperature:0.25,maxTokens:2600,title:"VICEHUB Growth Orchestrator"});
+      const saved=await db.AIContentDraft.create({user_id:admin.id,platform:"General",content_type:type,topic:"Scheduled "+agent.display_name+" report — "+new Date().toISOString().slice(0,10),output:generated.output,status:"draft",provider:generated.model});
+      await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Completed — draft "+saved.id});
+      results.push({agent:agent.agent_key,status:"completed",draftId:saved.id});
+    }catch(error){
+      const message=(error instanceof Error?error.message:String(error)).slice(0,240);
+      await db.AIAgentConfig.update(agent.id,{last_run_at:new Date().toISOString(),last_run_status:"Failed — "+message});
+      results.push({agent:agent.agent_key,status:"error",error:message});
+    }
+  }
+  return {success:results.every(x=>x.status==="completed"),agentsRun:results.length,results,ranAt:new Date().toISOString()};
+ });
+
 export const runConfiguredAgent = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({agentId:z.string().min(1),taskInput:z.string().min(5).max(3000)}))
  .handler(async({data,context})=>{
@@ -1383,6 +1518,29 @@ export const unblockCreator = createServerFn({method:"POST"}).middleware([requir
   const db=context.getBase44().asServiceRole.entities,rows=await db.UserBlock.filter({blocker_id:context.user.id,blocked_id:data.userId},"-created_date",10,0);
   for(const row of rows)await db.UserBlock.delete(row.id);return {success:true};
  });
+export const getPushNotificationConfig = createServerFn({method:"GET"}).middleware([requireUser]).handler(async()=>{
+  const publicKey=secrets.get("VAPID_PUBLIC_KEY")||"";
+  return {available:!!publicKey,publicKey};
+});
+export const savePushSubscription = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({endpoint:z.string().url().max(2000),p256dh:z.string().min(20).max(300),auth:z.string().min(8).max(200),expirationTime:z.number().int().positive().optional()}))
+ .handler(async({data,context})=>{
+  const endpoint=new URL(data.endpoint);
+  if(endpoint.protocol!=="https:")throw Object.assign(new Error("Push endpoints must use HTTPS."),{status:400});
+  const db=context.getBase44().asServiceRole.entities.PushSubscription;
+  const existing=await db.filter({user_id:context.user.id,endpoint:data.endpoint},"-created_date",1,0);
+  const payload={user_id:context.user.id,endpoint:data.endpoint,p256dh:data.p256dh,auth:data.auth,expiration_time:data.expirationTime||0,last_error:""};
+  return existing[0]?db.update(existing[0].id,payload):db.create(payload);
+ });
+export const removePushSubscription = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({endpoint:z.string().url().max(2000)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities.PushSubscription;
+  const rows=await db.filter({user_id:context.user.id,endpoint:data.endpoint},"-created_date",100,0);
+  for(const row of rows)await db.delete(row.id);
+  return {removed:rows.length};
+ });
+
 export const getMyNotifications = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>context.getBase44().asServiceRole.entities.UserNotification.filter({user_id:context.user.id},"-created_date",100,0));
 export const markNotificationRead = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({notificationId:z.string()}))

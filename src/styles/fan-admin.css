@@ -284,3 +284,9 @@
  .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td:first-child::before{content:"CLIENT PROFILE"}
  .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td:last-child .admin-crm-open{width:100%;min-height:44px;text-align:center;border:1px solid var(--vc-line);border-radius:10px;background:rgba(0,220,255,.07)}
 }
+
+.admin-growth-integrations{margin:18px 0;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(8,9,15,.45)}
+.admin-growth-integrations h3{margin:0 0 10px;color:#a9e8e4;font-size:10px;letter-spacing:1.4px}
+.admin-integration-status{padding:5px 8px;border-radius:5px;font-size:8px;font-weight:900;letter-spacing:.8px;white-space:nowrap}
+.admin-integration-status.ready{background:#1b493b;color:#8ff2c8}
+.admin-integration-status.missing{background:#4b2d37;color:#ffb3c8}

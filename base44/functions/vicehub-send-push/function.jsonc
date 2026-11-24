@@ -1,0 +1,4 @@
+{
+  "name": "vicehub-send-push",
+  "entry": "index.ts"
+}

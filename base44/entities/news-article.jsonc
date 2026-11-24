@@ -82,7 +82,11 @@
     },
     "created_by": {
       "type": "string"
-    }
+    },
+    "image_url": { "type": "string", "format": "uri" },
+    "image_alt": { "type": "string", "maxLength": 300 },
+    "source_published_at": { "type": "string", "format": "date-time" },
+    "last_verified_at": { "type": "string", "format": "date-time" }
   },
   "required": [
     "title",

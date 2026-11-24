@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyReferralDashboard, applyReferralWalletCredit } from "@/lib/server-fns";
+import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyReferralDashboard, applyReferralWalletCredit, getFreeSamplePack } from "@/lib/server-fns";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/client-dashboard.css";
@@ -28,6 +28,7 @@ function DashboardPage() {
   const [busyVideo, setBusyVideo] = useState("");
   const [billingBusy, setBillingBusy] = useState(false);
   const [referral, setReferral] = useState(null);
+  const [samplePack, setSamplePack] = useState(null);
   const [referralBusy, setReferralBusy] = useState(false);
   const [referralNotice, setReferralNotice] = useState("");
 
@@ -36,11 +37,12 @@ function DashboardPage() {
     setError("");
     try {
       await refreshMySubscription().catch(() => null);
-      const [accountResult, videoResult, newsResult, notificationResult] = await Promise.allSettled([
+      const [accountResult, videoResult, newsResult, notificationResult, sampleResult] = await Promise.allSettled([
         getMyAccount(),
         listPublishedVideosPage({ data: { offset: 0, limit: 6 } }),
         (async () => { const localized = await getNewsFeed({ data: { locale, limit: 4 } }); return Array.isArray(localized) && localized.length ? localized : locale === "en" ? [] : getNewsFeed({ data: { locale: "en", limit: 4 } }); })(),
         getMyNotifications(),
+        getFreeSamplePack(),
       ]);
       if (accountResult.status === "fulfilled") setAccount(accountResult.value);
       else setError(accountResult.reason?.message || "Account information could not be loaded.");
@@ -50,6 +52,8 @@ function DashboardPage() {
       else setNews([]);
       if (notificationResult.status === "fulfilled") setNotifications(Array.isArray(notificationResult.value) ? notificationResult.value.slice(0, 6) : []);
       else setNotifications([]);
+      if (sampleResult.status === "fulfilled") setSamplePack(sampleResult.value);
+      else setSamplePack(null);
     } finally {
       setLoading(false);
     }
@@ -109,6 +113,10 @@ function DashboardPage() {
       <section className="member-notification-hq">
         <div className="member-notification-heading"><div><span className="member-section-kicker">VICEHUB / LIVE DISPATCH</span><h2>MISSION <em>UPDATES.</em></h2><p>Your account activity, messages and important alerts.</p></div><span className="member-alert-count">{notifications.filter(n => !n.read_at).length} NEW</span></div>
         <div className="member-notification-layout"><div className="member-notification-list">{notifications.length ? notifications.map(item => <button type="button" className={"member-notification-item" + (!item.read_at ? " unread" : "")} key={item.id} onClick={() => openNotification(item)}><span className="member-notification-glyph">VI</span><span className="member-notification-copy"><b>{item.title}</b><small>{item.body}</small><time>{dateLabel(item.created_date, locale)}</time></span><i>↗</i></button>) : <div className="member-notification-empty">NO NEW DISPATCHES. IMPORTANT ACCOUNT UPDATES WILL APPEAR HERE.</div>}</div><Link to="/messages" className="member-message-shortcut"><span className="member-message-glyph">✉</span><b>PRIVATE MESSAGES</b><small>Open your creator inbox</small><i>OPEN INBOX ↗</i></Link></div>
+      </section>
+      <section className="member-free-sample">
+        <div className="member-free-sample-head"><div><span className="member-section-kicker">VICEHUB / FIRST DROP</span><h2>YOUR 3 FREE <em>VIDEO TRIAL.</em></h2><p>Every new member receives the same three selected videos. Each can be downloaded once, with the VICEHUB watermark. The pack is fixed for every account and does not refresh monthly.</p></div><span className="member-free-sample-count">{samplePack?.downloadsRemaining ?? 3}<small>/ 3 LEFT</small></span></div>
+        {samplePack?.packReady ? <div className="member-free-sample-grid">{samplePack.videos.map(video=><article className="member-free-sample-item" key={video.id}><div className="member-free-sample-image">{video.thumbnail_url?<img src={video.thumbnail_url} alt={video.title}/>:<span>VICEHUB / FREE DROP</span>}</div><div><small>{video.category} · {(video.language||"en").toUpperCase()}</small><b>{video.title}</b><p>{video.description}</p><button type="button" disabled={busyVideo===video.id||(samplePack.downloadedVideoIds||[]).includes(video.id)} onClick={()=>download(video)}>{busyVideo===video.id?"PREPARING…":(samplePack.downloadedVideoIds||[]).includes(video.id)?"ALREADY DOWNLOADED":"DOWNLOAD FREE VIDEO ↓"}</button></div></article>)}</div> : <div className="member-free-sample-empty">The free sample pack will appear here as soon as the three rights-cleared videos have been selected and published. The pack is identical for every new member.</div>}
       </section>
       <section className="member-referral-card">
         <div className="member-referral-head"><div><span className="member-section-kicker">VICEHUB / CREATOR REWARDS</span><h2>INVITE CREATORS. <em>EARN CREDIT.</em></h2><p>Give a new member 5% off their first payment. Earn 20% of that first paid subscription as VICEHUB credit after a 30-day validation period.</p></div><span className="member-referral-mark">20%</span></div>

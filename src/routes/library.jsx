@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import "@/styles/video-library.css";
-import { getVideoPreviewUrl, listPublishedVideosPage, requestVideoDownload } from "@/lib/server-fns";
+import { getVideoPreviewUrl, listPublishedVideosPage, requestVideoDownload, getPublicFreeSamplePack } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale } from "@/lib/i18n";
 
@@ -39,6 +39,7 @@ function VideoLibraryPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const requestSequence = useRef(0);
   const [videos, setVideos] = useState([]);
+  const [samplePack, setSamplePack] = useState({ready:false,videos:[]});
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -48,6 +49,8 @@ function VideoLibraryPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewMessage, setPreviewMessage] = useState("");
   const [downloadMessage, setDownloadMessage] = useState("");
+
+  useEffect(() => { getPublicFreeSamplePack().then(setSamplePack).catch(() => setSamplePack({ready:false,videos:[]})); }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -137,6 +140,11 @@ function VideoLibraryPage() {
         </div>
         <div className="vh-lib2-hero-art"><div className="vh-lib2-art-frame"><img src={featured?.thumbnail_url || "https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=3840"} alt="GTA VI Vice City artwork"/><span className="vh-lib2-art-tag">VICEHUB ORIGINALS</span><span className="vh-lib2-art-caption"><small>THE DROP ZONE</small><b>MADE FOR THE FEED.</b></span></div></div>
         <span className="vh-lib2-hero-index">V / 06</span>
+      </section>
+      <section className="vh-lib2-free-pack">
+        <div className="vh-lib2-free-pack-head"><div><span className="vh-lib2-kicker">FREE CREATOR STARTER PACK / 01</span><h2>TRY THE DROP ZONE. <em>ON US.</em></h2><p>Create a free account and download the same three selected videos as every other new member. One download per video, once per account.</p></div><span className="vh-lib2-free-pack-stamp">3 FREE<br/>DOWNLOADS</span></div>
+        {samplePack.ready ? <div className="vh-lib2-free-pack-grid">{samplePack.videos.map((video,index)=><article className="vh-lib2-free-pack-card" key={video.id}><div className="vh-lib2-free-pack-image">{video.thumbnail_url?<img src={video.thumbnail_url} alt={video.title} loading="lazy"/>:<img src="/vicehub-news-placeholder.svg" alt="VICEHUB video preview"/>}<span>FREE DROP 0{index+1}</span></div><div><small>{video.category} · {(video.language||"en").toUpperCase()}</small><b>{video.title}</b><p>{video.description}</p></div></article>)}</div> : <div className="vh-lib2-free-pack-empty">The three fixed sample videos will appear here as soon as the rights-cleared pack is selected and published. The same three videos will be offered to every new account.</div>}
+        <Link to={isAuthenticated?"/dashboard":"/register"} className="vh-lib2-free-pack-cta">{isAuthenticated?"OPEN YOUR FREE SAMPLE PACK":"CREATE A FREE ACCOUNT TO DOWNLOAD"} ↗</Link>
       </section>
       <section className="vh-lib2-feature">
         <div className="vh-lib2-section-label"><span>01 / EDITOR'S SELECTION</span><b>{t.featured}</b></div>
