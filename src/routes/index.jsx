@@ -157,8 +157,8 @@ function HomePage() {
         <div className="fh-kicker">WELCOME TO VICE CITY</div>
         <h1>Build your creator brand.<br /><em>Make every drop count.</em></h1>
         <p>Your GTA creator journey starts here. Build your brand, explore the creator hub and earn membership credit by inviting new creators. Paid downloads unlock as rights-cleared packs pass review.</p>
-        <div className="fh-hero-cta"><a href="#plans" className="fh-btn solid big">Get instant access</a><a href="#drops" className="fh-btn ghost big">Explore video drops</a></div>
-        <div className="vh-hero-proof"><span>RIGHTS-CLEARED DROPS ONLY</span><span>ONE SIMPLE MEMBERSHIP</span><span>CREATOR REFERRAL REWARDS</span></div>
+        <div className="fh-hero-cta"><a href="#plans" className="fh-btn solid big">Explore membership</a><a href="#drops" className="fh-btn ghost big">Explore video drops</a></div>
+        <div className="vh-hero-proof"><span>RIGHTS REVIEW BEFORE RELEASE</span><span>ONE SIMPLE MEMBERSHIP</span><span>CREATOR REFERRAL REWARDS</span></div>
         <ul className="fh-stats">
           <li><b>{videos.length}</b><span>videos ready</span></li>
           <li><b>{creators.length}</b><span>creators</span></li>
@@ -252,7 +252,7 @@ function HomePage() {
         <div>
           <span className="fh-section-kicker">VICEHUB MEMBERSHIPS</span>
           <h2>One membership. Everything you need to create.</h2>
-          <p>One clear monthly price. Access the full rights-cleared creator library, download your assets and use the creator tools without comparing confusing tiers.</p>
+          <p>One clear monthly price. Once the rights-cleared library is live, one membership unlocks the complete catalogue and creator tools.</p>
         </div>
         <label className="fh-currency-picker">DISPLAY CURRENCY
           <select value={currency} onChange={e => setCurrency(e.target.value)} aria-label="Display currency">
@@ -318,7 +318,7 @@ function HomePage() {
       {FAQ.map(([q, a], i) => <div className={"fh-faq-item" + (faq === i ? " open" : "")} key={q}><button type="button" aria-expanded={faq === i} onClick={() => setFaq(faq === i ? -1 : i)}>{q}<span>{faq === i ? "–" : "+"}</span></button>{faq === i && <p>{a}</p>}</div>)}
     </section>
 
-    <section className="fh-final"><h2>Ready to build your creator brand?</h2><p>Get your next creator drop and start publishing with a clear content workflow.</p><a href="#plans" className="fh-btn solid big">Explore memberships</a></section>
+    <section className="fh-final"><h2>Ready to build your creator brand?</h2><p>Create your free profile, explore the hub and be ready when the first rights-cleared drops are released.</p><a href="#plans" className="fh-btn solid big">Explore memberships</a></section>
     <p className="fan-disclaimer">VICEHUB is an independent fan community. Not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive.</p>
 
     {preview && <div className="fh-modal" role="dialog" aria-modal="true" aria-label={preview.video.title} onClick={() => setPreview(null)}>
