@@ -125,7 +125,7 @@ async function importX(source: any, url: URL, db: any, service?: any) {
     const mediaItem: any = mediaKey ? media.get(mediaKey) : null;
     const imageUrl = safeImageUrl(mediaItem?.url || mediaItem?.preview_image_url || "");
     const editorial = await generateEditorial(source,title,text,articleUrl);
-    const status = source.source_type === "official" ? "published" : "draft";
+    const status = source.source_type === "official" && imageUrl ? "published" : "draft";
     const publishedAt = status === "published" ? new Date().toISOString() : undefined;
     const slug = editorial.title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 150) + "-" + crypto.randomUUID().slice(0, 6);
     await db.NewsArticle.create({
