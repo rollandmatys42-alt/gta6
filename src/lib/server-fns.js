@@ -289,8 +289,18 @@ export const importAdminVideoMetadataCsv = createServerFn({method:"POST"}).middl
  const db=context.getBase44().asServiceRole.entities.Video;let imported=0;for(let i=0;i<records.length;i+=100){const created=await db.bulkCreate(records.slice(i,i+100));imported+=created.length;}return {imported,rejected:rejected.length,errors:rejected.slice(0,30),message:"Imported as metadata-only drafts. No media file or licence has been verified; upload and rights review are still required before publication."};
 });
 export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.Video.list("-created_date",2000,0);});
-export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()})).handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.Video;const current=await db.get(data.videoId);if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});const patch={};for(const [key,value] of Object.entries({title:data.title,description:data.description,category:data.category,language:data.language,is_featured:data.isFeatured,license_status:data.licenseStatus,source_reference:data.sourceReference}))if(value!==undefined)patch[key]=value;return db.update(data.videoId,patch);});
-export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),archived:z.boolean()})).handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.Video;const video=await db.get(data.videoId);if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});return db.update(data.videoId,{status:data.archived?"archived":"draft"});});
+export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()})).handler(async({data,context})=>{requireAdmin(context);const entities=context.getBase44().asServiceRole.entities,db=entities.Video;const current=await db.get(data.videoId);if(data.licenseStatus==="verified"&&!data.sourceReference&&!current.source_reference)throw Object.assign(new Error("A rights/source reference is required before verifying the licence."),{status:400});if(data.isFreeSample===true){if(current.status!=="published"||current.license_status!=="verified"||!current.storage_key||!current.watermarked_storage_key)throw Object.assign(new Error("Only published videos with verified rights and both renditions can be added to the free sample pack."),{status:409,code:"FREE_SAMPLE_VIDEO_NOT_READY"});const selected=await db.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",10,0);if(!current.is_free_sample&&selected.length>=3)throw Object.assign(new Error("The free sample pack must contain exactly three videos. Remove one before selecting another."),{status:409,code:"FREE_SAMPLE_PACK_FULL"});}const patch={};for(const [key,value] of Object.entries({title:data.title,description:data.description,category:data.category,language:data.language,is_featured:data.isFeatured,is_free_sample:data.isFreeSample,license_status:data.licenseStatus,source_reference:data.sourceReference}))if(value!==undefined)patch[key]=value;return db.update(data.videoId,patch);});
+export const archiveAdminVideo = createServerFn({method:"POST"}).middleware([requireUser]).validator(z.object({videoId:z.string().min(1),archived:z.boolean()})).handler(async({data,context})=>{requireAdmin(context);const db=context.getBase44().asServiceRole.entities.Video;const video=await db.get(data.videoId);if(!data.archived&&video.license_status!=="verified")return db.update(data.videoId,{status:"draft"});return db.update(data.videoId,{status:data.archived?"archived":"draft",...(data.archived?{is_free_sample:false}:{})});});
+async function notifyAllMembers(entities, notice) {
+  const users = await entities.User.list("-created_date", 5000, 0);
+  for (const user of users) {
+    await entities.UserNotification.create({
+      user_id: user.id, type: notice.type, title: notice.title,
+      body: notice.body, target_url: notice.target_url,
+    }).catch(() => null);
+  }
+}
+
 export const publishVideo = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({ videoId: z.string().min(1).max(128) }))
@@ -301,9 +311,15 @@ export const publishVideo = createServerFn({ method: "POST" })
     if (video.license_status !== "verified" || !video.source_reference || !video.storage_key || !video.watermarked_storage_key) {
       throw Object.assign(new Error("Record a rights/licence evidence reference, verify the content licence and upload both private renditions before publishing."), { status: 409, code: "PUBLISH_REQUIREMENTS_NOT_MET" });
     }
-    return base44.asServiceRole.entities.Video.update(video.id, {
+    const published = await base44.asServiceRole.entities.Video.update(video.id, {
       status: "published", published_at: new Date().toISOString(),
     });
+    await notifyAllMembers(base44.asServiceRole.entities, {
+      type: "system", title: "New VICEHUB video drop",
+      body: video.title + " is now available in the video library.",
+      target_url: "/library",
+    });
+    return published;
   });
 
 export const getMyAccount = createServerFn({ method: "GET" })
@@ -384,7 +400,7 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
   .validator(z.object({
     id: z.string().optional(), title: z.string().min(3).max(180), slug: z.string().min(3).max(200).regex(/^[a-z0-9-]+$/),
     summary: z.string().max(500), body: z.string().min(1).max(20000), sourceName: z.string().min(2).max(100),
-    sourceUrl: z.string().url().max(1000), sourceType: z.enum(["official","media","community","social"]),
+    sourceUrl: z.string().url().max(1000), imageUrl: z.string().url().max(1000).optional().or(z.literal("")), imageAlt: z.string().max(300).optional(), sourceType: z.enum(["official","media","community","social"]),
     confidence: z.enum(["official","confirmed","reported","rumour","theory","opinion"]),
     locale: z.enum(["en","fr","es","de","it","pt"]), tags: z.array(z.string().max(40)).max(15).optional(),
     status: z.enum(["draft","published","archived"])
@@ -392,12 +408,17 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     requireAdmin(context);
     const base44 = context.getBase44();
+    const db = base44.asServiceRole.entities;
     const payload = { title:data.title, slug:data.slug, summary:data.summary, body:data.body, source_name:data.sourceName,
       source_url:data.sourceUrl, source_type:data.sourceType, confidence:data.confidence, locale:data.locale,
-      tags:data.tags||[], status:data.status, created_by:context.user.id,
-      ...(data.status==="published" ? {published_at:new Date().toISOString()} : {}) };
-    if (data.id) return base44.asServiceRole.entities.NewsArticle.update(data.id,payload);
-    return base44.asServiceRole.entities.NewsArticle.create(payload);
+      image_url:data.imageUrl || "", image_alt:data.imageAlt || "", tags:data.tags||[], status:data.status, created_by:context.user.id,
+      ...(data.status==="published" ? {published_at:new Date().toISOString(),last_verified_at:new Date().toISOString()} : {}) };
+    const previous = data.id ? await db.NewsArticle.get(data.id).catch(()=>null) : null;
+    const saved = data.id ? await db.NewsArticle.update(data.id,payload) : await db.NewsArticle.create(payload);
+    if(data.status==="published" && previous?.status!=="published"){
+      await notifyAllMembers(db,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news"});
+    }
+    return saved;
   });
 
 export const getNewsSources = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
