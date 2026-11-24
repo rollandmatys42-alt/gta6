@@ -5,6 +5,7 @@ import { getCreatorDirectory, getMyCreatorProfile, saveMyCreatorProfile, sendDir
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale, translate } from "@/lib/i18n";
 import "@/styles/creators-directory.css";
+import "@/styles/vicehub-2026-redesign.css";
 
 const CREATOR_ART = [
   "https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=3840",
