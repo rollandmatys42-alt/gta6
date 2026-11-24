@@ -565,11 +565,14 @@ export const updateShopOrder = createServerFn({method:"POST"}).middleware([requi
   const db=context.getBase44().asServiceRole.entities.ShopOrder;
   const order=await db.get(data.orderId).catch(()=>null);
   if(!order)throw Object.assign(new Error("Order not found."),{status:404});
+  if(["paid","paid_stock_issue"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("Paid status can only be set by verified Stripe confirmation."),{status:409,code:"PAYMENT_CONFIRMATION_REQUIRED"});
+  if(["processing","shipped","delivered","refunded"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("This order cannot move to fulfilment until Stripe confirms payment."),{status:409,code:"ORDER_NOT_PAID"});
+  if(data.status==="cancelled"&&["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("A paid order must be refunded in Stripe before it can be cancelled."),{status:409,code:"REFUND_REQUIRED"});
   if(data.status==="refunded"&&order.status!=="refunded")throw Object.assign(new Error("Only mark an order as refunded after the refund has been completed in Stripe."),{status:409,code:"REFUND_CONFIRMATION_REQUIRED"});
   return db.update(order.id,{status:data.status,tracking_number:data.trackingNumber||"",tracking_url:data.trackingUrl||"",admin_note:data.adminNote||"",updated_by:context.user.id});
  });
 export const createShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10)})).min(1).max(20)}))
+ .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10),size:z.string().max(40).optional(),color:z.string().max(40).optional()})).min(1).max(20)}))
  .handler(async({data,context})=>{
   const user=context.user,db=context.getBase44().asServiceRole.entities;
   if(!secrets.get("STRIPE_SECRET_KEY"))throw Object.assign(new Error("Online checkout is not active yet. The administrator must connect Stripe in the VICEHUB payment settings before orders can be paid."),{status:503,code:"SHOP_PAYMENTS_NOT_CONFIGURED"});
@@ -579,8 +582,14 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
   if(cart.some(x=>x.product.product_type==="external"||x.product.vendor_type==="official_external"))throw Object.assign(new Error("Official external products must be purchased from their linked official retailer."),{status:400});
   const currencies=[...new Set(cart.map(x=>x.product.currency))];
   if(currencies.length!==1)throw Object.assign(new Error("Your bag contains different currencies. Checkout one currency at a time."),{status:400,code:"SHOP_MIXED_CURRENCIES"});
-  for(const {line,product} of cart)if(product.product_type==="physical"&&Number(product.stock_quantity||0)<line.quantity)throw Object.assign(new Error("Not enough stock for "+product.title+"."),{status:409,code:"SHOP_OUT_OF_STOCK"});
-  const currency=currencies[0],items=cart.map(({line,product})=>({product_id:product.id,title:product.title,sku:product.sku||"",product_type:product.product_type,quantity:line.quantity,unit_price_cents:Number(product.price_cents),currency,image_url:product.image_url||"",shipping_required:!!product.shipping_required}));
+  for(const {line,product} of cart){
+   if(product.product_type==="physical"&&Number(product.stock_quantity||0)<line.quantity)throw Object.assign(new Error("Not enough stock for "+product.title+"."),{status:409,code:"SHOP_OUT_OF_STOCK"});
+   if((product.size_options||[]).length&&!line.size)throw Object.assign(new Error("Select a size for "+product.title+"."),{status:400});
+   if(line.size&&!(product.size_options||[]).includes(line.size))throw Object.assign(new Error("The selected size is no longer available for "+product.title+"."),{status:409});
+   if((product.color_options||[]).length&&!line.color)throw Object.assign(new Error("Select a colour for "+product.title+"."),{status:400});
+   if(line.color&&!(product.color_options||[]).includes(line.color))throw Object.assign(new Error("The selected colour is no longer available for "+product.title+"."),{status:409});
+  }
+  const currency=currencies[0],items=cart.map(({line,product})=>({product_id:product.id,title:product.title,sku:product.sku||"",product_type:product.product_type,quantity:line.quantity,size:line.size||"",color:line.color||"",unit_price_cents:Number(product.price_cents),currency,image_url:product.image_url||"",shipping_required:!!product.shipping_required}));
   const subtotal=cart.reduce((sum,x)=>sum+Number(x.product.price_cents)*x.line.quantity,0);
   const shipping=cart.reduce((sum,x)=>sum+(x.product.product_type==="physical"&&x.product.shipping_required?Number(x.product.shipping_price_cents||0)*x.line.quantity:0),0);
   const total=subtotal+shipping;
