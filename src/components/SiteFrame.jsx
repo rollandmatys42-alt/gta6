@@ -68,7 +68,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
               <select className="fh-lang" aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select>
               {isAuthenticated
                 ? <><Link to="/dashboard" className="fh-btn solid" onClick={close}>My account</Link><button type="button" className="fh-btn ghost" onClick={() => { close(); logout(); }}>Sign out</button></>
-                : <><Link to="/login" className="fh-btn ghost" onClick={close}>Sign in</Link><Link to="/register" className="fh-btn solid" onClick={close}>Join now</Link></>}
+                : <><Link to="/sign-in" className="fh-btn ghost" onClick={close}>Sign in</Link><Link to="/register" className="fh-btn solid" onClick={close}>Join now</Link></>}
             </div>
           </nav>
         </div>
