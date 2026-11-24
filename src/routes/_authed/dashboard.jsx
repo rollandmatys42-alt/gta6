@@ -6,6 +6,7 @@ import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/client-dashboard.css";
 import "@/styles/vicehub-growth.css";
+import "@/styles/vicehub-2026-redesign.css";
 
 export const Route = createFileRoute("/_authed/dashboard")({
   ssr: false,
