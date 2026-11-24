@@ -389,6 +389,14 @@ export const getNewsFeed = createServerFn({ method: "GET" })
     return rows.map(publicArticle);
   });
 
+export const getNewsArticleBySlug = createServerFn({method:"GET"})
+  .validator(z.object({slug:z.string().min(1).max(200)}))
+  .handler(async({data,context})=>{
+    const rows=await context.getBase44().asServiceRole.entities.NewsArticle.filter({slug:data.slug,status:"published"},"-published_at",1,0);
+    if(!rows.length)throw Object.assign(new Error("This article was not found."),{status:404,code:"NEWS_ARTICLE_NOT_FOUND"});
+    return publicArticle(rows[0]);
+  });
+
 export const getAdminNews = createServerFn({ method: "GET" })
   .middleware([requireUser]).handler(async ({ context }) => {
     requireAdmin(context);
