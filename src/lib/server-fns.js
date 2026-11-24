@@ -528,7 +528,7 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
     const previous = data.id ? await db.NewsArticle.get(data.id).catch(()=>null) : null;
     const saved = data.id ? await db.NewsArticle.update(data.id,payload) : await db.NewsArticle.create(payload);
     if(data.status==="published" && previous?.status!=="published"){
-      await notifyAllMembers(base44.asServiceRole,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news"});
+      await notifyAllMembers(base44.asServiceRole,{type:"news",title:"New GTA VI article",body:data.title,target_url:"/news/"+saved.slug});
     }
     return saved;
   });
@@ -1591,7 +1591,10 @@ export const unblockCreator = createServerFn({method:"POST"}).middleware([requir
  });
 export const getPushNotificationConfig = createServerFn({method:"GET"}).middleware([requireUser]).handler(async()=>{
   const publicKey=secrets.get("VAPID_PUBLIC_KEY")||"";
-  return {available:!!publicKey,publicKey};
+  const privateKey=secrets.get("VAPID_PRIVATE_KEY")||"";
+  const subject=secrets.get("VAPID_SUBJECT")||"";
+  const dispatchSecret=secrets.get("PUSH_DISPATCH_SECRET")||"";
+  return {available:!!(publicKey&&privateKey&&subject&&dispatchSecret),publicKey};
 });
 export const savePushSubscription = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({endpoint:z.string().url().max(2000),p256dh:z.string().min(20).max(300),auth:z.string().min(8).max(200),expirationTime:z.number().int().positive().optional()}))
