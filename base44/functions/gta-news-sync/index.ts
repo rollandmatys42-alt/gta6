@@ -3,6 +3,7 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 const GTA_PATTERN = /\b(?:gta\s*(?:vi|6)|gta6|grand theft auto\s*vi)\b/i;
 const ALLOWED_HOSTS = new Set([
   "rockstargames.com", "www.rockstargames.com",
+  "blog.playstation.com", "news.xbox.com",
   "youtube.com", "www.youtube.com",
   "gtaboom.com", "www.gtaboom.com",
   "gtabase.com", "www.gtabase.com",
