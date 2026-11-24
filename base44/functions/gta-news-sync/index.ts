@@ -117,14 +117,18 @@ async function importX(source: any, url: URL, db: any) {
     const mediaItem: any = mediaKey ? media.get(mediaKey) : null;
     const imageUrl = safeImageUrl(mediaItem?.url || mediaItem?.preview_image_url || "");
     const editorial = await generateEditorial(source,title,text,articleUrl);
+    const status = source.source_type === "official" ? "published" : "draft";
+    const publishedAt = status === "published" ? new Date().toISOString() : undefined;
     const slug = editorial.title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 150) + "-" + crypto.randomUUID().slice(0, 6);
     await db.NewsArticle.create({
       title: editorial.title, slug, summary: editorial.summary, body: editorial.body,
-      source_name: "@" + username, source_url: articleUrl, source_type: "social",
-      confidence: "reported", locale: "en", status: "draft", tags: ["X import"],
+      source_name: "@" + username, source_url: articleUrl, source_type: source.source_type || "social",
+      confidence: source.source_type === "official" ? "official" : "reported", locale: "en", status, tags: ["X import"],
       ...(imageUrl ? { image_url: imageUrl, image_alt: "Image attached to the original X post by @" + username } : {}),
       source_published_at: tweet.created_at || new Date().toISOString(), last_verified_at: new Date().toISOString(),
+      ...(publishedAt ? { published_at: publishedAt } : {}),
     });
+    if (status === "published") await notifyPublished(db,editorial.title);
     created++;
   }
   return created;
