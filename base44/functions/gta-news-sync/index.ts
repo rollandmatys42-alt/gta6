@@ -86,7 +86,8 @@ async function generateEditorial(source: any, title: string, summary: string, ar
     return { title: String(result.title).slice(0,180), summary: String(result.summary).slice(0,500), body: String(result.body).slice(0,20000) };
   } catch { return fallback; }
 }
-async function notifyPublished(entities: any, title: string) {
+async function notifyPublished(entities: any, title: string, service?: any) {
+  const dispatchSecret=Deno.env.get("PUSH_DISPATCH_SECRET")||"";
   for (let offset=0; offset<100000; offset+=5000) {
     const users = await entities.User.list("-created_date", 5000, offset);
     if (!users.length) break;
@@ -94,11 +95,14 @@ async function notifyPublished(entities: any, title: string) {
       user_id: user.id, type: "news", title: "New official GTA VI update",
       body: title, target_url: "/news"
     }).catch(() => null);
+    if(dispatchSecret&&service?.functions?.invoke){
+      for(let start=0;start<users.length;start+=100)await service.functions.invoke("vicehub-send-push",{dispatchSecret,userIds:users.slice(start,start+100).map((user:any)=>user.id),title:"New official GTA VI update",body:title,url:"/news"}).catch(()=>null);
+    }
     if (users.length < 5000) break;
   }
 }
 
-async function importX(source: any, url: URL, db: any) {
+async function importX(source: any, url: URL, db: any, service?: any) {
   const token = Deno.env.get("X_BEARER_TOKEN") || "";
   if (!token) throw new Error("X_BEARER_TOKEN is missing from Base44 secrets.");
   if (source.last_external_id) url.searchParams.set("since_id", source.last_external_id);
@@ -132,12 +136,12 @@ async function importX(source: any, url: URL, db: any) {
       source_published_at: tweet.created_at || new Date().toISOString(), last_verified_at: new Date().toISOString(),
       ...(publishedAt ? { published_at: publishedAt } : {}),
     });
-    if (status === "published") await notifyPublished(db,editorial.title);
+    if (status === "published") await notifyPublished(db,editorial.title,service);
     created++;
   }
   return created;
 }
-async function importRss(source: any, url: URL, db: any) {
+async function importRss(source: any, url: URL, db: any, service?: any) {
   const response = await fetch(url.toString(), {
     headers: { Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
     signal: AbortSignal.timeout(12000),
