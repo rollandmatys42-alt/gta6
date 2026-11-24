@@ -348,11 +348,18 @@ export const getMyAccount = createServerFn({ method: "GET" })
         planName = plans[0].display_name || tier;
       }
     }
-    const monthKey = new Date().toISOString().slice(0, 7);
-    const quotas = await base44.asServiceRole.entities.DownloadQuota.filter(
-      { user_id: user.id, month_key: monthKey }, "-created_date", 1, 0,
-    );
-    const used = Number(quotas[0]?.downloads_used || 0);
+    let used = 0;
+    if (tier === "free") {
+      limit = 3;
+      const claims = await base44.asServiceRole.entities.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
+      used = (claims[0]?.downloaded_video_ids || []).length;
+    } else {
+      const monthKey = new Date().toISOString().slice(0, 7);
+      const quotas = await base44.asServiceRole.entities.DownloadQuota.filter(
+        { user_id: user.id, month_key: monthKey }, "-created_date", 1, 0,
+      );
+      used = Number(quotas[0]?.downloads_used || 0);
+    }
     const history = await base44.asServiceRole.entities.DownloadEvent.filter(
       { user_id: user.id }, "-created_date", 15, 0,
       ["id", "video_id", "month_key", "tier_code", "watermark_applied", "status", "created_date"],
