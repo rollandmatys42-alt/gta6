@@ -63,3 +63,57 @@
 .vh-subscription-help .vh-subscription-footnote{padding-top:12px;border-top:1px solid #ffffff18;font-size:10px}
 @media(max-width:760px){.message-columns,.vh-subscription-grid{grid-template-columns:1fr}.notification-row{align-items:flex-start;flex-direction:column}.vh-subscription-emblem{width:78px;height:78px;font-size:38px}.vh-subscription-metrics{grid-template-columns:1fr}.vh-workspace-topbar{gap:10px}.vh-workspace-actions{gap:7px;flex-wrap:wrap}}
 @media(max-width:520px){.vh-notification-dispatch{width:34px;height:34px}.vh-notification-mark{width:23px;height:23px}.platform-hero{padding:20px 16px}.platform-hero:after{font-size:26px;right:10px}.vh-subscription-hero{align-items:flex-start}.vh-subscription-emblem{margin-top:12px}.vh-subscription-actions{display:grid}.vh-subscription-actions a,.vh-subscription-actions button{width:100%}}
+
+/* Page-specific layouts: social control room, creator directory, newsroom and library */
+.social-hero{position:relative;display:flex;align-items:center;justify-content:space-between;gap:20px;overflow:hidden;padding:clamp(22px,4vw,40px);border:1px solid #ffffff20;border-radius:20px;background:radial-gradient(ellipse at 90% 15%,#ff4f9a29,transparent 38%),linear-gradient(125deg,#21162d,#0d101c)}
+.social-hero h1{margin:9px 0;color:#fff;font:900 clamp(38px,5vw,60px)/.9 'Barlow Condensed',Impact,sans-serif}
+.social-kicker,.social-hero .social-kicker{color:#75e4e2;font-size:9px;font-weight:900;letter-spacing:.18em}
+.social-hero-stamp{display:grid;place-items:center;flex:none;width:110px;height:110px;border:1px solid #ff72ad88;border-radius:50%;color:#fff;font:900 48px 'Barlow Condensed',Impact,sans-serif;text-shadow:0 0 18px #ff4f9a;box-shadow:0 0 45px #ff4f9a20}
+.social-section{margin-top:24px;padding:clamp(16px,3vw,24px);border:1px solid #ffffff1d;border-radius:16px;background:linear-gradient(145deg,#1b1728,#0c101b)}
+.social-section-head h2{color:#fff;font:900 clamp(25px,3vw,34px) 'Barlow Condensed',Impact,sans-serif}
+.social-provider-card,.social-composer,.social-post-card{border:1px solid #ffffff20!important;border-radius:13px!important;background:linear-gradient(145deg,#20182d,#0d101b)!important}
+.social-provider-card{padding:16px!important}
+.social-composer{padding:clamp(16px,3vw,24px)!important}
+.social-form-grid{gap:14px}
+.social-provider-card button,.social-composer button,.social-post-card button{border-radius:8px}
+.cr-page,.nr-page,.vh-lib2-page{max-width:1500px;margin:0 auto}
+.cr-hero,.nr-hero{position:relative;isolation:isolate;min-height:300px;border:1px solid #ffffff22;border-radius:20px;background-color:#11101d}
+.cr-hero:after,.nr-hero:after{content:"VICE CITY / 2026";position:absolute;right:20px;bottom:12px;color:#ffffff18;font:900 clamp(30px,6vw,76px)/1 'Barlow Condensed',Impact,sans-serif;letter-spacing:.1em;z-index:-1}
+.cr-hero-copy,.nr-hero-content{max-width:760px;padding:clamp(22px,4vw,42px)}
+.cr-kicker,.nr-kicker{color:#75e4e2;font-size:9px;font-weight:900;letter-spacing:.2em}
+.cr-hero h1,.nr-hero h1{color:#fff;font:900 clamp(40px,6vw,70px)/.9 'Barlow Condensed',Impact,sans-serif}
+.cr-hero h1 em,.nr-hero h1 em{color:#ff75b2;font-style:normal}
+.cr-directory,.nr-feed{margin-top:24px}
+.cr-directory-heading,.nr-feed-heading{display:flex;justify-content:space-between;align-items:end;gap:14px;flex-wrap:wrap}
+.cr-toolbar,.nr-controls{display:flex;gap:10px;flex-wrap:wrap}
+.cr-search,.nr-search{min-width:min(320px,100%);border:1px solid #ffffff25!important;border-radius:9px!important;background:#0a0d17!important;color:#fff!important}
+.cr-grid{gap:14px}
+.cr-card{border:1px solid #ffffff20!important;border-radius:15px!important;background:linear-gradient(145deg,#21172f,#0d101b)!important;overflow:hidden;transition:transform .2s,border-color .2s}
+.cr-card:hover{transform:translateY(-3px);border-color:#70e4e2aa!important}
+.cr-card-cover{min-height:130px}
+.cr-card-body{padding:16px}
+.cr-card-body h3{color:#fff;font:900 22px 'Barlow Condensed',Impact,sans-serif}
+.cr-card-bio,.cr-card-location{color:#bcb4c8}
+.cr-bottom-cta{margin-top:28px;border:1px solid #ffffff22;border-radius:18px;background:linear-gradient(120deg,#24162d,#10101d)}
+.nr-trust-strip{border-color:#ffffff1e}
+.nr-featured,.nr-story-card{border:1px solid #ffffff20!important;border-radius:15px!important;background:linear-gradient(145deg,#20172c,#0d101b)!important;overflow:hidden}
+.nr-featured-copy{padding:clamp(16px,3vw,26px)}
+.nr-featured-copy h2,.nr-story-card h2,.nr-story-card h3{color:#fff;font:900 clamp(20px,2.5vw,30px)/1 'Barlow Condensed',Impact,sans-serif}
+.nr-story-grid{gap:14px}
+.nr-story-card{transition:transform .2s,border-color .2s}
+.nr-story-card:hover{transform:translateY(-3px);border-color:#6be3e1aa!important}
+.nr-story-image img,.nr-featured-image img,.nr-article-cover img{display:block;width:100%;height:100%;object-fit:cover}
+.nr-editorial-note{margin-top:24px;padding:18px;border:1px solid #70dedd35;background:linear-gradient(110deg,#12242b,#161322)}
+.vh-lib2-hero{border:1px solid #ffffff22;border-radius:20px;overflow:hidden}
+.vh-lib2-catalog{margin-top:22px;padding:clamp(14px,2.5vw,22px);border:1px solid #ffffff1c;border-radius:18px;background:linear-gradient(145deg,#1b1728,#0c101b)}
+.vh-lib2-filter-panel{border:1px solid #ffffff20!important;border-radius:13px!important;background:#0b0e18!important}
+.vh-lib2-grid{gap:14px}
+.vh-lib2-card{border:1px solid #ffffff20!important;border-radius:14px!important;background:linear-gradient(145deg,#20172d,#0d101b)!important;overflow:hidden;transition:transform .2s,border-color .2s}
+.vh-lib2-card:hover{transform:translateY(-3px);border-color:#71e2e0aa!important}
+.vh-lib2-poster img{display:block;width:100%;height:100%;object-fit:cover}
+.vh-lib2-card-info{padding:14px}
+.vh-lib2-card-info h3{color:#fff;font:900 20px 'Barlow Condensed',Impact,sans-serif}
+.vh-lib2-card-meta{color:#aaa1b7}
+.vh-lib2-card-actions button,.vh-lib2-modal-actions button{border-radius:8px}
+@media(max-width:760px){.social-hero,.cr-directory-heading,.nr-feed-heading{align-items:flex-start;flex-direction:column}.social-hero-stamp{width:72px;height:72px;font-size:34px}.social-hero-actions{flex-wrap:wrap}.cr-hero,.nr-hero{min-height:240px}.cr-grid,.nr-story-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.cr-grid,.nr-story-grid{grid-template-columns:1fr}.social-hero{padding:20px 16px}.social-hero-stamp{display:none}.cr-hero-copy,.nr-hero-content{padding:20px 16px}.vh-lib2-catalog{padding:12px}}
