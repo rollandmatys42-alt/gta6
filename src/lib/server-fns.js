@@ -121,87 +121,108 @@ export const getVideoPreviewUrl = createServerFn({ method: "GET" })
     return { previewUrl, expiresInSeconds: 180, watermarkApplied: true };
   });
 
+export const getFreeSamplePack = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  const db=context.getBase44().asServiceRole.entities,user=context.user;
+  const claims=await db.FreeSamplePackClaim.filter({user_id:user.id},"-created_date",1,0);
+  const claim=claims[0];
+  const ids=claim?.video_ids||[];
+  const rows=claim
+    ? await Promise.all(ids.map(id=>db.Video.get(id).catch(()=>null)))
+    : await db.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"published_at",3,0);
+  const videos=rows.filter(v=>v&&v.status==="published"&&v.license_status==="verified").map(v=>({
+    id:v.id,title:v.title,description:v.description||"",category:v.category,language:v.language||"en",
+    thumbnail_url:v.thumbnail_url||"",duration_seconds:v.duration_seconds||0,creator_name:v.creator_name||"VICEHUB"
+  }));
+  const downloaded=claim?.downloaded_video_ids||[];
+  return {packReady:videos.length===3,claimed:!!claim,videoCount:videos.length,videos,downloadedVideoIds:downloaded,downloadsRemaining:Math.max(0,3-downloaded.length)};
+});
+
 export const requestVideoDownload = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({ videoId: z.string().min(1).max(128) }))
   .handler(async ({ data, context }) => {
     const base44 = context.getBase44();
+    const db = base44.asServiceRole.entities;
     const user = context.user;
-    const video = await base44.asServiceRole.entities.Video.get(data.videoId).catch(() => null);
+    const video = await db.Video.get(data.videoId).catch(() => null);
     if (!video || video.status !== "published" || video.license_status !== "verified") {
       throw Object.assign(new Error("This video is not available for download."), { status: 404, code: "VIDEO_NOT_AVAILABLE" });
     }
 
-    const subscriptions = await base44.asServiceRole.entities.UserSubscription.filter(
-      { user_id: user.id }, "-created_date", 1, 0,
-    );
+    const subscriptions = await db.UserSubscription.filter({ user_id: user.id }, "-created_date", 1, 0);
     const subscription = subscriptions[0];
     let tier = subscription?.tier_code || "free";
     if (tier !== "free" && subscription?.status !== "active" && !(subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date())) tier = "free";
-    let limit = MONTHLY_FREE_LIMIT;
-    let cleanDownloads = false;
-    if (tier !== "free") {
-      const plans = await base44.asServiceRole.entities.SubscriptionPlan.filter(
-        { tier_code: tier, currency: subscription?.currency || "USD", status: "active" }, "-created_date", 1, 0,
+
+    if (tier === "free") {
+      let claims = await db.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
+      let claim = claims[0];
+      if (!claim) {
+        const pack = await db.Video.filter({ is_free_sample: true, status: "published", license_status: "verified" }, "published_at", 4, 0);
+        if (pack.length !== 3) throw Object.assign(new Error("The three-video free trial pack is being prepared. Please check back soon."), { status: 409, code: "FREE_SAMPLE_PACK_NOT_READY" });
+        try {
+          claim = await db.FreeSamplePackClaim.create({ user_id: user.id, video_ids: pack.map(v=>v.id), downloaded_video_ids: [], claimed_at: new Date().toISOString() });
+        } catch {
+          claims = await db.FreeSamplePackClaim.filter({ user_id: user.id }, "-created_date", 1, 0);
+          claim = claims[0];
+          if (!claim) throw new Error("Your free sample pack could not be reserved. Please retry.");
+        }
+      }
+      if (!(claim.video_ids||[]).includes(video.id)) throw Object.assign(new Error("Free accounts can download only the three videos in the fixed VICEHUB sample pack. Upgrade for the full catalogue."), { status: 403, code: "FREE_SAMPLE_ONLY" });
+      const reserved = await db.FreeSamplePackClaim.updateMany(
+        { id: claim.id, downloaded_video_ids: { $nin: [video.id] } },
+        { $addToSet: { downloaded_video_ids: video.id }, $set: { last_download_at: new Date().toISOString() } },
       );
-      const plan = plans[0];
-      if (!plan) throw Object.assign(new Error("This subscription plan is not configured yet."), { status: 403, code: "PLAN_NOT_CONFIGURED" });
-      limit = Number(plan.monthly_download_limit || 0);
-      cleanDownloads = !!plan.clean_downloads;
+      if (!reserved?.updated) throw Object.assign(new Error("This sample video has already been downloaded from your account. The three free videos are available once per account."), { status: 409, code: "FREE_SAMPLE_ALREADY_DOWNLOADED" });
+      try {
+        if (!video.watermarked_storage_key) throw Object.assign(new Error("The watermarked sample video is not ready yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
+        const downloadUrl = await presignR2({ method: "GET", objectKey: video.watermarked_storage_key, expiresIn: DOWNLOAD_URL_TTL });
+        await db.DownloadEvent.create({
+          user_id: user.id, video_id: video.id, month_key: new Date().toISOString().slice(0,7),
+          tier_code: "free", watermark_applied: true, status: "signed",
+          delivery_expires_at: new Date(Date.now() + DOWNLOAD_URL_TTL * 1000).toISOString(),
+        });
+        const current = await db.FreeSamplePackClaim.get(claim.id);
+        return { downloadUrl, expiresInSeconds: DOWNLOAD_URL_TTL, watermarkApplied: true, freeSample: true, downloadsLimit: 3, downloadsUsed: (current.downloaded_video_ids||[]).length, downloadsRemaining: Math.max(0,3-(current.downloaded_video_ids||[]).length) };
+      } catch (error) {
+        await db.FreeSamplePackClaim.updateMany({ id: claim.id }, { $pull: { downloaded_video_ids: video.id } }).catch(()=>null);
+        throw error;
+      }
     }
+
+    let limit = 0;
+    let cleanDownloads = false;
+    const plans = await db.SubscriptionPlan.filter(
+      { tier_code: tier, currency: subscription?.currency || "GBP", status: "active" }, "-created_date", 1, 0,
+    );
+    const plan = plans[0];
+    if (!plan) throw Object.assign(new Error("This subscription plan is not configured yet."), { status: 403, code: "PLAN_NOT_CONFIGURED" });
+    limit = Number(plan.monthly_download_limit || 0);
+    cleanDownloads = !!plan.clean_downloads;
     if (!Number.isInteger(limit) || limit < 1) {
       throw Object.assign(new Error("Your plan does not currently include video downloads."), { status: 403, code: "DOWNLOADS_NOT_INCLUDED" });
     }
 
-    const watermarkApplied = tier === "free" || !cleanDownloads;
+    const watermarkApplied = !cleanDownloads;
     const objectKey = watermarkApplied ? video.watermarked_storage_key : video.storage_key;
-    if (!objectKey) {
-      throw Object.assign(new Error(watermarkApplied
-        ? "The watermarked video version has not been prepared yet."
-        : "The clean video version is not available yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
-    }
+    if (!objectKey) throw Object.assign(new Error(watermarkApplied ? "The watermarked video version has not been prepared yet." : "The clean video version is not available yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
     const downloadUrl = await presignR2({ method: "GET", objectKey, expiresIn: DOWNLOAD_URL_TTL });
-
-    const now = new Date();
-    const monthKey = now.toISOString().slice(0, 7);
-    let quotas = await base44.asServiceRole.entities.DownloadQuota.filter(
-      { user_id: user.id, month_key: monthKey }, "-created_date", 2, 0,
-    );
+    const now = new Date(), monthKey = now.toISOString().slice(0, 7);
+    let quotas = await db.DownloadQuota.filter({ user_id: user.id, month_key: monthKey }, "-created_date", 2, 0);
     let quota = quotas[0];
-    if (!quota) {
-      quota = await base44.asServiceRole.entities.DownloadQuota.create({
-        user_id: user.id, month_key: monthKey, downloads_used: 0,
-        downloads_limit: limit, tier_code: tier,
-      });
-    }
-    // Atomic conditional increment protects the established monthly quota row.
-    const reservation = await base44.asServiceRole.entities.DownloadQuota.updateMany(
+    if (!quota) quota = await db.DownloadQuota.create({ user_id: user.id, month_key: monthKey, downloads_used: 0, downloads_limit: limit, tier_code: tier });
+    const reservation = await db.DownloadQuota.updateMany(
       { id: quota.id, downloads_used: { $lt: limit } },
       { $inc: { downloads_used: 1 }, $set: { downloads_limit: limit, tier_code: tier, last_download_at: now.toISOString() } },
     );
-    if (!reservation?.updated) {
-      throw Object.assign(new Error("You have reached your monthly download allowance."), { status: 429, code: "MONTHLY_DOWNLOAD_LIMIT_REACHED", limit });
-    }
+    if (!reservation?.updated) throw Object.assign(new Error("You have reached your monthly download allowance."), { status: 429, code: "MONTHLY_DOWNLOAD_LIMIT_REACHED", limit });
     try {
-      await base44.asServiceRole.entities.DownloadEvent.create({
-        user_id: user.id, video_id: video.id, month_key: monthKey, tier_code: tier,
-        watermark_applied: watermarkApplied, status: "signed",
-        delivery_expires_at: new Date(now.getTime() + DOWNLOAD_URL_TTL * 1000).toISOString(),
-      });
+      await db.DownloadEvent.create({ user_id: user.id, video_id: video.id, month_key: monthKey, tier_code: tier, watermark_applied: watermarkApplied, status: "signed", delivery_expires_at: new Date(now.getTime() + DOWNLOAD_URL_TTL * 1000).toISOString() });
     } catch (error) {
-      await base44.asServiceRole.entities.DownloadQuota.updateMany(
-        { id: quota.id }, { $inc: { downloads_used: -1 } },
-      );
+      await db.DownloadQuota.updateMany({ id: quota.id }, { $inc: { downloads_used: -1 } });
       throw error;
     }
-    return {
-      downloadUrl,
-      expiresInSeconds: DOWNLOAD_URL_TTL,
-      watermarkApplied,
-      downloadsLimit: limit,
-      downloadsUsed: Number(quota.downloads_used || 0) + 1,
-      downloadsRemaining: Math.max(0, limit - Number(quota.downloads_used || 0) - 1),
-    };
+    return { downloadUrl, expiresInSeconds: DOWNLOAD_URL_TTL, watermarkApplied, downloadsLimit: limit, downloadsUsed: Number(quota.downloads_used || 0) + 1, downloadsRemaining: Math.max(0, limit - Number(quota.downloads_used || 0) - 1) };
   });
 
 export const createVideoUploadUrl = createServerFn({ method: "POST" })
