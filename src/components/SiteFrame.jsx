@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import "@/styles/fan-theme.css";
 import "@/styles/fan-pages.css";
+import "@/styles/vicehub-cinematic-pages.css";
 import "@/styles/fan-admin.css";
 import "@/styles/fan-admin-fix.css";
 import "@/styles/fan-home.css";
