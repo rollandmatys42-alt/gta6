@@ -84,3 +84,73 @@
 .vh-social-connect-intro p{color:#b4a9c0;font-size:12px;line-height:1.7}
 @media(max-width:800px){.vh-social-platform-grid{grid-template-columns:1fr}.vh-social-platform-card{min-height:230px}}
 @media(max-width:560px){.vh-social-connect-only .social-hero{min-height:0!important;padding:24px 18px!important}.vh-social-connect-only .social-hero-stamp{display:none!important}.vh-social-connect-heading{align-items:flex-start;flex-direction:column}.vh-social-linked-account{flex-wrap:wrap}.vh-social-linked-status{margin-left:auto}.vh-social-linked-account button{margin-left:auto}}
+
+
+/* FIX — Social connector cards must use the full workspace width.
+   The legacy global .social-shell two-column layout was squeezing this page. */
+.vh-social-connect-only{
+  display:block!important;
+  width:100%!important;
+  max-width:1320px!important;
+  min-width:0!important;
+  margin:0 auto!important;
+  padding:8px 0 64px!important;
+  box-sizing:border-box!important;
+}
+.vh-social-connect-only > *{min-width:0!important;max-width:100%!important}
+.vh-social-connect-only .social-hero{width:100%!important;box-sizing:border-box!important}
+.vh-social-connect-only .vh-social-connect-section,
+.vh-social-connect-only .vh-social-linked-section{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+}
+.vh-social-connect-only .vh-social-platform-grid{
+  display:grid!important;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))!important;
+  align-items:stretch!important;
+  gap:18px!important;
+  width:100%!important;
+  min-width:0!important;
+}
+.vh-social-connect-only .vh-social-platform-card{
+  display:flex!important;
+  flex-direction:column!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:265px!important;
+  box-sizing:border-box!important;
+  padding:24px!important;
+}
+.vh-social-connect-only .vh-social-platform-card h3{
+  font-size:clamp(28px,2.2vw,36px)!important;
+  line-height:1.05!important;
+}
+.vh-social-connect-only .vh-social-platform-card p{
+  min-height:0!important;
+  font-size:12px!important;
+  line-height:1.65!important;
+  overflow-wrap:anywhere!important;
+}
+.vh-social-connect-only .vh-social-platform-bottom{
+  width:100%!important;
+  min-width:0!important;
+}
+.vh-social-connect-only .vh-social-platform-bottom button{
+  width:100%!important;
+  min-width:0!important;
+  min-height:46px!important;
+  white-space:normal!important;
+  line-height:1.35!important;
+  overflow-wrap:anywhere!important;
+}
+.vh-social-connect-only .vh-social-linked-account{
+  min-width:0!important;
+  box-sizing:border-box!important;
+}
+@media(max-width:720px){
+  .vh-social-connect-only{padding:4px 0 48px!important}
+  .vh-social-connect-only .vh-social-platform-grid{grid-template-columns:minmax(0,1fr)!important}
+  .vh-social-connect-only .vh-social-platform-card{min-height:0!important;padding:20px!important}
+}
