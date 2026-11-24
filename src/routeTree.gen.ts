@@ -42,7 +42,7 @@ const CreatorsRoute = CreatorsRouteImport.update({ id: "/creators", path: "/crea
 const MarketplaceRoute = MarketplaceRouteImport.update({ id: "/marketplace", path: "/marketplace", getParentRoute: () => rootRouteImport });
 const MessagesRoute = MessagesRouteImport.update({ id: "/messages", path: "/messages", getParentRoute: () => rootRouteImport });
 const NewsRoute = NewsRouteImport.update({ id: "/news", path: "/news", getParentRoute: () => rootRouteImport });
-const NewsArticleRoute = NewsArticleRouteImport.update({ id: "/news/$slug", path: "/news/$slug", getParentRoute: () => rootRouteImport });
+const NewsArticleRoute = NewsArticleRouteImport.update({ id: "/$slug", path: "/$slug", getParentRoute: () => NewsRoute });
 const NewsSitemapRoute = NewsSitemapRouteImport.update({ id: "/news-sitemap.xml", path: "/news-sitemap.xml", getParentRoute: () => rootRouteImport });
 const GrowthCronRoute = GrowthCronRouteImport.update({ id: "/api/agents/growth/cron", path: "/api/agents/growth/cron", getParentRoute: () => rootRouteImport });
 const NotificationsRoute = NotificationsRouteImport.update({ id: "/notifications", path: "/notifications", getParentRoute: () => rootRouteImport });
@@ -54,6 +54,7 @@ const SocialRoute = SocialRouteImport.update({ id: "/social", path: "/social", g
 const StudioRoute = StudioRouteImport.update({ id: "/studio", path: "/studio", getParentRoute: () => rootRouteImport });
 const TermsRoute = TermsRouteImport.update({ id: "/terms", path: "/terms", getParentRoute: () => rootRouteImport });
 
+const NewsRouteWithChildren = NewsRoute._addFileChildren({ NewsArticleRoute });
 const AuthedRouteWithChildren = AuthedRoute._addFileChildren({
   AuthedDashboardRoute,
   AuthedAdminVideosRoute,
@@ -71,8 +72,7 @@ const rootRouteChildren = {
   CreatorsRoute,
   MarketplaceRoute,
   MessagesRoute,
-  NewsRoute,
-  NewsArticleRoute,
+  NewsRoute: NewsRouteWithChildren,
   NewsSitemapRoute,
   GrowthCronRoute,
   NotificationsRoute,
