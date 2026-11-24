@@ -550,7 +550,7 @@ export const saveShopProduct = createServerFn({method:"POST"}).middleware([requi
   return data.id?db.update(data.id,p):db.create(p);
  });
 export const getShopPaymentReadiness = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
- requireAdmin(context);return {stripeConfigured:!!secrets.get("STRIPE_SECRET_KEY")};
+ requireAdmin(context);return {stripeConfigured:!!secrets.get("STRIPE_SECRET_KEY"),webhookConfigured:!!secrets.get("STRIPE_WEBHOOK_SECRET")};
 });
 export const getMyShopOrders = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  return context.getBase44().asServiceRole.entities.ShopOrder.filter({user_id:context.user.id},"-created_date",30,0);
@@ -624,7 +624,7 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
    form.set("metadata[order_id]",order.id);form.set("metadata[user_id]",user.id);
    form.set("payment_intent_data[metadata][order_id]",order.id);form.set("payment_intent_data[metadata][user_id]",user.id);
    form.set("billing_address_collection","required");form.set("phone_number_collection[enabled]","true");
-   if(cart.some(x=>x.product.product_type==="physical"&&x.product.shipping_required)){
+   if(cart.some(x=>x.product.product_type==="physical")){
     ["GB","US","CA","FR","DE","ES","IT","PT","BE","LU","NL","IE"].forEach((country,i)=>form.set("shipping_address_collection[allowed_countries]["+i+"]",country));
    }
    let index=0;
