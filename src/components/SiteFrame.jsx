@@ -51,7 +51,7 @@ function NotificationBell({isAuthenticated}) {
       newestId.current=newest?.id || "__none__";
     }).catch(()=>{});
     load();
-    const timer=window.setInterval(load,60000);
+    const timer=window.setInterval(load,30000);
     const onFocus=()=>load();
     window.addEventListener("focus",onFocus);
     return()=>{active=false;window.clearInterval(timer);window.removeEventListener("focus",onFocus);};
