@@ -12,6 +12,7 @@ import "@/styles/vicehub-page-refresh.css";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
 import { getMyNotifications, getPushNotificationConfig, savePushSubscription } from "@/lib/server-fns";
+import "@/styles/vicehub-2026-redesign.css";
 
 const links = [["/", "nav.home"], ["/library", "nav.library"], ["/news", "nav.news"], ["/creators", "nav.creators"]];
 const workspaceLinks = [
