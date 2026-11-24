@@ -269,3 +269,18 @@
  .vh-admin-pricing .fan-actions{display:grid;grid-template-columns:minmax(0,1fr)}
  .vh-admin-pricing .fan-actions button{width:100%;min-height:44px}
 }
+
+/* Subscriber CRM — convert the desktop grid into readable mobile records */
+@media(max-width:760px){
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table{min-width:0;width:100%}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table,
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table tbody{display:block;width:100%}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 12px;padding:10px;border:1px solid var(--vc-line);border-radius:14px;background:rgba(255,255,255,.025)}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td{display:flex;flex-direction:column;gap:4px;min-width:0;padding:9px;border:0;overflow-wrap:anywhere}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td:first-child,
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td:last-child{grid-column:1/-1}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td::before{content:attr(data-label);color:var(--vc-cyan);font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td:first-child::before{content:"CLIENT PROFILE"}
+ .admin-console[data-admin-tab="Subscribers"] .admin-crm-table td:last-child .admin-crm-open{width:100%;min-height:44px;text-align:center;border:1px solid var(--vc-line);border-radius:10px;background:rgba(0,220,255,.07)}
+}
