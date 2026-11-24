@@ -545,10 +545,10 @@ export const saveShopProduct = createServerFn({method:"POST"}).middleware([requi
   const p={
    title:data.title,description:data.description,product_type:data.productType,price_cents:data.priceCents,currency:data.currency,
    stock_quantity:data.stockQuantity||0,status:data.status,sku:data.sku||"",category:data.category,vendor_type:data.vendorType,
-   rights_status:data.rightsStatus,rights_evidence_url:data.rightsEvidenceUrl||"",rights_note:data.rightsNote||"",external_url:data.externalUrl||"",shipping_required:data.productType==="physical"&&data.shippingRequired,
+   rights_status:data.rightsStatus,rights_note:data.rightsNote||"",shipping_required:data.productType==="physical"&&data.shippingRequired,
    shipping_price_cents:data.productType==="physical"&&data.shippingRequired?data.shippingPriceCents:0,
    size_options:data.sizeOptions,color_options:data.colorOptions,is_featured:data.isFeatured,
-   ...(data.imageUrl?{image_url:data.imageUrl}:{})
+   ...(data.imageUrl?{image_url:data.imageUrl}:{}),...(data.externalUrl?{external_url:data.externalUrl}:{}),...(data.rightsEvidenceUrl?{rights_evidence_url:data.rightsEvidenceUrl}:{})
   };
   return data.id?db.update(data.id,p):db.create(p);
  });
@@ -593,7 +593,7 @@ export const updateShopOrder = createServerFn({method:"POST"}).middleware([requi
   if(["paid","paid_stock_issue","refund_pending","refunded"].includes(data.status))throw Object.assign(new Error("Payment and refund states are controlled by Stripe confirmation and the secure refund action."),{status:409,code:"PAYMENT_STATE_LOCKED"});
   if(["processing","shipped","delivered","refunded"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("This order cannot move to fulfilment until Stripe confirms payment."),{status:409,code:"ORDER_NOT_PAID"});
   if(data.status==="cancelled"&&["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("A paid order must be refunded in Stripe before it can be cancelled."),{status:409,code:"REFUND_REQUIRED"});
-  return db.update(order.id,{status:data.status,tracking_number:data.trackingNumber||"",tracking_url:data.trackingUrl||"",admin_note:data.adminNote||"",updated_by:context.user.id});
+  const patch={status:data.status,tracking_number:data.trackingNumber||"",admin_note:data.adminNote||"",updated_by:context.user.id};if(data.trackingUrl)patch.tracking_url=data.trackingUrl;return db.update(order.id,patch);
  });
 export const createShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10),size:z.string().max(40).optional(),color:z.string().max(40).optional()})).min(1).max(20)}))
