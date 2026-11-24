@@ -124,7 +124,7 @@ function VideoLibraryPage() {
   const languageLabel = value => value === "All" ? t.all : ({en:"English",fr:"Français",es:"Español",pt:"Português",it:"Italiano",de:"Deutsch"}[value] || value);
   const formatDuration = seconds => seconds ? Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0") : "VIDEO";
 
-  return <SiteFrame eyebrow="WELCOME TO VICE CITY">
+  return <SiteFrame eyebrow="VICEHUB / VIDEO LIBRARY" workspace={isAuthenticated} activeKey="library">
     <div className="vh-lib2-page">
       <div className="vh-lib2-ticker"><span>VICEHUB / THE DROP ZONE</span><b>GTA VI CREATOR LIBRARY</b><span>CURATED FOOTAGE · CINEMATICS · GAMEPLAY · SHORTS</span></div>
       <section className="vh-lib2-hero">
