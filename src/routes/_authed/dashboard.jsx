@@ -4,7 +4,6 @@ import SiteFrame from "@/components/SiteFrame";
 import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed } from "@/lib/server-fns";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
-import { formatMoney } from "@/lib/loyalty";
 import "@/styles/client-dashboard.css";
 
 export const Route = createFileRoute("/_authed/dashboard")({
@@ -15,7 +14,6 @@ export const Route = createFileRoute("/_authed/dashboard")({
 
 const localeMap = { en: "en-GB", fr: "fr-FR", es: "es-ES", pt: "pt-PT", it: "it-IT", de: "de-DE" };
 const dateLabel = (value, locale) => value ? new Date(value).toLocaleDateString(localeMap[locale] || "en-GB", { day: "numeric", month: "short" }) : "LATEST";
-const money = (cents, currency) => formatMoney(Number(cents || 0), currency || "USD");
 
 function DashboardPage() {
   const { user } = Route.useRouteContext();
@@ -27,7 +25,6 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyVideo, setBusyVideo] = useState("");
-  const [notice, setNotice] = useState("");
 
   const refresh = async () => {
     setLoading(true);
@@ -88,7 +85,6 @@ function DashboardPage() {
       </section>
 
       {error && <div className="member-alert" role="alert">{error}</div>}
-      {notice && <div className="member-notice" role="status">{notice}</div>}
 
       <section className="member-overview">
         <article className="member-plan-card">
