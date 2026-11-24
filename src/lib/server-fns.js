@@ -1000,7 +1000,7 @@ export const createContentReport = createServerFn({method:"POST"}).middleware([r
  .handler(async({data,context})=>context.getBase44().asServiceRole.entities.ContentReport.create({reporter_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reason:data.reason,details:data.details||"",status:"open"}));
 
 export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object({currency:z.enum(["USD","EUR","GBP"]).default("USD")})).handler(async({data,context})=>{
- const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",20,0);
+ const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({tier_code:"pro",status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",1,0);
  return rows;
 });
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
@@ -1039,12 +1039,12 @@ export const getMyPlanQuote = createServerFn({method:"GET"}).middleware([require
 
 
 const STRIPE_SITE_URL = "https://gta6-creator-hub-c26cc578.base44.app";
-async function stripeApi(path, method = "GET", body = null) {
+async function stripeApi(path, method = "GET", body = null, idempotencyKey = "") {
   const key = secrets.get("STRIPE_SECRET_KEY");
   if (!key) throw Object.assign(new Error("Stripe billing is not configured yet. Add STRIPE_SECRET_KEY in the secure app secrets before opening paid memberships."), { status: 503, code: "STRIPE_NOT_CONFIGURED" });
   const response = await fetch("https://api.stripe.com/v1/" + path, {
     method,
-    headers: { Authorization: "Bearer " + key, ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    headers: { Authorization: "Bearer " + key, ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}), ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
     ...(body ? { body: body.toString() } : {}),
   });
   const payload = await response.json().catch(() => ({}));
@@ -1060,19 +1060,40 @@ function stripeLocalStatus(status) {
 }
 
 export const createStripeCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
-  .validator(z.object({tierCode:z.enum(["starter","pro","premium"]),currency:z.enum(["USD","EUR","GBP"])}))
+  .validator(z.object({tierCode:z.literal("pro"),currency:z.enum(["USD","EUR","GBP"]),referralCode:z.string().regex(/^[A-Z0-9]{6,12}$/).optional()}))
   .handler(async({data,context})=>{
     const db=context.getBase44().asServiceRole.entities;
     const user=context.user;
-    const plans=await db.SubscriptionPlan.filter({tier_code:data.tierCode,currency:data.currency,status:"active"},"-created_date",1,0);
+    const plans=await db.SubscriptionPlan.filter({tier_code:"pro",currency:data.currency,status:"active"},"-created_date",1,0);
     const plan=plans[0];
     if(!plan||Number(plan.monthly_price_cents||0)<=0||Number(plan.monthly_download_limit||0)<1)throw Object.assign(new Error("This membership is not yet open for sale. The administrator must configure a positive monthly price and download allowance first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
     if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
-    // The first ladder step is the actual Stripe checkout amount. Legacy percentage discounts are not mixed with the explicit ladder.
-    const priceCents=priceForMonth(plan,1);
-    const discount=0;
+    // Single paid membership: no new subscriptions use the legacy degressive ladder.
+    const priceCents=Number(plan.monthly_price_cents || 0);
+    let referrerUserId = "";
+    let referralCouponId = "";
+    if (data.referralCode && !existing) {
+      const profiles = await db.ReferralProfile.filter({ referral_code: data.referralCode }, "-created_date", 1, 0);
+      const profile = profiles[0];
+      const priorReferral = await db.ReferralCredit.filter({ referred_user_id: user.id }, "-created_date", 1, 0);
+      if (profile && profile.user_id !== user.id && !priorReferral.length) {
+        referrerUserId = profile.user_id;
+        referralCouponId = "VICEHUB_REFERRAL_5_FIRST_INVOICE";
+        try { await stripeApi("coupons/" + referralCouponId); }
+        catch {
+          const coupon = new URLSearchParams();
+          coupon.set("id", referralCouponId); coupon.set("name", "VICEHUB referral — 5% first invoice");
+          coupon.set("percent_off", "5"); coupon.set("duration", "once");
+          try { await stripeApi("coupons", "POST", coupon); }
+          catch { await stripeApi("coupons/" + referralCouponId); }
+        }
+      } else if (!profile) {
+        throw Object.assign(new Error("This referral link is not valid."), { status: 400, code: "INVALID_REFERRAL_CODE" });
+      }
+    }
+    const discount=referrerUserId ? 5 : 0;
     if(priceCents<=0)throw Object.assign(new Error("The calculated membership price is invalid. Check the administrator pricing settings."),{status:409,code:"INVALID_PLAN_PRICE"});
     let stripeProductId=plan.stripe_product_id;
     if(!stripeProductId){
@@ -1105,6 +1126,7 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     form.set("metadata[currency]",data.currency);
     form.set("metadata[monthly_price_cents]",String(priceCents));
     form.set("metadata[discount_percent]",String(discount));
+    if (referrerUserId) { form.set("metadata[referrer_user_id]", referrerUserId); form.set("metadata[referral_code]", data.referralCode); form.set("subscription_data[metadata][referrer_user_id]", referrerUserId); form.set("subscription_data[metadata][referral_code]", data.referralCode); form.set("discounts[0][coupon]", referralCouponId); }
     form.set("subscription_data[metadata][user_id]",user.id);
     form.set("subscription_data[metadata][tier_code]",data.tierCode);
     form.set("subscription_data[metadata][currency]",data.currency);
@@ -1142,8 +1164,97 @@ export const confirmStripeCheckoutSession = createServerFn({method:"POST"}).midd
     const rows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const payload={user_id:user.id,tier_code:tierCode,status,currency,started_at:startedAt,streak_months:0,loyalty_discount_percent:Number(session.metadata?.discount_percent||0),current_monthly_price_cents:priceCents,stripe_customer_id:customerId,stripe_subscription_id:stripeSubscription.id,voluntary_cancelled:false};
     if(rows[0])await db.UserSubscription.update(rows[0].id,payload);else await db.UserSubscription.create(payload);
-    return {success:true,tierCode,status,currency,priceCents,startedAt};
+    let referralCreditCreated = false;
+    const referrerUserId = String(session.metadata?.referrer_user_id || "");
+    if (referrerUserId && referrerUserId !== user.id) {
+      const existingCredit = await db.ReferralCredit.filter({ referred_user_id: user.id }, "-created_date", 1, 0);
+      if (!existingCredit.length) {
+        const paidCents = Math.max(0, Number(session.amount_total || 0) - Number(session.total_details?.amount_tax || 0));
+        const commissionCents = Math.floor(paidCents * 0.20);
+        if (commissionCents > 0) {
+          await db.ReferralCredit.create({
+            referrer_user_id: referrerUserId, referred_user_id: user.id,
+            stripe_session_id: session.id, stripe_subscription_id: stripeSubscription.id,
+            currency, amount_cents: commissionCents, available_cents: commissionCents,
+            redeemed_cents: 0, commission_rate_percent: 20, referral_discount_percent: 5,
+            status: "pending", available_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+          });
+          referralCreditCreated = true;
+        }
+      }
+    }
+    return {success:true,tierCode,status,currency,priceCents,startedAt,referralCreditCreated};
   });
+
+export const getMyReferralDashboard = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+  const db=context.getBase44().asServiceRole.entities, user=context.user;
+  let profiles=await db.ReferralProfile.filter({user_id:user.id},"-created_date",1,0);
+  let profile=profiles[0];
+  if(!profile){
+    let code="";
+    for(let attempt=0;attempt<5;attempt++){
+      code=crypto.randomUUID().replace(/-/g,"").slice(0,10).toUpperCase();
+      const collision=await db.ReferralProfile.filter({referral_code:code},"-created_date",1,0);
+      if(!collision.length)break;
+      code="";
+    }
+    if(!code)throw new Error("Could not create a unique referral code. Retry shortly.");
+    profile=await db.ReferralProfile.create({user_id:user.id,referral_code:code,status:"active"});
+  }
+  const credits=await db.ReferralCredit.filter({referrer_user_id:user.id},"-created_date",1000,0);
+  const now=Date.now();let availableCents=0,earnedCents=0,referralCount=0;
+  for(const credit of credits){
+    if(credit.status==="reversed")continue;
+    referralCount++;
+    earnedCents+=Number(credit.amount_cents||0);
+    if(credit.status==="pending"&&credit.available_at&&new Date(credit.available_at).getTime()<=now){
+      await db.ReferralCredit.update(credit.id,{status:"available"});
+      credit.status="available";
+    }
+    if(["available","pending"].includes(credit.status)&&(!credit.available_at||new Date(credit.available_at).getTime()<=now))availableCents+=Number(credit.available_cents??credit.amount_cents??0);
+  }
+  const subs=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0), sub=subs[0];
+  const isSubscribed=!!sub&&sub.status==="active"&&!sub.voluntary_cancelled&&!!sub.stripe_customer_id;
+  return {code:profile.referral_code,referralCount,earnedCents,availableCents,currency:sub?.currency||"GBP",isSubscribed};
+});
+
+export const applyReferralWalletCredit = createServerFn({method:"POST"}).middleware([requireUser]).handler(async({context})=>{
+  const db=context.getBase44().asServiceRole.entities,user=context.user;
+  const subs=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0),sub=subs[0];
+  if(!sub||sub.status!=="active"||sub.voluntary_cancelled||!sub.stripe_customer_id)throw Object.assign(new Error("An active paid membership is required before applying referral credit."),{status:403,code:"ACTIVE_MEMBERSHIP_REQUIRED"});
+  const currency=String(sub.currency||"GBP").toUpperCase();
+  const pendingRows=await db.ReferralRedemption.filter({user_id:user.id,status:"pending"},"-created_date",1,0);
+  let redemption=pendingRows[0];
+  if(!redemption){
+    const credits=await db.ReferralCredit.filter({referrer_user_id:user.id,currency,status:{$in:["available","pending"]}},"created_date",1000,0);
+    const now=Date.now(),allocations=[];let available=0;
+    for(const credit of credits){
+      if(credit.status==="pending"&&credit.available_at&&new Date(credit.available_at).getTime()>now)continue;
+      const cents=Number(credit.available_cents??credit.amount_cents??0);
+      if(cents>0){available+=cents;allocations.push({credit_id:credit.id,amount_cents:cents,remaining_after_cents:0});}
+    }
+    const maxCredit=Math.max(0,Number(sub.current_monthly_price_cents||0));
+    const redeemCents=Math.min(available,maxCredit);
+    if(redeemCents<1)throw Object.assign(new Error("No validated referral credit is available for this invoice yet."),{status:409,code:"NO_REFERRAL_CREDIT"});
+    let remaining=redeemCents;
+    for(const allocation of allocations){const used=Math.min(allocation.amount_cents,remaining);allocation.amount_cents=used;allocation.remaining_after_cents=Number((await db.ReferralCredit.get(allocation.credit_id)).available_cents??0)-used;remaining-=used;if(remaining<=0)break;}
+    redemption=await db.ReferralRedemption.create({user_id:user.id,amount_cents:redeemCents,currency,stripe_customer_id:sub.stripe_customer_id,idempotency_key:crypto.randomUUID(),allocations:allocations.filter(x=>x.amount_cents>0),status:"pending"});
+  }
+  const form=new URLSearchParams();form.set("amount",String(-Number(redemption.amount_cents)));form.set("currency",currency.toLowerCase());form.set("description","VICEHUB referral membership credit");form.set("metadata[user_id]",user.id);form.set("metadata[referral_redemption_id]",redemption.id);
+  try{
+    const transaction=await stripeApi("customers/"+encodeURIComponent(sub.stripe_customer_id)+"/balance_transactions","POST",form,redemption.idempotency_key);
+    for(const allocation of redemption.allocations||[]){
+      const credit=await db.ReferralCredit.get(allocation.credit_id);
+      const remaining=Number(allocation.remaining_after_cents||0);
+      await db.ReferralCredit.update(credit.id,{available_cents:remaining,redeemed_cents:Number(credit.redeemed_cents||0)+Number(allocation.amount_cents||0),status:remaining>0?"available":"redeemed"});
+    }
+    await db.ReferralRedemption.update(redemption.id,{status:"applied",stripe_balance_transaction_id:transaction.id,applied_at:new Date().toISOString()});
+    return {success:true,amountCents:Number(redemption.amount_cents),currency,message:"Credit has been added to your Stripe customer balance and will reduce your next invoice. Any unused wallet balance remains available."};
+  }catch(error){
+    await db.ReferralRedemption.update(redemption.id,{last_error:String(error?.message||error).slice(0,500)}).catch(()=>null);
+    throw error;
+  }
+});
 
 export const createStripePortalSession = createServerFn({method:"POST"}).middleware([requireUser])
   .handler(async({context})=>{
