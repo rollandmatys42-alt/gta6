@@ -179,6 +179,8 @@ export const Route = createFileRoute("/api/stripe/webhook")({
               await db.ShopOrder.update(order.id, {
                 status: stockIssue ? "paid_stock_issue" : "paid",
                 paid_at: new Date().toISOString(),
+                total_cents: Number(object.amount_total || order.total_cents),
+                tax_cents: Number(object.total_details?.amount_tax || 0),
                 stripe_payment_intent_id: typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id || "",
                 customer_email: object.customer_details?.email || order.customer_email,
                 customer_name: object.shipping_details?.name || object.customer_details?.name || order.customer_name,
