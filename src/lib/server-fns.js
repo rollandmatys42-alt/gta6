@@ -175,7 +175,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
       }
       if (!(claim.video_ids||[]).includes(video.id)) throw Object.assign(new Error("Free accounts can download only the three videos in the fixed VICEHUB sample pack. Upgrade for the full catalogue."), { status: 403, code: "FREE_SAMPLE_ONLY" });
       const reserved = await db.FreeSamplePackClaim.updateMany(
-        { id: claim.id, downloaded_video_ids: { $nin: [video.id] } },
+        { id: claim.id, downloaded_video_ids: { $ne: video.id } },
         { $addToSet: { downloaded_video_ids: video.id }, $set: { last_download_at: new Date().toISOString() } },
       );
       if (!reserved?.updated) throw Object.assign(new Error("This sample video has already been downloaded from your account. The three free videos are available once per account."), { status: 409, code: "FREE_SAMPLE_ALREADY_DOWNLOADED" });
