@@ -5,3 +5,6 @@
 .vh-pwa-install-message{position:absolute;z-index:20;top:calc(100% + 8px);right:0;width:230px;padding:10px;border:1px solid #ffffff33;border-radius:8px;background:#15131d;color:#fff;font-size:10px;line-height:1.5;box-shadow:0 8px 25px #0009}
 .vh-workspace-actions .vh-pwa-install{padding:7px 8px}
 @media(max-width:760px){.vh-pwa-install{font-size:8px;padding:7px 8px}.vh-notification-bell{width:32px;height:32px}}
+
+.vh-notification-control{display:inline-flex;align-items:center;gap:5px}
+.vh-notification-enable{width:20px;height:20px;border:0;border-radius:50%;background:#75e6e4;color:#0b1016;font-size:8px;line-height:1}
