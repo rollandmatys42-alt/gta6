@@ -515,17 +515,133 @@ export const createMarketplaceInquiry = createServerFn({method:"POST"}).middlewa
  });
 
 export const getShopProducts = createServerFn({method:"GET"}).handler(async({context})=>{
- return context.getBase44().asServiceRole.entities.ShopProduct.filter({status:"published"},"-created_date",100,0);
+ const rows=await context.getBase44().asServiceRole.entities.ShopProduct.filter({status:"published"},"-is_featured -created_date",100,0);
+ return rows.filter(p=>["original","licensed","official_external"].includes(p.rights_status||""));
 });
 export const getAdminShopProducts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
- requireAdmin(context);return context.getBase44().asServiceRole.entities.ShopProduct.list("-created_date",100,0);
+ requireAdmin(context);return context.getBase44().asServiceRole.entities.ShopProduct.list("-created_date",200,0);
 });
 export const saveShopProduct = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({id:z.string().optional(),title:z.string().min(2).max(160),description:z.string().max(5000),productType:z.enum(["physical","digital"]),priceCents:z.number().int().min(0),currency:z.enum(["USD","EUR","GBP"]),stockQuantity:z.number().int().min(0).optional(),imageUrl:z.string().url().optional(),status:z.enum(["draft","published","archived"]),sku:z.string().max(80).optional()}))
+ .validator(z.object({
+  id:z.string().optional(),title:z.string().min(2).max(160),description:z.string().max(5000),
+  productType:z.enum(["physical","digital","external"]),priceCents:z.number().int().min(0),
+  currency:z.enum(["USD","EUR","GBP"]),stockQuantity:z.number().int().min(0).optional(),
+  imageUrl:z.string().url().optional(),status:z.enum(["draft","published","archived"]),sku:z.string().max(80).optional(),
+  category:z.enum(["Apparel","Accessories","Collectibles","Digital","Creator Gear","Other"]),
+  vendorType:z.enum(["vicehub","licensed_partner","official_external"]),
+  rightsStatus:z.enum(["unverified","original","licensed","official_external"]),
+  externalUrl:z.string().url().optional(),shippingRequired:z.boolean(),shippingPriceCents:z.number().int().min(0),
+  sizeOptions:z.array(z.string().max(40)).max(30),colorOptions:z.array(z.string().max(40)).max(30),isFeatured:z.boolean()
+ }))
  .handler(async({data,context})=>{
-  requireAdmin(context);const db=context.getBase44().asServiceRole.entities.ShopProduct;
-  const p={title:data.title,description:data.description,product_type:data.productType,price_cents:data.priceCents,currency:data.currency,stock_quantity:data.stockQuantity||0,status:data.status,...(data.imageUrl?{image_url:data.imageUrl}:{}),sku:data.sku||""};
+  requireAdmin(context);
+  if(data.status==="published"&&data.rightsStatus==="unverified")throw Object.assign(new Error("Rights must be verified before a product can be published."),{status:400,code:"SHOP_RIGHTS_NOT_VERIFIED"});
+  if(data.productType==="external"&&(!data.externalUrl||data.rightsStatus!=="official_external"||data.vendorType!=="official_external"))throw Object.assign(new Error("External official listings need an external URL and the official external classification."),{status:400,code:"SHOP_EXTERNAL_LINK_REQUIRED"});
+  if(data.productType!=="external"&&data.vendorType==="official_external")throw Object.assign(new Error("Official external products must use the external link product type."),{status:400});
+  const db=context.getBase44().asServiceRole.entities.ShopProduct;
+  const p={
+   title:data.title,description:data.description,product_type:data.productType,price_cents:data.priceCents,currency:data.currency,
+   stock_quantity:data.stockQuantity||0,status:data.status,sku:data.sku||"",category:data.category,vendor_type:data.vendorType,
+   rights_status:data.rightsStatus,external_url:data.externalUrl||"",shipping_required:data.productType==="physical"&&data.shippingRequired,
+   shipping_price_cents:data.productType==="physical"&&data.shippingRequired?data.shippingPriceCents:0,
+   size_options:data.sizeOptions,color_options:data.colorOptions,is_featured:data.isFeatured,
+   ...(data.imageUrl?{image_url:data.imageUrl}:{})
+  };
   return data.id?db.update(data.id,p):db.create(p);
+ });
+export const getMyShopOrders = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ return context.getBase44().asServiceRole.entities.ShopOrder.filter({user_id:context.user.id},"-created_date",30,0);
+});
+export const getAdminShopOrders = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);return context.getBase44().asServiceRole.entities.ShopOrder.list("-created_date",200,0);
+});
+export const updateShopOrder = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({orderId:z.string().min(1),status:z.enum(["pending_payment","paid","paid_stock_issue","processing","shipped","delivered","cancelled","refunded"]),trackingNumber:z.string().max(120).optional(),trackingUrl:z.string().url().optional(),adminNote:z.string().max(1000).optional()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const db=context.getBase44().asServiceRole.entities.ShopOrder;
+  const order=await db.get(data.orderId).catch(()=>null);
+  if(!order)throw Object.assign(new Error("Order not found."),{status:404});
+  if(data.status==="refunded"&&order.status!=="refunded")throw Object.assign(new Error("Only mark an order as refunded after the refund has been completed in Stripe."),{status:409,code:"REFUND_CONFIRMATION_REQUIRED"});
+  return db.update(order.id,{status:data.status,tracking_number:data.trackingNumber||"",tracking_url:data.trackingUrl||"",admin_note:data.adminNote||"",updated_by:context.user.id});
+ });
+export const createShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10)})).min(1).max(20)}))
+ .handler(async({data,context})=>{
+  const user=context.user,db=context.getBase44().asServiceRole.entities;
+  if(!secrets.get("STRIPE_SECRET_KEY"))throw Object.assign(new Error("Online checkout is not active yet. The administrator must connect Stripe in the VICEHUB payment settings before orders can be paid."),{status:503,code:"SHOP_PAYMENTS_NOT_CONFIGURED"});
+  const products=await Promise.all(data.items.map(x=>db.ShopProduct.get(x.productId).catch(()=>null)));
+  const cart=data.items.map((line,i)=>({line,product:products[i]}));
+  if(cart.some(x=>!x.product||x.product.status!=="published"||!["original","licensed"].includes(x.product.rights_status)))throw Object.assign(new Error("One or more products are no longer available for sale."),{status:409,code:"SHOP_PRODUCT_UNAVAILABLE"});
+  if(cart.some(x=>x.product.product_type==="external"||x.product.vendor_type==="official_external"))throw Object.assign(new Error("Official external products must be purchased from their linked official retailer."),{status:400});
+  const currencies=[...new Set(cart.map(x=>x.product.currency))];
+  if(currencies.length!==1)throw Object.assign(new Error("Your bag contains different currencies. Checkout one currency at a time."),{status:400,code:"SHOP_MIXED_CURRENCIES"});
+  for(const {line,product} of cart)if(product.product_type==="physical"&&Number(product.stock_quantity||0)<line.quantity)throw Object.assign(new Error("Not enough stock for "+product.title+"."),{status:409,code:"SHOP_OUT_OF_STOCK"});
+  const currency=currencies[0],items=cart.map(({line,product})=>({product_id:product.id,title:product.title,sku:product.sku||"",product_type:product.product_type,quantity:line.quantity,unit_price_cents:Number(product.price_cents),currency,image_url:product.image_url||"",shipping_required:!!product.shipping_required}));
+  const subtotal=cart.reduce((sum,x)=>sum+Number(x.product.price_cents)*x.line.quantity,0);
+  const shipping=cart.reduce((sum,x)=>sum+(x.product.product_type==="physical"&&x.product.shipping_required?Number(x.product.shipping_price_cents||0)*x.line.quantity:0),0);
+  const total=subtotal+shipping;
+  if(total<1)throw Object.assign(new Error("The order total must be greater than zero."),{status:400});
+  const order=await db.ShopOrder.create({user_id:user.id,customer_email:user.email||"",customer_name:user.full_name||user.name||"",currency,items,subtotal_cents:subtotal,shipping_cents:shipping,total_cents:total,status:"pending_payment"});
+  try{
+   const form=new URLSearchParams();form.set("mode","payment");
+   form.set("success_url",STRIPE_SITE_URL+"/shop?session_id={CHECKOUT_SESSION_ID}");
+   form.set("cancel_url",STRIPE_SITE_URL+"/shop?checkout=cancelled");
+   form.set("client_reference_id",user.id);form.set("customer_email",user.email||"");
+   form.set("metadata[order_id]",order.id);form.set("metadata[user_id]",user.id);
+   form.set("payment_intent_data[metadata][order_id]",order.id);form.set("payment_intent_data[metadata][user_id]",user.id);
+   form.set("billing_address_collection","required");form.set("phone_number_collection[enabled]","true");
+   if(cart.some(x=>x.product.product_type==="physical"&&x.product.shipping_required)){
+    ["GB","US","CA","FR","DE","ES","IT","PT","BE","LU","NL","IE"].forEach((country,i)=>form.set("shipping_address_collection[allowed_countries]["+i+"]",country));
+   }
+   let index=0;
+   for(const {line,product} of cart){
+    const prefix="line_items["+index+"]";form.set(prefix+"[quantity]",String(line.quantity));
+    form.set(prefix+"[price_data][currency]",currency.toLowerCase());
+    form.set(prefix+"[price_data][unit_amount]",String(product.price_cents));
+    form.set(prefix+"[price_data][product_data][name]",product.title);
+    if(product.description)form.set(prefix+"[price_data][product_data][description]",product.description.slice(0,450));
+    if(product.image_url)form.set(prefix+"[price_data][product_data][images][0]",product.image_url);
+    index++;
+   }
+   if(shipping>0){
+    const prefix="line_items["+index+"]";form.set(prefix+"[quantity]","1");
+    form.set(prefix+"[price_data][currency]",currency.toLowerCase());form.set(prefix+"[price_data][unit_amount]",String(shipping));
+    form.set(prefix+"[price_data][product_data][name]","Shipping");
+   }
+   const session=await stripeApi("checkout/sessions","POST",form);
+   if(!session.url)throw new Error("Stripe did not return a checkout URL.");
+   await db.ShopOrder.update(order.id,{stripe_session_id:session.id});
+   return {url:session.url,orderId:order.id};
+  }catch(error){
+   await db.ShopOrder.update(order.id,{status:"payment_failed",admin_note:String(error.message||error).slice(0,900)}).catch(()=>null);
+   throw error;
+  }
+ });
+export const confirmShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({sessionId:z.string().min(10).max(255)}))
+ .handler(async({data,context})=>{
+  const user=context.user,session=await stripeApi("checkout/sessions/"+encodeURIComponent(data.sessionId));
+  if(session.client_reference_id!==user.id||session.metadata?.user_id!==user.id)throw Object.assign(new Error("This checkout session does not belong to your account."),{status:403});
+  if(session.mode!=="payment"||session.status!=="complete"||session.payment_status!=="paid")throw Object.assign(new Error("Stripe has not confirmed this payment yet."),{status:409,code:"SHOP_PAYMENT_NOT_CONFIRMED"});
+  const db=context.getBase44().asServiceRole.entities,order=await db.ShopOrder.get(session.metadata?.order_id||"").catch(()=>null);
+  if(!order||order.user_id!==user.id||order.stripe_session_id!==session.id)throw Object.assign(new Error("The order linked to this payment could not be verified."),{status:403,code:"SHOP_ORDER_MISMATCH"});
+  if(["paid","processing","shipped","delivered","paid_stock_issue"].includes(order.status))return {success:true,orderId:order.id,status:order.status};
+  let stockIssue=false;
+  for(const item of order.items||[]){
+   if(item.product_type!=="physical")continue;
+   const result=await db.ShopProduct.updateMany({id:item.product_id,stock_quantity:{$gte:Number(item.quantity)}},{$inc:{stock_quantity:-Number(item.quantity)}});
+   if(!result?.updated)stockIssue=true;
+  }
+  const shipping=session.shipping_details?.address||session.customer_details?.address||null;
+  const updated=await db.ShopOrder.update(order.id,{
+   status:stockIssue?"paid_stock_issue":"paid",paid_at:new Date().toISOString(),
+   stripe_payment_intent_id:typeof session.payment_intent==="string"?session.payment_intent:session.payment_intent?.id||"",
+   customer_email:session.customer_details?.email||order.customer_email,
+   customer_name:session.shipping_details?.name||session.customer_details?.name||order.customer_name,
+   shipping_address:shipping||{}
+  });
+  return {success:true,orderId:updated.id,status:updated.status};
  });
 
 export const getSitePage = createServerFn({method:"GET"}).validator(z.object({slug:z.string().min(1),locale:z.enum(["en","fr","es","de","it","pt"]).default("en")})).handler(async({data,context})=>{
