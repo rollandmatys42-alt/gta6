@@ -3,6 +3,7 @@ import { z } from "zod";
 import { secrets } from "base44:runtime";
 import { requireUser } from "@/lib/auth-middleware";
 import { priceForMonth } from "@/lib/loyalty";
+import { issueStorageUploadUrl, recordStorageUsage } from "@/lib/storage-fns";
 
 const encoder = new TextEncoder();
 const MONTHLY_FREE_LIMIT = 5;
@@ -157,8 +158,8 @@ export const getVideoPreviewUrl = createServerFn({ method: "GET" })
     if (!video.watermarked_storage_key || !video.watermarked_storage_key.startsWith("videos/watermarked/")) {
       throw Object.assign(new Error("The protected preview is not ready yet."), { status: 409, code: "PREVIEW_NOT_READY" });
     }
-    const previewUrl = await presignR2({ method: "GET", objectKey: video.watermarked_storage_key, expiresIn: 180 });
-    return { previewUrl, expiresInSeconds: 180, watermarkApplied: true };
+    const previewUrl = "/api/video/preview/" + encodeURIComponent(video.id);
+    return { previewUrl, watermarkApplied: true };
   });
 
 export const getPublicFreeSamplePack = createServerFn({method:"GET"}).handler(async({context})=>{
@@ -229,7 +230,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
       if (!reserved?.updated) throw Object.assign(new Error("This sample video has already been downloaded from your account. The three free videos are available once per account."), { status: 409, code: "FREE_SAMPLE_ALREADY_DOWNLOADED" });
       try {
         if (!video.watermarked_storage_key) throw Object.assign(new Error("The watermarked sample video is not ready yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
-        const downloadUrl = await presignR2({ method: "GET", objectKey: video.watermarked_storage_key, expiresIn: DOWNLOAD_URL_TTL });
+        const downloadUrl = "/api/video/download/" + encodeURIComponent(video.id);
         await db.DownloadEvent.create({
           user_id: user.id, video_id: video.id, month_key: new Date().toISOString().slice(0,7),
           tier_code: "free", watermark_applied: true, status: "signed",
@@ -259,7 +260,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
     const watermarkApplied = !cleanDownloads;
     const objectKey = watermarkApplied ? video.watermarked_storage_key : video.storage_key;
     if (!objectKey) throw Object.assign(new Error(watermarkApplied ? "The watermarked video version has not been prepared yet." : "The clean video version is not available yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
-    const downloadUrl = await presignR2({ method: "GET", objectKey, expiresIn: DOWNLOAD_URL_TTL });
+    const downloadUrl = "/api/video/download/" + encodeURIComponent(video.id);
     const now = new Date(), monthKey = now.toISOString().slice(0, 7);
     let quotas = await db.DownloadQuota.filter({ user_id: user.id, month_key: monthKey }, "-created_date", 2, 0);
     let quota = quotas[0];
@@ -284,13 +285,19 @@ export const createVideoUploadUrl = createServerFn({ method: "POST" })
     fileName: z.string().min(1).max(180).regex(/^[a-zA-Z0-9._ -]+$/),
     contentType: z.enum(["video/mp4", "video/quicktime"]),
     assetVariant: z.enum(["original", "watermarked"]),
+    storageConnectionId: z.string().optional(),
+    fileSize: z.number().int().min(0).max(20000000000).optional(),
+    reservedBytes: z.number().int().min(0).max(20000000000).optional(),
   }))
   .handler(async ({ data, context }) => {
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
     const extension = data.contentType === "video/quicktime" ? "mov" : "mp4";
     const objectKey = "videos/" + data.assetVariant + "/" + crypto.randomUUID() + "." + extension;
+    const entities = context.getBase44().asServiceRole.entities;
+    const multi = await issueStorageUploadUrl({ entities, contentType: data.contentType, fileSize: data.fileSize, reservedBytes: data.reservedBytes, assetVariant: data.assetVariant, connectionId: data.storageConnectionId });
+    if (multi) return { ...multi, contentType: data.contentType };
     const uploadUrl = await presignR2({ method: "PUT", objectKey, contentType: data.contentType, expiresIn: 300 });
-    return { uploadUrl, objectKey, contentType: data.contentType, expiresInSeconds: 300 };
+    return { uploadUrl, objectKey, contentType: data.contentType, storageConnectionId: null, storageProvider: "cloudflare-r2", expiresInSeconds: 300 };
   });
 
 export const createVideoRecord = createServerFn({ method: "POST" })
@@ -309,6 +316,10 @@ export const createVideoRecord = createServerFn({ method: "POST" })
     licenseVerified: z.boolean(),
     originalStorageKey: z.string().min(1).max(300),
     watermarkedStorageKey: z.string().min(1).max(300),
+    originalStorageConnectionId: z.string().optional(),
+    watermarkedStorageConnectionId: z.string().optional(),
+    originalBytes: z.number().int().min(0).optional(),
+    watermarkedBytes: z.number().int().min(0).optional(),
   }))
   .handler(async ({ data, context }) => {
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
@@ -319,7 +330,8 @@ export const createVideoRecord = createServerFn({ method: "POST" })
       throw Object.assign(new Error("A rights or licence evidence reference is required before a video can be marked verified."), { status: 400, code: "RIGHTS_EVIDENCE_REQUIRED" });
     }
     const base44 = context.getBase44();
-    return base44.asServiceRole.entities.Video.create({
+    const entities = base44.asServiceRole.entities;
+    const created = await entities.Video.create({
       title: data.title, description: data.description || "", category: data.category,
       language: data.language || "en", is_featured: !!data.isFeatured,
       tags: data.tags || [], duration_seconds: data.durationSeconds || 0,
@@ -328,8 +340,15 @@ export const createVideoRecord = createServerFn({ method: "POST" })
       ...(data.sourceReference ? { source_reference: data.sourceReference } : {}),
       license_status: data.licenseVerified ? "verified" : "pending",
       storage_key: data.originalStorageKey, watermarked_storage_key: data.watermarkedStorageKey,
+      storage_connection_id: data.originalStorageConnectionId || "",
+      watermarked_storage_connection_id: data.watermarkedStorageConnectionId || data.originalStorageConnectionId || "",
+      original_bytes: data.originalBytes || 0, watermarked_bytes: data.watermarkedBytes || 0,
       uploaded_by: context.user.id, status: "draft",
     });
+    await recordStorageUsage({ entities, connectionId: data.originalStorageConnectionId, bytes: data.originalBytes || 0 });
+    if (data.watermarkedStorageConnectionId && data.watermarkedStorageConnectionId !== data.originalStorageConnectionId) await recordStorageUsage({ entities, connectionId: data.watermarkedStorageConnectionId, bytes: data.watermarkedBytes || 0 });
+    else await recordStorageUsage({ entities, connectionId: data.originalStorageConnectionId, bytes: data.watermarkedBytes || 0 });
+    return created;
   });
 
 function parseAdminCsv(text) {
@@ -359,7 +378,7 @@ export const lockFreeSamplePack = createServerFn({method:"POST"}).middleware([re
   await entities.SiteSetting.create(setting);
   return {locked:true,videoIds:selected.map(v=>v.id),videos:selected.map(v=>v.title)};
  });
-export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.Video.list("-created_date",2000,0);});
+export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).validator(z.object({offset:z.number().int().min(0).default(0),limit:z.number().int().min(1).max(100).default(48)})).handler(async({data,context})=>{requireAdmin(context);const videos=await context.getBase44().asServiceRole.entities.Video.list("-created_date",data.limit,data.offset);return {videos,nextOffset:data.offset+videos.length,hasMore:videos.length===data.limit};});
 export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()}))
  .handler(async({data,context})=>{

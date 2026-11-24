@@ -50,7 +50,7 @@ function codecSignature(track) {
   return [track.Format || "", track.CodecID || "", track.Format_Profile || ""].join("|");
 }
 
-function assertCompatibleTracks(before, after) {
+function assertCompatibleTracks(before, after, expectedMetadata = {}) {
   const beforeVideo = tracksOf(before, "Video");
   const afterVideo = tracksOf(after, "Video");
   const beforeAudio = tracksOf(before, "Audio");
@@ -89,16 +89,20 @@ function assertCompatibleTracks(before, after) {
   }
 
   const residual = outputTracks.flatMap(track =>
-    Array.from(PRIVATE_METADATA_KEYS).filter(key =>
-      track[key] !== undefined && track[key] !== null && String(track[key]).trim() !== ""
-    )
+    Array.from(PRIVATE_METADATA_KEYS).filter(key => {
+      const value = track[key];
+      if (value === undefined || value === null || String(value).trim() === "") return false;
+      if (key === "Title" && expectedMetadata.title && String(value) === expectedMetadata.title) return false;
+      if (key === "Comment" && expectedMetadata.comment && String(value) === expectedMetadata.comment) return false;
+      return true;
+    })
   );
   if (residual.length) {
     throw new Error("Some descriptive metadata remains. The file was not delivered.");
   }
 }
 
-export async function cleanVideoBlob(sourceBlob, extension, onProgress = () => {}) {
+export async function cleanVideoBlob(sourceBlob, extension, onProgress = () => {}, options = {}) {
   if (processing) throw new Error("Another video is already being cleaned. Wait for it to finish.");
   if (!["mp4", "mov", "webm"].includes(extension)) {
     throw new Error("Only MP4, MOV and WebM files can be cleaned automatically.");
@@ -142,6 +146,10 @@ export async function cleanVideoBlob(sourceBlob, extension, onProgress = () => {
       }
     });
 
+    const exportId = crypto.randomUUID();
+    const metadataTitle = String(options.title || "VICEHUB video").split("").filter(char => char.charCodeAt(0) >= 32).join("").slice(0, 140);
+    const metadataComment = "Processed by VICEHUB · Export " + exportId;
+    args.push("-metadata", "title=" + metadataTitle, "-metadata", "comment=" + metadataComment, "-metadata", "encoded_by=VICEHUB");
     if (extension === "mp4") args.push("-movflags", "+faststart");
     args.push(outputName);
 
@@ -166,7 +174,7 @@ export async function cleanVideoBlob(sourceBlob, extension, onProgress = () => {
     const mimeType = extension === "mp4" ? "video/mp4" : extension === "mov" ? "video/quicktime" : "video/webm";
     const cleanedBlob = new Blob([outputBytes], { type: mimeType });
     const after = await inspectWithMediaInfo(cleanedBlob);
-    assertCompatibleTracks(before, after);
+    assertCompatibleTracks(before, after, { title: metadataTitle, comment: metadataComment });
 
     onProgress("Running the final audio/video integrity check…");
     const verifyCode = await ffmpeg.exec([

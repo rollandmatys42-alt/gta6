@@ -13,11 +13,39 @@
     },
     "category": {
       "type": "string",
-      "enum": ["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]
+      "enum": [
+        "Cinematics",
+        "Gameplay",
+        "Characters",
+        "Vehicles",
+        "Locations",
+        "Missions",
+        "Shorts",
+        "Edit packs",
+        "Tutorials",
+        "Other"
+      ]
     },
-    "language": { "type": "string", "enum": ["en", "fr", "es", "pt", "it", "de"], "default": "en" },
-    "is_featured": { "type": "boolean", "default": false },
-    "is_free_sample": { "type": "boolean", "default": false },
+    "language": {
+      "type": "string",
+      "enum": [
+        "en",
+        "fr",
+        "es",
+        "pt",
+        "it",
+        "de"
+      ],
+      "default": "en"
+    },
+    "is_featured": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_free_sample": {
+      "type": "boolean",
+      "default": false
+    },
     "tags": {
       "type": "array",
       "items": {
@@ -97,6 +125,72 @@
     "published_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "storage_connection_id": {
+      "type": "string",
+      "description": "Private storage connection identifier for the clean master.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "watermarked_storage_connection_id": {
+      "type": "string",
+      "description": "Private storage connection identifier for the watermarked rendition.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "original_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Original master size in bytes.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "watermarked_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Watermarked rendition size in bytes.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     }
   },
   "required": [
