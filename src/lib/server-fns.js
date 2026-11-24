@@ -1000,8 +1000,10 @@ export const createContentReport = createServerFn({method:"POST"}).middleware([r
  .handler(async({data,context})=>context.getBase44().asServiceRole.entities.ContentReport.create({reporter_id:context.user.id,target_type:data.targetType,target_id:data.targetId,reason:data.reason,details:data.details||"",status:"open"}));
 
 export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object({currency:z.enum(["USD","EUR","GBP"]).default("USD")})).handler(async({data,context})=>{
- const rows=await context.getBase44().asServiceRole.entities.SubscriptionPlan.filter({tier_code:"pro",status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",1,0);
- return rows;
+ const db=context.getBase44().asServiceRole.entities;
+ const rows=await db.SubscriptionPlan.filter({tier_code:"pro",status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",1,0);
+ const assets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",5,0,["id"]);
+ return rows.map(plan=>({...plan,catalogueReady:assets.length>=5,publishedAssetCount:assets.length}));
 });
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
 export const saveAdminPlan = createServerFn({method:"POST"}).middleware([requireUser])
@@ -1067,6 +1069,8 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     const plans=await db.SubscriptionPlan.filter({tier_code:"pro",currency:data.currency,status:"active"},"-created_date",1,0);
     const plan=plans[0];
     if(!plan||Number(plan.monthly_price_cents||0)<=0||Number(plan.monthly_download_limit||0)<1)throw Object.assign(new Error("This membership is not yet open for sale. The administrator must configure a positive monthly price and download allowance first."),{status:409,code:"PLAN_NOT_CONFIGURED"});
+    const rightsClearedAssets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",5,0,["id"]);
+    if(rightsClearedAssets.length<5)throw Object.assign(new Error("Paid checkout is temporarily closed until at least five rights-cleared downloads are published in the library."),{status:409,code:"CONTENT_LIBRARY_NOT_READY"});
     const existingRows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const existing=existingRows[0];
     if(existing?.status==="active"||existing?.status==="trialing"||existing?.status==="past_due")throw Object.assign(new Error("You already have a current or overdue membership. Use Manage membership to update payment details or cancel it; do not create a second subscription."),{status:409,code:"SUBSCRIPTION_ALREADY_ACTIVE"});
@@ -1231,13 +1235,13 @@ export const applyReferralWalletCredit = createServerFn({method:"POST"}).middlew
     for(const credit of credits){
       if(credit.status==="pending"&&credit.available_at&&new Date(credit.available_at).getTime()>now)continue;
       const cents=Number(credit.available_cents??credit.amount_cents??0);
-      if(cents>0){available+=cents;allocations.push({credit_id:credit.id,amount_cents:cents,remaining_after_cents:0});}
+      if(cents>0){available+=cents;allocations.push({credit_id:credit.id,amount_cents:cents,remaining_after_cents:0,redeemed_after_cents:Number(credit.redeemed_cents||0)+cents});}
     }
     const maxCredit=Math.max(0,Number(sub.current_monthly_price_cents||0));
     const redeemCents=Math.min(available,maxCredit);
     if(redeemCents<1)throw Object.assign(new Error("No validated referral credit is available for this invoice yet."),{status:409,code:"NO_REFERRAL_CREDIT"});
     let remaining=redeemCents;
-    for(const allocation of allocations){const used=Math.min(allocation.amount_cents,remaining);allocation.amount_cents=used;allocation.remaining_after_cents=Number((await db.ReferralCredit.get(allocation.credit_id)).available_cents??0)-used;remaining-=used;if(remaining<=0)break;}
+    for(const allocation of allocations){const used=Math.min(allocation.amount_cents,remaining);allocation.amount_cents=used;const creditRow=await db.ReferralCredit.get(allocation.credit_id);allocation.remaining_after_cents=Number(creditRow.available_cents??creditRow.amount_cents??0)-used;allocation.redeemed_after_cents=Number(creditRow.redeemed_cents||0)+used;remaining-=used;if(remaining<=0)break;}
     redemption=await db.ReferralRedemption.create({user_id:user.id,amount_cents:redeemCents,currency,stripe_customer_id:sub.stripe_customer_id,idempotency_key:crypto.randomUUID(),allocations:allocations.filter(x=>x.amount_cents>0),status:"pending"});
   }
   const form=new URLSearchParams();form.set("amount",String(-Number(redemption.amount_cents)));form.set("currency",currency.toLowerCase());form.set("description","VICEHUB referral membership credit");form.set("metadata[user_id]",user.id);form.set("metadata[referral_redemption_id]",redemption.id);
@@ -1246,7 +1250,8 @@ export const applyReferralWalletCredit = createServerFn({method:"POST"}).middlew
     for(const allocation of redemption.allocations||[]){
       const credit=await db.ReferralCredit.get(allocation.credit_id);
       const remaining=Number(allocation.remaining_after_cents||0);
-      await db.ReferralCredit.update(credit.id,{available_cents:remaining,redeemed_cents:Number(credit.redeemed_cents||0)+Number(allocation.amount_cents||0),status:remaining>0?"available":"redeemed"});
+      const redeemedAfter=Number(allocation.redeemed_after_cents ?? (Number(credit.redeemed_cents||0)+Number(allocation.amount_cents||0)));
+      await db.ReferralCredit.update(credit.id,{available_cents:remaining,redeemed_cents:redeemedAfter,status:remaining>0?"available":"redeemed"});
     }
     await db.ReferralRedemption.update(redemption.id,{status:"applied",stripe_balance_transaction_id:transaction.id,applied_at:new Date().toISOString()});
     return {success:true,amountCents:Number(redemption.amount_cents),currency,message:"Credit has been added to your Stripe customer balance and will reduce your next invoice. Any unused wallet balance remains available."};
