@@ -16,7 +16,6 @@ const localeMap = { en: "en-GB", fr: "fr-FR", es: "es-ES", pt: "pt-PT", it: "it-
 const dateLabel = (value, locale) => value ? new Date(value).toLocaleDateString(localeMap[locale] || "en-GB", { day: "numeric", month: "short" }) : "LATEST";
 
 function DashboardPage() {
-  const { user } = Route.useRouteContext();
   const { logout } = useAuth();
   const locale = useLocale();
   const [account, setAccount] = useState(null);
@@ -49,7 +48,7 @@ function DashboardPage() {
 
   useEffect(() => { refresh(); }, [locale]);
 
-  const firstName = (user?.full_name || user?.email || "Creator").split(" ")[0];
+  const firstName = "CREATOR";
   const used = Number(account?.downloadsUsed || 0);
   const limit = Number(account?.downloadsLimit || 0);
   const remaining = Number(account?.downloadsRemaining || 0);
