@@ -52,7 +52,7 @@ function MySubscriptionPage() {
           <h1>MY <em>SUBSCRIPTION.</em></h1>
           <p>Review your current membership, download allowance and billing controls.</p>
         </div>
-        <div className="vh-subscription-emblem">VI</div>
+        <div className="vh-subscription-emblem vh-subscription-art"><img src="https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=1920" alt="Vice City — official GTA VI artwork" /><span>VICE CITY / VI</span></div>
       </section>
       {error && <div className="member-alert" role="alert">{error}</div>}
       {loading ? <div className="vh-subscription-panel">LOADING YOUR MEMBERSHIP…</div> : <div className="vh-subscription-grid">

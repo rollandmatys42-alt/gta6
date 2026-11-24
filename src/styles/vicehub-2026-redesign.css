@@ -101,3 +101,23 @@
 .vh-subscription-emblem{border-radius:16px 50% 16px 50%!important;background:linear-gradient(145deg,#ff4f9a24,#68e2e411)!important}
 @media(max-width:1050px){.social-shell{grid-template-columns:1fr!important}.social-secondary{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}.cr-grid,.nr-story-grid,.vh-lib2-grid,.member-video-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.vh-lib2-hero{grid-template-columns:1fr!important}.vh-lib2-hero-art{display:none!important}}
 @media(max-width:760px){.vh-workspace-page{padding:18px 14px 40px!important}.social-secondary{grid-template-columns:1fr!important}.social-connect-grid,.social-form-grid,.nr-featured,.vh-lib2-feature,.vh-lib2-feature-card,.message-columns{grid-template-columns:1fr!important}.cr-grid,.nr-story-grid,.vh-lib2-grid,.member-video-grid,.member-free-sample-grid,.vh-lib2-free-pack-grid{grid-template-columns:1fr!important}.cr-hero,.nr-hero{min-height:250px!important}.cr-hero-side{display:none!important}.cr-manifesto,.nr-trust-strip{grid-template-columns:1fr!important}.nr-featured-image{min-height:200px!important}.vh-lib2-free-pack-image,.vh-lib2-feature-image,.vh-lib2-poster,.member-video-image,.member-free-sample-image{aspect-ratio:16/9!important}.notification-row{align-items:flex-start!important;flex-direction:column!important}.notification-row>div:last-child{width:100%!important}.notification-row>div:last-child button{flex:1!important}.member-section-head{align-items:flex-start!important;flex-direction:column!important}}
+
+
+/* Real GTA VI artwork on every workspace tab hero */
+.vh-image-hero{position:relative!important;isolation:isolate!important;overflow:hidden!important}
+.vh-image-hero>.vh-page-art-image{position:absolute!important;inset:0!important;z-index:-2!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center 38%!important;opacity:.66!important;filter:saturate(.92) contrast(1.06)!important}
+.vh-image-hero>.vh-page-art-shade{position:absolute!important;inset:0!important;z-index:-1!important;background:linear-gradient(90deg,rgba(7,9,18,.96) 0%,rgba(7,9,18,.78) 48%,rgba(7,9,18,.24) 100%),linear-gradient(0deg,rgba(7,9,18,.58),transparent 60%)!important;pointer-events:none!important}
+.social-hero.vh-image-hero{min-height:320px!important}
+.social-hero.vh-image-hero>div:first-of-type{position:relative!important;z-index:1!important;max-width:760px!important}
+.social-hero.vh-image-hero .social-hero-stamp{position:relative!important;z-index:1!important}
+.platform-hero.vh-image-hero{min-height:270px!important;padding:clamp(24px,4vw,44px)!important}
+.platform-hero.vh-image-hero>div{position:relative!important;z-index:1!important}
+.nr-hero-image{object-fit:cover!important;object-position:center 36%!important}
+.member-hero-art.vh-member-image{position:relative!important;isolation:isolate!important;overflow:hidden!important;min-height:250px!important;border:1px solid #ffffff35!important;border-radius:16px!important}
+.member-hero-art.vh-member-image img{position:absolute!important;inset:0!important;z-index:-2!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center 30%!important;opacity:.76!important}
+.member-hero-art.vh-member-image:after{content:"";position:absolute!important;inset:0!important;z-index:-1!important;background:linear-gradient(0deg,#080b14e8,transparent 75%)!important}
+.member-hero-art.vh-member-image span,.member-hero-art.vh-member-image b,.member-hero-art.vh-member-image small{position:relative!important;z-index:1!important}
+.vh-subscription-emblem.vh-subscription-art{position:relative!important;isolation:isolate!important;overflow:hidden!important;min-width:260px!important;min-height:190px!important;border-radius:14px!important}
+.vh-subscription-art img{position:absolute!important;inset:0!important;z-index:-2!important;width:100%!important;height:100%!important;object-fit:cover!important;opacity:.78!important}
+.vh-subscription-art span{position:absolute!important;left:12px!important;bottom:12px!important;color:#fff!important;font:900 12px 'Barlow Condensed',Impact,sans-serif!important;letter-spacing:.18em!important;text-shadow:0 2px 12px #000!important}
+@media(max-width:760px){.social-hero.vh-image-hero{min-height:280px!important}.platform-hero.vh-image-hero{min-height:230px!important}.vh-subscription-emblem.vh-subscription-art{min-width:100%!important;min-height:160px!important}}
