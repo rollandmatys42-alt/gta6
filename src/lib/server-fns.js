@@ -1079,10 +1079,12 @@ export const createStripeCheckoutSession = createServerFn({method:"POST"}).middl
     let referrerUserId = "";
     let referralCouponId = "";
     if (data.referralCode && !existing) {
-      const profiles = await db.ReferralProfile.filter({ referral_code: data.referralCode }, "-created_date", 1, 0);
+      const profiles = await db.ReferralProfile.filter({ referral_code: data.referralCode, status: "active" }, "-created_date", 1, 0);
       const profile = profiles[0];
       const priorReferral = await db.ReferralCredit.filter({ referred_user_id: user.id }, "-created_date", 1, 0);
-      if (profile && profile.user_id !== user.id && !priorReferral.length) {
+      const referrerUser = profile ? await db.User.get(profile.user_id).catch(() => null) : null;
+      const sameEmail = !!(referrerUser?.email && user.email && String(referrerUser.email).toLowerCase() === String(user.email).toLowerCase());
+      if (profile && profile.user_id !== user.id && !sameEmail && !priorReferral.length) {
         referrerUserId = profile.user_id;
         referralCouponId = "VICEHUB_REFERRAL_5_FIRST_INVOICE";
         try { await stripeApi("coupons/" + referralCouponId); }
@@ -1206,20 +1208,23 @@ export const getMyReferralDashboard = createServerFn({method:"GET"}).middleware(
     profile=await db.ReferralProfile.create({user_id:user.id,referral_code:code,status:"active"});
   }
   const credits=await db.ReferralCredit.filter({referrer_user_id:user.id},"-created_date",1000,0);
-  const now=Date.now();let availableCents=0,earnedCents=0,referralCount=0;
+  const subs=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0), sub=subs[0];
+  const currency=sub?.currency||"GBP", now=Date.now(), balances={GBP:{earnedCents:0,availableCents:0},EUR:{earnedCents:0,availableCents:0},USD:{earnedCents:0,availableCents:0}};
+  let referralCount=0;
   for(const credit of credits){
     if(credit.status==="reversed")continue;
     referralCount++;
-    earnedCents+=Number(credit.amount_cents||0);
+    const code=String(credit.currency||"GBP").toUpperCase();
+    if(!balances[code])continue;
+    balances[code].earnedCents+=Number(credit.amount_cents||0);
     if(credit.status==="pending"&&credit.available_at&&new Date(credit.available_at).getTime()<=now){
       await db.ReferralCredit.update(credit.id,{status:"available"});
       credit.status="available";
     }
-    if(["available","pending"].includes(credit.status)&&(!credit.available_at||new Date(credit.available_at).getTime()<=now))availableCents+=Number(credit.available_cents??credit.amount_cents??0);
+    if(["available","pending"].includes(credit.status)&&(!credit.available_at||new Date(credit.available_at).getTime()<=now))balances[code].availableCents+=Number(credit.available_cents??credit.amount_cents??0);
   }
-  const subs=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0), sub=subs[0];
   const isSubscribed=!!sub&&sub.status==="active"&&!sub.voluntary_cancelled&&!!sub.stripe_customer_id;
-  return {code:profile.referral_code,referralCount,earnedCents,availableCents,currency:sub?.currency||"GBP",isSubscribed};
+  return {code:profile.referral_code,referralCount,earnedCents:balances[currency]?.earnedCents||0,availableCents:balances[currency]?.availableCents||0,currency,isSubscribed,balances};
 });
 
 export const applyReferralWalletCredit = createServerFn({method:"POST"}).middleware([requireUser]).handler(async({context})=>{
@@ -1237,7 +1242,8 @@ export const applyReferralWalletCredit = createServerFn({method:"POST"}).middlew
       const cents=Number(credit.available_cents??credit.amount_cents??0);
       if(cents>0){available+=cents;allocations.push({credit_id:credit.id,amount_cents:cents,remaining_after_cents:0,redeemed_after_cents:Number(credit.redeemed_cents||0)+cents});}
     }
-    const maxCredit=Math.max(0,Number(sub.current_monthly_price_cents||0));
+    const planRows=await db.SubscriptionPlan.filter({tier_code:sub.tier_code,currency,status:"active"},"-created_date",1,0);
+    const maxCredit=Math.max(0,Number(sub.current_monthly_price_cents||planRows[0]?.monthly_price_cents||0));
     const redeemCents=Math.min(available,maxCredit);
     if(redeemCents<1)throw Object.assign(new Error("No validated referral credit is available for this invoice yet."),{status:409,code:"NO_REFERRAL_CREDIT"});
     let remaining=redeemCents;
