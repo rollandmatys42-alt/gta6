@@ -450,7 +450,7 @@ export const saveNewsArticle = createServerFn({ method: "POST" })
     requireAdmin(context);
     const base44 = context.getBase44();
     const db = base44.asServiceRole.entities;
-    if(data.status==="published"&&!data.imageUrl)throw Object.assign(new Error("Every published article must include a source image and an image description."),{status:400,code:"ARTICLE_IMAGE_REQUIRED"});
+    if(data.status==="published"&&(!data.imageUrl||!data.imageAlt))throw Object.assign(new Error("Every published article must include a source image and an accessible image description."),{status:400,code:"ARTICLE_IMAGE_REQUIRED"});
     const payload = { title:data.title, slug:data.slug, summary:data.summary, body:data.body, source_name:data.sourceName,
       source_url:data.sourceUrl, source_type:data.sourceType, confidence:data.confidence, locale:data.locale,
       ...(data.imageUrl ? {image_url:data.imageUrl,image_alt:data.imageAlt||""} : {}), tags:data.tags||[], status:data.status, created_by:context.user.id,
