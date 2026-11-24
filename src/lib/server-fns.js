@@ -323,13 +323,14 @@ export const publishVideo = createServerFn({ method: "POST" })
     if (context.user.role !== "admin") throw Object.assign(new Error("Administrator access required."), { status: 403, code: "ADMIN_REQUIRED" });
     const base44 = context.getBase44();
     const video = await base44.asServiceRole.entities.Video.get(data.videoId);
+    const alreadyPublished = video.status === "published";
     if (video.license_status !== "verified" || !video.source_reference || !video.storage_key || !video.watermarked_storage_key) {
       throw Object.assign(new Error("Record a rights/licence evidence reference, verify the content licence and upload both private renditions before publishing."), { status: 409, code: "PUBLISH_REQUIREMENTS_NOT_MET" });
     }
     const published = await base44.asServiceRole.entities.Video.update(video.id, {
       status: "published", published_at: new Date().toISOString(),
     });
-    await notifyAllMembers(base44.asServiceRole, {
+    if (!alreadyPublished) await notifyAllMembers(base44.asServiceRole, {
       type: "system", title: "New VICEHUB video drop",
       body: video.title + " is now available in the video library.",
       target_url: "/library",
