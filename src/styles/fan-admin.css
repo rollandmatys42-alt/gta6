@@ -125,3 +125,84 @@
   .admin-console button,.admin-console select,.admin-console input{max-width:100%}
 }
 @media(prefers-reduced-motion:reduce){.admin-console .admin-sidebar{transition:none}}
+
+
+/* ADMIN EXPERIENCE REBUILD — consistent interaction patterns across every module */
+.admin-console{--admin-surface:rgba(19,12,31,.88);--admin-border:rgba(211,178,255,.14);--admin-shadow:0 18px 48px rgba(0,0,0,.22)}
+.admin-console .admin-workspace{max-width:1600px;margin:0 auto}
+.admin-console .admin-module{animation:admin-module-enter .22s ease both}
+@keyframes admin-module-enter{from{opacity:.65;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.admin-console .admin-module-head{padding:clamp(16px,2.5vw,28px);border:1px solid var(--admin-border);border-radius:22px;background:linear-gradient(120deg,rgba(255,45,149,.09),rgba(139,92,246,.08) 48%,rgba(0,220,255,.04));box-shadow:var(--admin-shadow)}
+.admin-console .admin-module-head h2{line-height:.98}
+.admin-console .admin-data-card,.admin-console .admin-panel,.admin-console .platform-form,.admin-console .admin-subscriber-detail{box-shadow:var(--admin-shadow);min-width:0}
+.admin-console .admin-data-card h3,.admin-console .admin-panel>h2{margin-top:0}
+.admin-console .admin-list-row>div:first-child,.admin-console .admin-finance-row>div:first-child{min-width:0;flex:1}
+.admin-console .admin-list-row small,.admin-console .admin-list-row p{overflow-wrap:anywhere}
+.admin-console .admin-list-row .market-admin-actions,.admin-console .admin-list-row .agent-actions{flex-shrink:0}
+.admin-console .admin-crm-table-wrap,.admin-console .admin-revenue-table-wrap{max-width:100%;overscroll-behavior-x:contain;scrollbar-width:thin}
+.admin-console .admin-crm-table td{vertical-align:top;overflow-wrap:anywhere}
+.admin-console .admin-crm-table td small{display:block;color:var(--vc-muted);margin-top:4px;line-height:1.4}
+.admin-console .admin-crm-table tbody tr:focus-within{background:rgba(0,220,255,.06)}
+.admin-console .admin-primary-action,.admin-console .admin-secondary-action,.admin-console .admin-danger-action,.admin-console .primary-btn,.admin-console .outline-btn,.admin-console .admin-refresh,.admin-console .text-btn{min-height:42px}
+.admin-console .admin-primary-action:focus-visible,.admin-console .admin-secondary-action:focus-visible,.admin-console .admin-danger-action:focus-visible,.admin-console .primary-btn:focus-visible,.admin-console .outline-btn:focus-visible,.admin-console .admin-refresh:focus-visible,.admin-console .text-btn:focus-visible,.admin-console .admin-nav-item:focus-visible{outline:2px solid var(--vc-cyan);outline-offset:3px}
+.admin-console .admin-subscriber-detail{position:relative}
+.admin-console .admin-subscriber-detail>div:first-child{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.admin-console .admin-subscriber-detail dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0;padding:16px;border-radius:14px;background:rgba(0,0,0,.2)}
+.admin-console .admin-subscriber-detail dt{color:var(--vc-muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.admin-console .admin-subscriber-detail dd{margin:3px 0 0;color:#fff;overflow-wrap:anywhere}
+.admin-console .admin-subscriber-edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.admin-console .admin-subscriber-edit .admin-edit-wide{grid-column:1/-1}
+.admin-console .admin-bar-row>div{height:8px;flex:1;min-width:50px;max-width:48%;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.08)}
+.admin-console .admin-bar-row>div i{display:block;height:100%;border-radius:inherit;background:var(--vc-grad)}
+.admin-console .admin-social-readiness{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.admin-console .admin-social-readiness span{padding:10px 12px;border:1px solid var(--admin-border);border-radius:12px;background:rgba(0,0,0,.14);overflow-wrap:anywhere}
+.admin-console .admin-legal-template-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.admin-console .admin-legal-template-actions button{min-height:48px}
+@media(max-width:1100px){
+ .admin-console{grid-template-columns:240px minmax(0,1fr)}
+ .admin-console .admin-main{padding-left:20px;padding-right:20px}
+ .admin-console .admin-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .admin-console .admin-overview-grid,.admin-console .admin-two-col{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:960px){
+ .admin-console{display:block}
+ .admin-console .admin-sidebar{position:fixed}
+ .admin-console .admin-main{padding-left:18px;padding-right:18px}
+ .admin-console .admin-overview-grid,.admin-console .admin-two-col{grid-template-columns:minmax(0,1fr)}
+ .admin-console .admin-module-head{align-items:flex-start}
+}
+@media(max-width:600px){
+ .admin-console .admin-main{padding-left:12px;padding-right:12px}
+ .admin-console .admin-topbar{grid-template-columns:auto minmax(0,1fr);align-items:center}
+ .admin-console .admin-topbar>div:first-of-type{min-width:0}
+ .admin-console .admin-topbar h1{font-size:25px;line-height:1.02}
+ .admin-console .admin-top-actions{gap:7px}
+ .admin-console .admin-top-actions .admin-status-pill{font-size:9px;padding:5px 8px}
+ .admin-console .admin-module-head{padding:16px;border-radius:16px}
+ .admin-console .admin-module-head h2{font-size:34px}
+ .admin-console .admin-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .admin-console .admin-kpi-row article{padding:13px;min-width:0}
+ .admin-console .admin-kpi-row small{font-size:9px;letter-spacing:.08em}
+ .admin-console .admin-kpi-row b{font-size:30px}
+ .admin-console .admin-data-card,.admin-console .admin-panel,.admin-console .platform-form,.admin-console .admin-subscriber-detail{padding:14px;margin-bottom:12px;border-radius:15px}
+ .admin-console .admin-crm-toolbar{align-items:stretch}
+ .admin-console .admin-crm-toolbar>div{min-width:0}
+ .admin-console .admin-crm-filters,.admin-console .admin-video-filters,.admin-console .admin-crm-actions,.admin-console .market-admin-actions,.admin-console .agent-actions{display:grid;grid-template-columns:minmax(0,1fr);width:100%}
+ .admin-console .admin-crm-filters>*{width:100%;min-width:0}
+ .admin-console .admin-legal-template-actions{grid-template-columns:1fr}
+ .admin-console .admin-legal-template-actions button{text-align:left}
+ .admin-console .form-two,.admin-console .admin-invoice-settings-form,.admin-console .admin-metric-form,.admin-console .admin-subscriber-edit{grid-template-columns:minmax(0,1fr)}
+ .admin-console .admin-subscriber-edit .admin-edit-wide{grid-column:auto}
+ .admin-console .admin-subscriber-detail>div:first-child{flex-direction:column}
+ .admin-console .admin-subscriber-detail dl{grid-template-columns:1fr 1fr;padding:12px}
+ .admin-console .admin-list-row,.admin-console .admin-finance-row,.admin-console .admin-bar-row{align-items:flex-start;flex-wrap:wrap}
+ .admin-console .admin-list-row>div:first-child{flex-basis:100%}
+ .admin-console .admin-list-row .market-admin-actions,.admin-console .admin-list-row .agent-actions{width:100%}
+ .admin-console .admin-crm-table{min-width:720px}
+ .admin-console .admin-crm-table-wrap{margin-left:-2px;margin-right:-2px}
+ .admin-console input,.admin-console select,.admin-console textarea{font-size:16px;min-height:44px}
+ .admin-console textarea{min-height:120px}
+ .admin-console button{touch-action:manipulation}
+ .admin-console .admin-compliance-note{overflow-wrap:anywhere}
+}
+@media(prefers-reduced-motion:reduce){.admin-console .admin-module{animation:none}}
