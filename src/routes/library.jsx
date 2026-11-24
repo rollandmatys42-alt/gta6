@@ -143,7 +143,7 @@ function VideoLibraryPage() {
         {featured ? <button type="button" className="vh-lib2-feature-card" onClick={() => openPreview(featured)}>
           <div className="vh-lib2-feature-image">{featured.thumbnail_url ? <img src={featured.thumbnail_url} alt={featured.title}/> : <img src="https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=3840" alt="Vice City artwork"/>}<span className="vh-lib2-feature-play">▶</span></div>
           <div className="vh-lib2-feature-copy"><span className="vh-lib2-kicker">FEATURED DROP · {(featured.language || "en").toUpperCase()}</span><h2>{featured.title}</h2><p>{featured.creator_name || "VICEHUB COMMUNITY"} <span>·</span> {featured.category || "GTA VI"}</p><b>{t.preview} <i>↗</i></b></div>
-        </button> : <div className="vh-lib2-feature-empty">{t.loading}</div>}
+        </button> : <div className="vh-lib2-feature-empty">{loading ? t.loading : t.empty}</div>}
       </section>
       <section className="vh-lib2-catalog" id="vh-lib2-catalog">
         <div className="vh-lib2-catalog-head"><div><span className="vh-lib2-kicker">02 / BROWSE THE COLLECTION</span><h2>THE <em>LATEST DROPS.</em></h2><p>Find the right footage. Preview it. Download it. Create.</p></div><span className="vh-lib2-result-count">{filtered.length.toString().padStart(2,"0")} <small>{t.results}</small></span></div>
