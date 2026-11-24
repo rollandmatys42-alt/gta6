@@ -158,7 +158,7 @@ export const getVideoPreviewUrl = createServerFn({ method: "GET" })
     if (!video.watermarked_storage_key || !video.watermarked_storage_key.startsWith("videos/watermarked/")) {
       throw Object.assign(new Error("The protected preview is not ready yet."), { status: 409, code: "PREVIEW_NOT_READY" });
     }
-    const previewUrl = await createStorageAssetUrl({ entities: base44.asServiceRole.entities, connectionId: video.watermarked_storage_connection_id, objectKey: video.watermarked_storage_key, expiresIn: 180 }) || await presignR2({ method: "GET", objectKey: video.watermarked_storage_key, expiresIn: 180 });
+    const previewUrl = "/api/video/preview/" + encodeURIComponent(video.id);
     return { previewUrl, expiresInSeconds: 180, watermarkApplied: true };
   });
 
@@ -230,7 +230,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
       if (!reserved?.updated) throw Object.assign(new Error("This sample video has already been downloaded from your account. The three free videos are available once per account."), { status: 409, code: "FREE_SAMPLE_ALREADY_DOWNLOADED" });
       try {
         if (!video.watermarked_storage_key) throw Object.assign(new Error("The watermarked sample video is not ready yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
-        const downloadUrl = await presignR2({ method: "GET", objectKey: video.watermarked_storage_key, expiresIn: DOWNLOAD_URL_TTL });
+        const downloadUrl = "/api/video/download/" + encodeURIComponent(video.id);
         await db.DownloadEvent.create({
           user_id: user.id, video_id: video.id, month_key: new Date().toISOString().slice(0,7),
           tier_code: "free", watermark_applied: true, status: "signed",
@@ -261,7 +261,7 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
     const objectKey = watermarkApplied ? video.watermarked_storage_key : video.storage_key;
     if (!objectKey) throw Object.assign(new Error(watermarkApplied ? "The watermarked video version has not been prepared yet." : "The clean video version is not available yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
     const storageConnectionId = watermarkApplied ? video.watermarked_storage_connection_id : video.storage_connection_id;
-    const downloadUrl = await createStorageAssetUrl({ entities: db, connectionId: storageConnectionId, objectKey, expiresIn: DOWNLOAD_URL_TTL }) || await presignR2({ method: "GET", objectKey, expiresIn: DOWNLOAD_URL_TTL });
+    const downloadUrl = "/api/video/download/" + encodeURIComponent(video.id);
     const now = new Date(), monthKey = now.toISOString().slice(0, 7);
     let quotas = await db.DownloadQuota.filter({ user_id: user.id, month_key: monthKey }, "-created_date", 2, 0);
     let quota = quotas[0];

@@ -1,4 +1,5 @@
 import { requestVideoDownload } from "@/lib/server-fns";
+import { getAccessToken } from "@base44/sdk";
 import { cleanVideoBlob } from "@/lib/video-cleaner";
 
 const EXTENSION_BY_MIME = {
@@ -34,6 +35,7 @@ export async function downloadCleanVideo({ videoId, title, onProgress = () => {}
       method: "GET",
       mode: "cors",
       credentials: "omit",
+      headers: getAccessToken() ? { Authorization: "Bearer " + getAccessToken() } : {},
       cache: "no-store",
     });
   } catch {

@@ -143,3 +143,30 @@ export async function recordStorageUsage({entities,connectionId,bytes}) {
   const parsed=JSON.parse(row.setting_value||"{}"); parsed.public.usedBytes=Number(parsed.public.usedBytes||0)+Number(bytes||0);
   await entities.SiteSetting.update(row.id,{setting_value:JSON.stringify(parsed)});
 }
+
+async function legacyR2Connection() {
+  const endpoint=secrets.get("VIDEO_STORAGE_ENDPOINT"),bucket=secrets.get("VIDEO_STORAGE_BUCKET"),accessKey=secrets.get("VIDEO_STORAGE_ACCESS_KEY_ID"),secretKey=secrets.get("VIDEO_STORAGE_SECRET_ACCESS_KEY");
+  if(!endpoint||!bucket||!accessKey||!secretKey)throw Object.assign(new Error("Private video storage is not configured."),{status:503});
+  return {endpoint,bucket,accessKey,secretKey,region:secrets.get("VIDEO_STORAGE_REGION")||"auto"};
+}
+export async function proxyStorageAsset({entities,connectionId,objectKey,request}) {
+  let connection;
+  if(connectionId){
+    const row=(await allConnectionRows(entities)).find(item=>item.setting_key===PREFIX+connectionId);
+    if(!row)throw Object.assign(new Error("The video storage connection is no longer available."),{status:404});
+    connection=await readConnection(row);
+    if(connection.enabled===false)throw Object.assign(new Error("The video storage connection is disabled."),{status:503});
+  } else connection=await legacyR2Connection();
+  const url=await signUrl(connection,"GET",objectKey,null,300);
+  const upstreamHeaders=new Headers();
+  for(const name of ["range","if-range"]) { const value=request.headers.get(name); if(value)upstreamHeaders.set(name,value); }
+  const upstream=await fetch(url,{method:"GET",headers:upstreamHeaders,redirect:"follow"});
+  const responseHeaders=new Headers();
+  for(const name of ["content-type","content-length","content-range","accept-ranges","etag","last-modified"]) {
+    const value=upstream.headers.get(name); if(value)responseHeaders.set(name,value);
+  }
+  if(!responseHeaders.has("accept-ranges"))responseHeaders.set("accept-ranges","bytes");
+  responseHeaders.set("cache-control","private, no-store");
+  responseHeaders.set("x-content-type-options","nosniff");
+  return new Response(upstream.body,{status:upstream.status,headers:responseHeaders});
+}
