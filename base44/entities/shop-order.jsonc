@@ -105,6 +105,7 @@
         "shipped",
         "delivered",
         "cancelled",
+        "refund_pending",
         "refunded",
         "payment_failed"
       ],
@@ -139,6 +140,14 @@
     },
     "updated_by": {
       "type": "string"
+    },
+    "refunded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stripe_refund_id": {
+      "type": "string",
+      "maxLength": 255
     }
   },
   "required": [
