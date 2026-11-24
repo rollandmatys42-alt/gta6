@@ -28,7 +28,7 @@ function AdminPricing() {
 
 function SinglePlan({ plan, onSaved, onError }) {
   const [price, setPrice] = useState((Number(plan.monthly_price_cents || 0) / 100).toFixed(2));
-  const [downloads, setDownloads] = useState(Number(plan.monthly_download_limit || 100));
+  const [downloads, setDownloads] = useState(Number(plan.monthly_download_limit || 50));
   const [clean, setClean] = useState(!!plan.clean_downloads);
   const [busy, setBusy] = useState(false);
   const save = async () => {
