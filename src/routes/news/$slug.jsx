@@ -31,8 +31,18 @@ export const Route = createFileRoute("/news/$slug")({
 function NewsArticlePage() {
   const article = Route.useLoaderData();
   const paragraphs = String(article.body || "").split(/\n{2,}/).map(value => value.trim()).filter(Boolean);
+  const canonical = "https://gta6-creator-hub-c26cc578.base44.app/news/" + article.slug;
+  const structuredData = JSON.stringify({
+    "@context":"https://schema.org","@type":"NewsArticle",
+    headline:article.title,description:article.summary,datePublished:article.published_at,
+    dateModified:article.last_verified_at||article.published_at,
+    image:article.image_url?[article.image_url]:undefined,
+    author:{"@type":"Organization","name":"VICEHUB Newsroom"},
+    publisher:{"@type":"Organization","name":"VICEHUB","logo":{"@type":"ImageObject","url":"https://gta6-creator-hub-c26cc578.base44.app/icons/vicehub-512.svg"}},
+    mainEntityOfPage:canonical,citation:article.source_url
+  }).replace(/</g,"\\u003c");
   const label = ({official:"OFFICIAL",confirmed:"CONFIRMED",reported:"REPORTED",rumour:"RUMOUR",theory:"THEORY",opinion:"OPINION"})[article.confidence] || "NEWS";
-  return <SiteFrame eyebrow="VICEHUB / THE LEONIDA DISPATCH">
+  return <SiteFrame eyebrow="VICEHUB / THE LEONIDA DISPATCH">\n    <script type="application/ld+json" dangerouslySetInnerHTML={{__html:structuredData}}/>
     <article className="nr-article-page">
       <div className="nr-article-page-kicker">{article.source_type?.toUpperCase() || "EDITORIAL"} / {label}</div>
       <h1>{article.title}</h1>
