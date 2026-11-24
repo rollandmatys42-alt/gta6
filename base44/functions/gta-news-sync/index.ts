@@ -9,7 +9,7 @@ const ALLOWED_HOSTS = new Set([
   "gamespot.com", "www.gamespot.com",
   "ign.com", "www.ign.com",
   "rockstarintel.com", "www.rockstarintel.com",
-  "api.x.com", "api.twitter.com",
+  "api.x.com", "api.twitter.com", "reddit.com", "www.reddit.com",
 ]);
 
 function safeEqual(a: string, b: string) {
