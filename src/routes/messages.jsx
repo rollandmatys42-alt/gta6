@@ -4,6 +4,7 @@ import SiteFrame from "@/components/SiteFrame";
 import {getMyMessages,getCreatorDirectory,sendDirectMessage,markMessageRead,blockCreator} from "@/lib/server-fns";
 import {useAuth} from "@/lib/AuthContext";
 import {useLocale,translate} from "@/lib/i18n";
+import "@/styles/vicehub-2026-redesign.css";
 export const Route=createFileRoute("/messages")({ssr:false,head:()=>({meta:[{title:"Private Messages — VICEHUB"},{name:"robots",content:"noindex,nofollow"}]}),component:MessagesPage});
 function MessagesPage(){
  const {isAuthenticated,navigateToLogin}=useAuth();const locale=useLocale(),tx=key=>translate(locale,key);const [data,setData]=useState({inbox:[],sent:[]}),[creators,setCreators]=useState([]),[recipient,setRecipient]=useState(""),[body,setBody]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState("");
