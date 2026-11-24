@@ -7,7 +7,7 @@ import { getAdminPlans, saveAdminPlan, syncAdminPlanToStripe } from "@/lib/serve
 
 export const Route = createFileRoute("/admin-pricing")({
   ssr: false, beforeLoad: requireSignedIn, errorComponent: AuthGateError,
-  head: () => ({ meta: [{ title: "Pricing ladder — VICEHUB admin" }, { name: "robots", content: "noindex,nofollow" }] }),
+  head: () => ({ meta: [{ title: "Creator Membership pricing — VICEHUB admin" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: AdminPricing,
 });
 
@@ -18,7 +18,7 @@ function AdminPricing() {
   const load = () => getAdminPlans().then(r => setPlans(Array.isArray(r) ? r.filter(p => p.tier_code === "pro") : [])).catch(e => setMsg(e.message || "Could not load plans."));
   useEffect(() => { if (user?.role === "admin") load(); }, [user?.id]);
   if (user?.role !== "admin") return <SiteFrame eyebrow="VICEHUB / RESTRICTED"><h1>ACCESS DENIED.</h1></SiteFrame>;
-  return <SiteFrame eyebrow="ADMIN / DEGRESSIVE PRICING"><div className="vh-admin-pricing">
+  return <SiteFrame eyebrow="ADMIN / CREATOR MEMBERSHIP"><div className="vh-admin-pricing">
     <h1>One Creator Membership</h1>
     <p>VICEHUB now uses one paid membership. Set the local monthly price and download allowance for GBP, EUR and USD. The old degressive ladder is no longer used for new subscriptions. Existing subscriptions are not silently repriced.</p>
     {msg && <div className="fan-notice" role="status">{msg}</div>}
