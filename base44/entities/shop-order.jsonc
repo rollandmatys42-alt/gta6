@@ -1,0 +1,198 @@
+{
+  "name": "ShopOrder",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "customer_email": {
+      "type": "string",
+      "maxLength": 254
+    },
+    "customer_name": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "product_type": {
+            "type": "string",
+            "enum": [
+              "physical",
+              "digital"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "unit_price_cents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR",
+              "GBP"
+            ]
+          },
+          "image_url": {
+            "type": "string"
+          },
+          "shipping_required": {
+            "type": "boolean"
+          },
+          "size": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "color": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "product_id",
+          "title",
+          "product_type",
+          "quantity",
+          "unit_price_cents",
+          "currency"
+        ]
+      }
+    },
+    "subtotal_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "shipping_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_payment",
+        "payment_verifying",
+        "paid",
+        "paid_stock_issue",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "refund_pending",
+        "refunded",
+        "payment_failed"
+      ],
+      "default": "pending_payment"
+    },
+    "stripe_session_id": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "stripe_payment_intent_id": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "shipping_address": {
+      "type": "object"
+    },
+    "tracking_number": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "tracking_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "admin_note": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "paid_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_by": {
+      "type": "string"
+    },
+    "refunded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stripe_refund_id": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "tax_cents": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    }
+  },
+  "required": [
+    "user_id",
+    "customer_email",
+    "currency",
+    "items",
+    "subtotal_cents",
+    "shipping_cents",
+    "total_cents",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

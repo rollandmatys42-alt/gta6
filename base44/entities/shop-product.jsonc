@@ -15,7 +15,8 @@
       "type": "string",
       "enum": [
         "physical",
-        "digital"
+        "digital",
+        "external"
       ],
       "default": "digital"
     },
@@ -51,6 +52,76 @@
     "sku": {
       "type": "string",
       "maxLength": 80
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Apparel",
+        "Accessories",
+        "Collectibles",
+        "Digital",
+        "Creator Gear",
+        "Other"
+      ],
+      "default": "Other"
+    },
+    "vendor_type": {
+      "type": "string",
+      "enum": [
+        "vicehub",
+        "licensed_partner",
+        "official_external"
+      ],
+      "default": "vicehub"
+    },
+    "rights_status": {
+      "type": "string",
+      "enum": [
+        "unverified",
+        "original",
+        "licensed",
+        "official_external"
+      ],
+      "default": "unverified"
+    },
+    "external_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "shipping_required": {
+      "type": "boolean",
+      "default": false
+    },
+    "shipping_price_cents": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "size_options": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 40
+      }
+    },
+    "color_options": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 40
+      }
+    },
+    "is_featured": {
+      "type": "boolean",
+      "default": false
+    },
+    "rights_evidence_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "rights_note": {
+      "type": "string",
+      "maxLength": 1000
     }
   },
   "required": [
