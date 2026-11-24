@@ -87,11 +87,15 @@ async function generateEditorial(source: any, title: string, summary: string, ar
   } catch { return fallback; }
 }
 async function notifyPublished(entities: any, title: string) {
-  const users = await entities.User.list("-created_date", 5000, 0);
-  for (const user of users) await entities.UserNotification.create({
-    user_id: user.id, type: "news", title: "New official GTA VI update",
-    body: title, target_url: "/news"
-  }).catch(() => null);
+  for (let offset=0; offset<100000; offset+=5000) {
+    const users = await entities.User.list("-created_date", 5000, offset);
+    if (!users.length) break;
+    for (const user of users) await entities.UserNotification.create({
+      user_id: user.id, type: "news", title: "New official GTA VI update",
+      body: title, target_url: "/news"
+    }).catch(() => null);
+    if (users.length < 5000) break;
+  }
 }
 
 async function importX(source: any, url: URL, db: any) {
