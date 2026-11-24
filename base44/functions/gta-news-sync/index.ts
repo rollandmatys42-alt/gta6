@@ -60,10 +60,44 @@ function validateSourceUrl(value: string) {
   }
   return url;
 }
+async function generateEditorial(source: any, title: string, summary: string, articleUrl: string) {
+  const fallback = { title: title.slice(0,180), summary: summary.slice(0,500), body: summary.slice(0,2000) || title };
+  const key = Deno.env.get("OMNIROUTE_API_KEY") || "";
+  const base = Deno.env.get("OMNIROUTE_BASE_URL") || "";
+  if (!key || !base || !summary.trim()) return fallback;
+  try {
+    const response = await fetch(base.replace(/\\/$/, "") + "/chat/completions", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "X-Title": "VICEHUB Newsroom" },
+      body: JSON.stringify({
+        model: Deno.env.get("OMNIROUTE_MODEL") || "auto", temperature: 0.2, max_tokens: 1100,
+        messages: [
+          { role: "system", content: "You are the VICEHUB editorial desk. Write an original, concise GTA VI news brief using ONLY the supplied source material. Do not invent facts, dates, numbers, quotes, context or implications. Attribute claims to the named source. Keep uncertainty explicit. Return JSON only with title (max 160 chars), summary (max 450 chars), body (120-220 words maximum). If the source contains too little information, produce a short factual brief rather than padding. Do not reproduce the source article." },
+          { role: "user", content: JSON.stringify({ source: source.name, sourceUrl: articleUrl, headline: title, sourceText: summary }) }
+        ]
+      })
+    });
+    if (!response.ok) return fallback;
+    const payload = await response.json();
+    const raw = payload.choices?.[0]?.message?.content || "";
+    const clean = raw.replace(/^\\s*\\x60\\x60\\x60(?:json)?/i,"").replace(/\\x60\\x60\\x60\\s*$/,"").trim();
+    const result = JSON.parse(clean);
+    if (!result.title || !result.summary || !result.body) return fallback;
+    return { title: String(result.title).slice(0,180), summary: String(result.summary).slice(0,500), body: String(result.body).slice(0,20000) };
+  } catch { return fallback; }
+}
+async function notifyPublished(entities: any, title: string) {
+  const users = await entities.User.list("-created_date", 5000, 0);
+  for (const user of users) await entities.UserNotification.create({
+    user_id: user.id, type: "news", title: "New official GTA VI update",
+    body: title, target_url: "/news"
+  }).catch(() => null);
+}
+
 async function importX(source: any, url: URL, db: any) {
   const token = Deno.env.get("X_BEARER_TOKEN") || "";
   if (!token) throw new Error("X_BEARER_TOKEN is missing from Base44 secrets.");
-  const response = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+  if (source.last_external_id) url.searchParams.set("since_id", source.last_external_id);\n  const response = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
   if (!response.ok) throw new Error("X API returned HTTP " + response.status);
   const payload = await response.json();
   const users = new Map((payload.includes?.users || []).map((u: any) => [u.id, u]));
@@ -81,12 +115,13 @@ async function importX(source: any, url: URL, db: any) {
     const mediaKey = tweet.attachments?.media_keys?.[0];
     const mediaItem: any = mediaKey ? media.get(mediaKey) : null;
     const imageUrl = safeImageUrl(mediaItem?.url || mediaItem?.preview_image_url || "");
-    const slug = title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 150) + "-" + crypto.randomUUID().slice(0, 6);
+    const editorial = await generateEditorial(source,title,text,articleUrl);
+    const slug = editorial.title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 150) + "-" + crypto.randomUUID().slice(0, 6);
     await db.NewsArticle.create({
-      title, slug, summary: text.slice(0, 500), body: text.slice(0, 2000),
+      title: editorial.title, slug, summary: editorial.summary, body: editorial.body,
       source_name: "@" + username, source_url: articleUrl, source_type: "social",
       confidence: "reported", locale: "en", status: "draft", tags: ["X import"],
-      image_url: imageUrl, image_alt: imageUrl ? "Image attached to the original X post by @" + username : "",
+      ...(imageUrl ? { image_url: imageUrl, image_alt: "Image attached to the original X post by @" + username } : {}),
       source_published_at: tweet.created_at || new Date().toISOString(), last_verified_at: new Date().toISOString(),
     });
     created++;
@@ -114,16 +149,21 @@ async function importRss(source: any, url: URL, db: any) {
     if (!title || !articleUrl.startsWith("https://") || !GTA_PATTERN.test(title + " " + summary)) continue;
     const exists = await db.NewsArticle.filter({ source_url: articleUrl }, "-created_date", 1, 0);
     if (exists.length) continue;
-    const slug = title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 170) + "-" + crypto.randomUUID().slice(0, 6);
+    const editorial = await generateEditorial(source,title,summary || title,articleUrl);
+    const status = source.source_type === "official" ? "published" : "draft";
+    const publishedAt = status === "published" ? new Date().toISOString() : undefined;
+    const slug = editorial.title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 170) + "-" + crypto.randomUUID().slice(0, 6);
     await db.NewsArticle.create({
-      title, slug, summary: summary || "Imported from " + source.name,
-      body: summary || title, source_name: source.name, source_url: articleUrl,
+      title: editorial.title, slug, summary: editorial.summary,
+      body: editorial.body, source_name: source.name, source_url: articleUrl,
       source_type: source.source_type || "media",
       confidence: source.source_type === "official" ? "official" : "reported",
-      locale: "en", status: "draft", tags: ["RSS import"],
-      image_url: imageUrl, image_alt: imageUrl ? "Image supplied by " + source.name : "",
+      locale: "en", status, tags: ["RSS import"],
+      ...(imageUrl ? { image_url: imageUrl, image_alt: "Image supplied by " + source.name } : {}),
       source_published_at: publishedDate, last_verified_at: new Date().toISOString(),
+      ...(publishedAt ? { published_at: publishedAt } : {}),
     });
+    if (status === "published") await notifyPublished(db,editorial.title);
     created++;
   }
   return created;
