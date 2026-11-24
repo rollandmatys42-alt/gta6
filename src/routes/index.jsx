@@ -58,7 +58,7 @@ function Row({ title, sub, to, children, auto }) {
 }
 
 function HomePage() {
-  const { isAuthenticated, navigateToLogin } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [videos, setVideos] = useState([]);
   const [loadingVideos, setLoadingVideos] = useState(true);
   const [news, setNews] = useState([]);
@@ -126,7 +126,7 @@ function HomePage() {
     catch (e) { setPreview({ video, url: "", msg: e?.message || "Preview unavailable." }); }
   };
   const download = async video => {
-    if (!isAuthenticated) { navigateToLogin(); return; }
+    if (!isAuthenticated) { window.location.assign("/login"); return; }
     setNotice("Checking your plan…");
     try { const r = await requestVideoDownload({ data: { videoId: video.id } }); window.location.assign(r.downloadUrl); setNotice(`Download started — ${r.downloadsRemaining} left this month.`); }
     catch (e) { setNotice(e?.message || "Download unavailable."); }
