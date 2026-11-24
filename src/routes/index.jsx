@@ -126,7 +126,7 @@ function HomePage() {
     catch (e) { setPreview({ video, url: "", msg: e?.message || "Preview unavailable." }); }
   };
   const download = async video => {
-    if (!isAuthenticated) { window.location.assign("/login"); return; }
+    if (!isAuthenticated) { window.location.assign("/sign-in"); return; }
     setNotice("Checking your plan…");
     try { const r = await requestVideoDownload({ data: { videoId: video.id } }); window.location.assign(r.downloadUrl); setNotice(`Download started — ${r.downloadsRemaining} left this month.`); }
     catch (e) { setNotice(e?.message || "Download unavailable."); }

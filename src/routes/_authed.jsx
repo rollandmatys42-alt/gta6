@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_authed")({
     try {
       await authClient.auth.me();
     } catch (error) {
-      if (error?.status === 401 || error?.status === 403) throw redirect({ to: "/login" });
+      if (error?.status === 401 || error?.status === 403) throw redirect({ to: "/sign-in" });
       throw error;
     }
   },
