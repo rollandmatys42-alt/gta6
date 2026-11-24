@@ -6,13 +6,6 @@ import { useLocale, translate } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/newsroom.css";
 
-const NEWS_ART = [
-  "https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=3840",
-  "https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=3840",
-  "https://www.rockstargames.com/VI/_next/static/media/Lucia_Caminos_12.0saq9ns-~xj03.jpg?akim=1&imdensity=1&imwidth=3840",
-  "https://www.rockstargames.com/VI/_next/static/media/VINTAGE_VICE_CITY_PACK_01.05zaof7o1uz.3.jpg?akim=1&imdensity=1&imwidth=3840",
-  "https://www.rockstargames.com/VI/_next/static/media/ULTIMATE_EDITION_GROTTI_CHEETAH_01.0a.wy3s_ogjey.jpg?akim=1&imdensity=1&imwidth=3840",
-];
 const stamp = value => value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "VICEHUB NEWS DESK";
 const confidenceLabel = value => ({ official: "OFFICIAL", confirmed: "CONFIRMED", reported: "REPORTED", rumour: "RUMOUR", theory: "THEORY", community: "COMMUNITY" }[value] || String(value || "NEWS").toUpperCase());
 
