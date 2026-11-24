@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyReferralDashboard, applyReferralWalletCredit, getFreeSamplePack } from "@/lib/server-fns";
+import { getMyAccount, refreshMySubscription, listPublishedVideosPage, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyReferralDashboard, applyReferralWalletCredit, getFreeSamplePack } from "@/lib/server-fns";
+import { downloadCleanVideo } from "@/lib/video-download";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/client-dashboard.css";
@@ -88,8 +89,11 @@ function DashboardPage() {
     setBusyVideo(video.id);
     setError("");
     try {
-      const result = await requestVideoDownload({ data: { videoId: video.id } });
-      window.location.assign(result.downloadUrl);
+      await downloadCleanVideo({
+        videoId: video.id,
+        title: video.title,
+        onProgress: () => {},
+      });
     } catch (err) {
       setError(err?.message || "This download could not be authorised.");
     } finally {
