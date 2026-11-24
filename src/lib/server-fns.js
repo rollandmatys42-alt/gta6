@@ -573,7 +573,7 @@ export const refundShopOrder = createServerFn({method:"POST"}).middleware([requi
    const form=new URLSearchParams();form.set("payment_intent",order.stripe_payment_intent_id);form.set("reason","requested_by_customer");
    const refund=await stripeApi("refunds","POST",form);
    if(!refund.id||!["succeeded","pending"].includes(refund.status))throw new Error("Stripe did not confirm the refund.");
-   return await db.update(order.id,{status:"refunded",stripe_refund_id:refund.id,refunded_at:new Date().toISOString(),admin_note:(order.admin_note?order.admin_note+" | ":"")+"Refund "+refund.id});
+   return await db.update(order.id,{status:refund.status==="succeeded"?"refunded":"refund_pending",stripe_refund_id:refund.id,...(refund.status==="succeeded"?{refunded_at:new Date().toISOString()}:{}),admin_note:(order.admin_note?order.admin_note+" | ":"")+"Refund "+refund.id+" ("+refund.status+")"});
   }catch(error){
    await db.update(order.id,{status:order.status}).catch(()=>null);
    throw error;
