@@ -96,7 +96,8 @@ function PwaInstallButton() {
   };
   return <span className="vh-pwa-install-wrap"><button type="button" className="vh-pwa-install" onClick={install}>↓ INSTALL APP</button>{message&&<span className="vh-pwa-install-message" role="status">{message}</span>}</span>;
 }
-\nexport default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ", workspace = false, activeKey = "" }) {
+
+export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ", workspace = false, activeKey = "" }) {
   const locale = useLocale();
   const { isAuthenticated, logout } = useAuth();
   const [open, setOpen] = useState(false);
