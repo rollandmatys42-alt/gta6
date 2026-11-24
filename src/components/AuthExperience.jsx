@@ -117,7 +117,7 @@ export default function AuthExperience({ mode = "login" }) {
         </form>}
         {view === "verify" && <form onSubmit={verify} className="vh-auth-form">
           <label>Verification code<input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} required value={otp} onChange={e=>setOtp(e.target.value)} placeholder="Enter the code from your email"/></label>
-          <p className="vh-auth-terms vh-auth-otp-help">No code arrived? Check Spam/Junk and Promotions, confirm the email address, then try resending. You can also use Google above to sign in with a Google account.</p>
+          <p className="vh-auth-terms vh-auth-otp-help">No code arrived? Search all folders for no-reply@base44-apps.com, including Spam/Junk and Promotions. Confirm the email address, then request a new code. You can also continue with Google above and avoid email-code verification.</p>
           <button className="vh-auth-submit" disabled={busy}>{busy?"VERIFYING…":"VERIFY & ENTER VICEHUB"} <b>↗</b></button>
           <button type="button" className="vh-auth-secondary" disabled={busy} onClick={resend}>Resend verification code</button>
         </form>}
