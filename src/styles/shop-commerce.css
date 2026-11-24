@@ -1,5 +1,5 @@
 /* VICEHUB / LEONIDA FIELD STORE */
-.vh-shop-leonida{--sea:#04a9bd;--sea-deep:#006d7e;--ink:#092e38;--paper:#f3f0e5;--sun:#f0d56c;--muted:#59737a;width:min(1440px,calc(100% - 56px));margin:0 auto 84px;color:var(--ink);font-family:"DM Sans",Arial,sans-serif}
+.vh-shop-leonida{--sea:#04a9bd;--sea-deep:#006d7e;--ink:#092e38;--paper:#f3f0e5;--sun:#f0d56c;--muted:#59737a;position:relative;left:50%;width:100vw;max-width:1440px;transform:translateX(-50%);margin:0 auto;color:var(--ink);background:var(--paper);padding:0 max(24px,calc((100vw - 1392px)/2)) 84px;box-sizing:border-box;font-family:"DM Sans",Arial,sans-serif}
 .vh-shop-leonida .vh-shop-hero{position:relative;display:grid;grid-template-columns:.82fr 1.18fr;min-height:600px;margin:20px 0 0;overflow:hidden;background:var(--sea);border:1px solid #007d90}
 .vh-shop-leonida .vh-shop-hero-map{position:relative;grid-column:2;grid-row:1;display:flex;justify-content:center;align-items:center;min-height:600px;padding:26px 28px 36px;background:linear-gradient(140deg,#08b4c5,#007f91)}
 .vh-shop-leonida .vh-shop-hero-map:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.13) 1px,transparent 1px);background-size:12.5% 12.5%;pointer-events:none}
