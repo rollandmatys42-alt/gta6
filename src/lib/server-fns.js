@@ -3,7 +3,7 @@ import { z } from "zod";
 import { secrets } from "base44:runtime";
 import { requireUser } from "@/lib/auth-middleware";
 import { priceForMonth } from "@/lib/loyalty";
-import { issueStorageUploadUrl, recordStorageUsage } from "@/lib/storage-fns";
+import { issueStorageUploadUrl, recordStorageUsage, listStorageConnections, addStorageConnection, verifyStorageConnection, turnOffStorageConnection } from "@/lib/storage-fns";
 
 const encoder = new TextEncoder();
 const MONTHLY_FREE_LIMIT = 5;
@@ -378,6 +378,39 @@ export const lockFreeSamplePack = createServerFn({method:"POST"}).middleware([re
   await entities.SiteSetting.create(setting);
   return {locked:true,videoIds:selected.map(v=>v.id),videos:selected.map(v=>v.title)};
  });
+
+export const getStorageConnections = createServerFn({ method: "GET" }).middleware([requireUser]).handler(async ({ context }) => {
+  requireAdmin(context);
+  return listStorageConnections(context.getBase44().asServiceRole.entities);
+});
+export const saveStorageConnection = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({
+    name: z.string().trim().min(2).max(80),
+    provider: z.enum(["cloudflare-r2", "s3-compatible"]),
+    endpoint: z.string().url().max(300),
+    bucket: z.string().trim().min(1).max(120).regex(/^[a-zA-Z0-9._-]+$/),
+    region: z.string().trim().min(1).max(40).default("auto"),
+    accessKey: z.string().trim().min(4).max(300),
+    secretKey: z.string().min(8).max(500),
+    capacityGb: z.number().positive().max(1000000).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    return addStorageConnection({ entities: context.getBase44().asServiceRole.entities, data, userId: context.user.id });
+  });
+export const testStorageConnection = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ connectionId: z.string().min(1) }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    return verifyStorageConnection({ entities: context.getBase44().asServiceRole.entities, connectionId: data.connectionId, userId: context.user.id });
+  });
+export const disableStorageConnection = createServerFn({ method: "POST" }).middleware([requireUser])
+  .validator(z.object({ connectionId: z.string().min(1) }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    return turnOffStorageConnection({ entities: context.getBase44().asServiceRole.entities, connectionId: data.connectionId, userId: context.user.id });
+  });
+
 export const getAdminVideoLibrary = createServerFn({method:"GET"}).middleware([requireUser]).validator(z.object({offset:z.number().int().min(0).default(0),limit:z.number().int().min(1).max(100).default(48)})).handler(async({data,context})=>{requireAdmin(context);const videos=await context.getBase44().asServiceRole.entities.Video.list("-created_date",data.limit,data.offset);return {videos,nextOffset:data.offset+videos.length,hasMore:videos.length===data.limit};});
 export const updateAdminVideo = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({videoId:z.string().min(1),title:z.string().min(2).max(140).optional(),description:z.string().max(3000).optional(),category:z.enum(["Cinematics","Gameplay","Characters","Vehicles","Locations","Missions","Shorts","Edit packs","Tutorials","Other"]).optional(),language:z.enum(["en","fr","es","pt","it","de"]).optional(),isFeatured:z.boolean().optional(),isFreeSample:z.boolean().optional(),licenseStatus:z.enum(["pending","verified","restricted"]).optional(),sourceReference:z.string().url().max(1000).optional()}))
