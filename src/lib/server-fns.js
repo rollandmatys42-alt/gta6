@@ -590,9 +590,13 @@ export const updateShopOrder = createServerFn({method:"POST"}).middleware([requi
   const db=context.getBase44().asServiceRole.entities.ShopOrder;
   const order=await db.get(data.orderId).catch(()=>null);
   if(!order)throw Object.assign(new Error("Order not found."),{status:404});
-  if(["paid","paid_stock_issue","refund_pending","refunded"].includes(data.status))throw Object.assign(new Error("Payment and refund states are controlled by Stripe confirmation and the secure refund action."),{status:409,code:"PAYMENT_STATE_LOCKED"});
-  if(["processing","shipped","delivered","refunded"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("This order cannot move to fulfilment until Stripe confirms payment."),{status:409,code:"ORDER_NOT_PAID"});
-  if(data.status==="cancelled"&&["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("A paid order must be refunded in Stripe before it can be cancelled."),{status:409,code:"REFUND_REQUIRED"});
+  if(["paid","paid_stock_issue","payment_verifying","refund_pending","refunded","payment_failed"].includes(data.status))throw Object.assign(new Error("Payment and refund states are controlled by Stripe confirmation and the secure refund action."),{status:409,code:"PAYMENT_STATE_LOCKED"});
+  if(["processing","shipped","delivered"].includes(data.status)&&!["paid","paid_stock_issue","processing","shipped","delivered"].includes(order.status))throw Object.assign(new Error("This order cannot move to fulfilment until Stripe confirms payment."),{status:409,code:"ORDER_NOT_PAID"});
+  const fulfilmentRank={paid:1,paid_stock_issue:1,processing:2,shipped:3,delivered:4};
+  if(fulfilmentRank[data.status]&&fulfilmentRank[order.status]&&fulfilmentRank[data.status]<fulfilmentRank[order.status])throw Object.assign(new Error("Order fulfilment cannot move backwards."),{status:409,code:"ORDER_STATUS_REGRESSION"});
+  if(data.status==="pending_payment"&&order.status!=="pending_payment")throw Object.assign(new Error("An order cannot be reset to pending payment."),{status:409,code:"ORDER_STATUS_REGRESSION"});
+  if(data.status==="cancelled"&&["paid","paid_stock_issue","processing","shipped","delivered","refund_pending","refunded"].includes(order.status))throw Object.assign(new Error("A paid order must be refunded in Stripe before it can be cancelled."),{status:409,code:"REFUND_REQUIRED"});
+  if(["cancelled","refunded","payment_failed"].includes(order.status)&&data.status!==order.status)throw Object.assign(new Error("This order is closed and cannot be reopened."),{status:409,code:"ORDER_CLOSED"});
   const patch={status:data.status,tracking_number:data.trackingNumber||"",admin_note:data.adminNote||"",updated_by:context.user.id};if(data.trackingUrl)patch.tracking_url=data.trackingUrl;return db.update(order.id,patch);
  });
 export const createShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
