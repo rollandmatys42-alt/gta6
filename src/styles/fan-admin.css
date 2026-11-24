@@ -81,3 +81,47 @@
 .admin-console .admin-video-library,.admin-video-library{background:linear-gradient(160deg,var(--vc-card2),var(--vc-card));border:1px solid var(--vc-line);border-radius:20px;padding:22px}
 /* Responsive */
 @media(max-width:960px){.admin-console{grid-template-columns:1fr}.admin-console .admin-sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap;gap:8px;overflow:visible}.admin-console .admin-nav-group{flex-direction:row;flex-wrap:wrap}.admin-console .admin-nav-item{width:auto}.admin-console .admin-sidebar-bottom,.admin-console .admin-sidebar-label{display:none}}
+
+
+/* VICEHUB admin responsive shell — off-canvas navigation and touch-first layout */
+.admin-console .admin-mobile-menu-toggle{display:none}
+.admin-console .admin-mobile-backdrop{display:none}
+@media(max-width:960px){
+  .admin-console{display:block;min-height:100vh}
+  .admin-console .admin-sidebar{position:fixed;inset:0 auto 0 0;width:min(86vw,330px);height:100dvh;min-height:0;z-index:50;display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:8px;padding:20px 16px calc(24px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;background:rgba(10,6,18,.98);border-right:1px solid var(--vc-line);box-shadow:24px 0 70px rgba(0,0,0,.48);transform:translateX(-105%);transition:transform .22s ease}
+  .admin-console .admin-sidebar.mobile-open{transform:translateX(0)}
+  .admin-console .admin-sidebar .admin-nav-group{display:flex;flex-direction:column;flex-wrap:nowrap;gap:4px;width:100%}
+  .admin-console .admin-sidebar .admin-nav-heading,.admin-console .admin-sidebar .admin-sidebar-label{display:block}
+  .admin-console .admin-sidebar .admin-nav-item{width:100%;min-height:46px;white-space:normal;justify-content:flex-start}
+  .admin-console .admin-sidebar .admin-sidebar-bottom{display:flex;margin-top:auto}
+  .admin-console .admin-mobile-menu-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:none;min-height:42px;padding:0 13px;border:1px solid var(--vc-line);border-radius:12px;background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:900;letter-spacing:.08em}
+  .admin-console .admin-mobile-backdrop:not([hidden]){display:block;position:fixed;inset:0;z-index:49;width:100%;height:100%;border:0;background:rgba(0,0,0,.62);backdrop-filter:blur(3px)}
+  .admin-console .admin-main{padding:0 16px calc(48px + env(safe-area-inset-bottom));min-width:0}
+  .admin-console .admin-topbar{top:0;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;padding:12px 0;background:rgba(10,6,18,.96)}
+  .admin-console .admin-topbar>div:first-of-type{min-width:0}
+  .admin-console .admin-breadcrumb{font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .admin-console .admin-topbar h1{font-size:clamp(22px,4vw,30px);margin:5px 0}
+  .admin-console .admin-topbar p{font-size:11px}
+  .admin-console .admin-top-actions{grid-column:1/-1;justify-content:flex-end;flex-wrap:wrap}
+  .admin-console .admin-workspace{padding:10px 0 32px}
+  .admin-console .admin-two-col,.admin-console .admin-overview-grid{grid-template-columns:minmax(0,1fr)}
+  .admin-console .admin-module-head{align-items:flex-start}
+}
+@media(max-width:600px){
+  .admin-console .admin-main{padding-left:12px;padding-right:12px}
+  .admin-console .admin-topbar{gap:9px}
+  .admin-console .admin-topbar p{display:none}
+  .admin-console .admin-top-actions{justify-content:space-between}
+  .admin-console .admin-refresh{min-height:42px;padding:9px 13px}
+  .admin-console .admin-avatar{width:42px;height:42px}
+  .admin-console .admin-panel,.admin-console .admin-data-card,.admin-console .platform-form,.admin-console .admin-crm-card,.admin-console .admin-subscriber-detail{padding:16px;border-radius:15px}
+  .admin-console .admin-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .admin-console .admin-kpi-row article{min-width:0;padding:14px}
+  .admin-console .admin-kpi-row b{font-size:32px;overflow-wrap:anywhere}
+  .admin-console .admin-crm-filters,.admin-console .admin-video-filters,.admin-console .admin-crm-actions,.admin-console .market-admin-actions,.admin-console .agent-actions{display:grid;grid-template-columns:minmax(0,1fr);width:100%}
+  .admin-console .admin-crm-filters>*{width:100%;min-width:0}
+  .admin-console .form-two,.admin-console .admin-invoice-settings-form,.admin-console .admin-metric-form{grid-template-columns:minmax(0,1fr)}
+  .admin-console .admin-list-row,.admin-console .admin-finance-row,.admin-console .admin-bar-row{align-items:flex-start;flex-wrap:wrap}
+  .admin-console button,.admin-console select,.admin-console input{max-width:100%}
+}
+@media(prefers-reduced-motion:reduce){.admin-console .admin-sidebar{transition:none}}
