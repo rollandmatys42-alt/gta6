@@ -5,6 +5,7 @@ import "@/styles/fan-pages.css";
 import "@/styles/vicehub-cinematic-pages.css";
 import "@/styles/fan-admin.css";
 import "@/styles/fan-admin-fix.css";
+import "@/styles/pwa-notifications.css";
 import "@/styles/fan-home.css";
 import "@/styles/client-workspace.css";
 import { useAuth } from "@/lib/AuthContext";
