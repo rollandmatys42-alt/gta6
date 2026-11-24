@@ -99,6 +99,7 @@
       "type": "string",
       "enum": [
         "pending_payment",
+        "payment_verifying",
         "paid",
         "paid_stock_issue",
         "processing",
