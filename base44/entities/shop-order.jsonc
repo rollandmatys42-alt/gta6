@@ -63,6 +63,14 @@
           },
           "shipping_required": {
             "type": "boolean"
+          },
+          "size": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "color": {
+            "type": "string",
+            "maxLength": 40
           }
         },
         "required": [
