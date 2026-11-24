@@ -69,7 +69,7 @@ function NewsPage() {
   return <SiteFrame eyebrow="VICEHUB / THE LEONIDA DISPATCH" workspace={isAuthenticated} activeKey="news">
     <div className="nr-page">
       <section className="nr-hero">
-        <img className="nr-hero-image" src={NEWS_ART[1]} alt="Vice City — official Grand Theft Auto VI artwork" />
+        <img className="nr-hero-image" src="/vicehub-news-placeholder.svg" alt="VICEHUB editorial artwork" />
         <div className="nr-hero-shade" />
         <div className="nr-hero-content">
           <div className="nr-kicker"><span className="nr-live-dot" /> VICEHUB NEWSROOM <i /> LEONIDA / FLORIDA</div>
@@ -91,12 +91,12 @@ function NewsPage() {
 
       {selected ? <article className="nr-article-view">
         <button className="nr-back" type="button" onClick={() => setSelected(null)}>← BACK TO THE NEWSROOM</button>
-        <div className="nr-article-cover"><img src={selected.image_url || NEWS_ART[Math.max(0, articles.indexOf(selected)) % NEWS_ART.length]} alt="" /><span>{confidenceLabel(selected.confidence)}</span></div>
+        <div className="nr-article-cover"><img src={selected.image_url || "/vicehub-news-placeholder.svg"} alt={selected.image_alt || selected.title} /><span>{confidenceLabel(selected.confidence)}</span></div>
         <div className="nr-article-meta"><span>{selected.source_name || "VICEHUB NEWS DESK"}</span><i />{stamp(selected.published_at)}</div>
         <h2>{selected.title}</h2>
         <p className="nr-article-summary">{selected.summary}</p>
         <div className="nr-article-body">{selected.body}</div>
-        <div className="nr-source-panel"><div><small>ORIGINAL REPORTING</small><b>{selected.source_name || "Original source"}</b></div><a href={selected.source_url} target="_blank" rel="noreferrer">READ ORIGINAL ↗</a></div>
+        <div className="nr-source-panel"><div><small>ORIGINAL REPORTING</small><b>{selected.source_name || "Original source"}</b></div><a href={"/news/"+selected.slug}>OPEN SHAREABLE ARTICLE ↗</a><a href={selected.source_url} target="_blank" rel="noreferrer">READ ORIGINAL ↗</a></div>
         <button className="nr-report" type="button" onClick={report} disabled={reportBusy}>{reportBusy ? "SENDING…" : "REPORT A PROBLEM WITH THIS STORY"}</button>
       </article> : <section className="nr-feed" id="latest">
         <div className="nr-feed-heading"><div><span className="nr-section-label">01 / THE NEWS WIRE</span><h2>Latest <em>stories</em></h2><p>What is happening across Leonida and the GTA VI universe.</p></div><span className="nr-edition">VICEHUB<br/>DAILY EDITION</span></div>
@@ -113,12 +113,12 @@ function NewsPage() {
           : filtered.length === 0 ? <div className="nr-empty"><span className="nr-empty-mark">VH</span><b>{articles.length ? "NO MATCHING STORIES" : "THE NEWSROOM IS ON STANDBY"}</b><p>{articles.length ? "Try another search or filter." : "No stories have been published yet. When a story is approved, it will appear here with its source and verification label."}</p>{(search || filter !== "all") && <button type="button" onClick={() => { setSearch(""); setFilter("all"); }}>CLEAR FILTERS</button>}</div>
           : <div className="nr-story-layout">
             {featured && <button type="button" className="nr-featured" onClick={() => setSelected(featured)}>
-              <div className="nr-featured-image"><img src={featured.image_url || NEWS_ART[0]} alt="" loading="lazy"/><span className="nr-featured-tag">EDITOR'S PICK / LATEST</span><span className={"nr-status " + (featured.confidence || "")}>{confidenceLabel(featured.confidence)}</span></div>
+              <div className="nr-featured-image"><img src={featured.image_url || "/vicehub-news-placeholder.svg"} alt={featured.image_alt || featured.title} loading="lazy"/><span className="nr-featured-tag">EDITOR'S PICK / LATEST</span><span className={"nr-status " + (featured.confidence || "")}>{confidenceLabel(featured.confidence)}</span></div>
               <div className="nr-featured-copy"><div className="nr-card-meta"><span>{featured.source_name || "VICEHUB NEWS DESK"}</span><i />{stamp(featured.published_at)}</div><h3>{featured.title}</h3><p>{featured.summary}</p><span className="nr-read">READ THE STORY <b>↗</b></span></div>
             </button>}
             <div className="nr-story-grid">
               {rest.map((a, i) => <button type="button" className="nr-story-card" key={a.id} onClick={() => setSelected(a)}>
-                <div className="nr-story-image"><img src={a.image_url || NEWS_ART[(i + 1) % NEWS_ART.length]} alt="" loading="lazy"/><span className={"nr-status " + (a.confidence || "")}>{confidenceLabel(a.confidence)}</span></div>
+                <div className="nr-story-image"><img src={a.image_url || "/vicehub-news-placeholder.svg"} alt={a.image_alt || a.title} loading="lazy"/><span className={"nr-status " + (a.confidence || "")}>{confidenceLabel(a.confidence)}</span></div>
                 <div className="nr-card-meta"><span>{a.source_name || "VICEHUB"}</span><i />{stamp(a.published_at)}</div>
                 <h3>{a.title}</h3><p>{a.summary}</p><span className="nr-read">READ STORY <b>↗</b></span>
               </button>)}
