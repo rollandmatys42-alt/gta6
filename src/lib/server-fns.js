@@ -351,8 +351,8 @@ export const lockFreeSamplePack = createServerFn({method:"POST"}).middleware([re
  .validator(z.object({confirmation:z.literal("LOCK_VICEHUB_SAMPLE_PACK_V1")}))
  .handler(async({data,context})=>{
   requireAdmin(context);const entities=context.getBase44().asServiceRole.entities;
-  const existing=await readLockedFreeSamplePack(entities);
-  if(existing)throw Object.assign(new Error("The global three-video sample pack is already locked and cannot be replaced."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
+  const existingRows=await entities.SiteSetting.filter({setting_key:FREE_SAMPLE_SETTING_KEY},"-updated_date",1,0);
+  if(existingRows.length)throw Object.assign(new Error("The global three-video sample pack is already locked and cannot be replaced."),{status:409,code:"FREE_SAMPLE_PACK_LOCKED"});
   const selected=await entities.Video.filter({is_free_sample:true,status:"published",license_status:"verified"},"-published_at",4,0);
   if(selected.length!==3||selected.some(v=>!v.storage_key||!v.watermarked_storage_key||!v.source_reference))throw Object.assign(new Error("Select exactly three published videos with verified rights, a rights reference and both private video files before locking the pack."),{status:409,code:"FREE_SAMPLE_PACK_NOT_READY"});
   const setting={setting_key:FREE_SAMPLE_SETTING_KEY,setting_value:JSON.stringify({version:1,videoIds:selected.map(v=>v.id),lockedAt:new Date().toISOString()}),is_public:false,updated_by:context.user.id};
@@ -1209,7 +1209,7 @@ export const getPublicPlans = createServerFn({method:"GET"}).validator(z.object(
  const db=context.getBase44().asServiceRole.entities;
  const rows=await db.SubscriptionPlan.filter({tier_code:"pro",status:"active",currency:data.currency,monthly_price_cents:{$gt:0},monthly_download_limit:{$gt:0}},"sort_order",1,0);
  const assets=await db.Video.filter({status:"published",license_status:"verified"},"-published_at",20,0,["id"]);
- return rows.map(plan=>({...plan,catalogueReady:assets.length>=5,publishedAssetCount:assets.length}));
+ return rows.map(plan=>({...plan,catalogueReady:assets.length>=20,publishedAssetCount:assets.length}));
 });
 export const getAdminPlans = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{requireAdmin(context);return context.getBase44().asServiceRole.entities.SubscriptionPlan.list("sort_order",100,0);});
 export const saveAdminPlan = createServerFn({method:"POST"}).middleware([requireUser])
