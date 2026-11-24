@@ -1,0 +1,36 @@
+/* VICEHUB growth and referral experience */
+.fh-hero{position:relative;overflow:hidden}
+.fh-hero:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 12% 18%,rgba(255,79,154,.22),transparent 42%),radial-gradient(ellipse at 90% 80%,rgba(69,220,226,.15),transparent 38%)}
+.fh-hero-copy{position:relative;z-index:1}
+.vh-hero-proof{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+.vh-hero-proof span{padding:7px 10px;border:1px solid rgba(103,226,227,.25);border-radius:99px;background:rgba(10,6,18,.55);color:#a9f2ef;font-size:8px;font-weight:900;letter-spacing:.12em}
+.vh-hero-artwork{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:410px;background:radial-gradient(circle at 50% 45%,rgba(255,79,154,.34),transparent 45%),linear-gradient(145deg,#25113b,#090613 70%);border:1px solid rgba(255,255,255,.2)}
+.vh-hero-artwork:before{content:"";position:absolute;inset:8%;border:1px solid rgba(103,226,227,.25);border-radius:48% 52% 40% 60%;transform:rotate(-18deg)}
+.vh-hero-artwork b{font:900 clamp(120px,20vw,230px)/.8 'Barlow Condensed',Impact,sans-serif;color:#fff;text-shadow:0 0 24px #ff4f9a,0 0 80px #8d63f3;letter-spacing:-.08em}
+.vh-art-kicker,.vh-art-city,.vh-hero-artwork small{position:relative;color:#75e6e4;font-size:9px;font-weight:900;letter-spacing:.22em}
+.vh-art-city{color:#ff91bf;font-size:12px}
+.fh-membership-grid{grid-template-columns:minmax(0,640px);justify-content:center}
+.fh-membership-featured{width:100%;box-shadow:0 20px 70px rgba(255,45,149,.16)}
+.vh-single-plan .vh-check{display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0}
+.vh-single-plan .vh-check input{width:auto;margin:0}
+.vh-plan-status{color:var(--vc-muted);font-size:12px}
+.member-referral-card{margin:18px 0 30px;padding:22px;border:1px solid #ff4f9a55;border-radius:20px;background:radial-gradient(500px 260px at 100% 0%,#ff4f9a24,transparent 65%),linear-gradient(145deg,#21172f,#100b1c)}
+.member-referral-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:16px}
+.member-referral-head h2{margin:7px 0 5px;font:900 clamp(28px,4vw,40px)/.95 'Barlow Condensed',Impact,sans-serif}
+.member-referral-head h2 em{font-style:normal;color:#ff82b8}
+.member-referral-head p{max-width:720px;margin:0;color:#b9afc4;font-size:11px;line-height:1.6}
+.member-referral-mark{display:grid;place-items:center;flex:none;width:72px;height:72px;border:1px solid #ff4f9a66;border-radius:50%;color:#ff8fbe;font:900 25px 'Barlow Condensed',sans-serif;box-shadow:0 0 28px #ff4f9a24}
+.member-referral-grid{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(110px,1fr));gap:10px}
+.member-referral-link,.member-referral-stat{min-width:0;padding:14px;border:1px solid #ffffff1b;border-radius:13px;background:#0c0817}
+.member-referral-link{display:flex;flex-direction:column;gap:9px}
+.member-referral-link small,.member-referral-stat small{color:#8f849d;font-size:8px;font-weight:900;letter-spacing:.12em}
+.member-referral-link code{overflow-wrap:anywhere;color:#fff;font-size:10px}
+.member-referral-link button,.member-referral-actions button{align-self:flex-start;min-height:36px;padding:0 14px;border:0;border-radius:9px;background:linear-gradient(110deg,#ff4f9a,#8d63f3);color:#fff;font-size:8px;font-weight:900;letter-spacing:.1em;cursor:pointer}
+.member-referral-link p{margin:0;color:#9e93aa;font-size:8px;line-height:1.5}
+.member-referral-stat{display:flex;flex-direction:column;justify-content:center;gap:9px}
+.member-referral-stat b{color:#fff;font:900 clamp(19px,2vw,27px)/1 'Barlow Condensed',sans-serif;overflow-wrap:anywhere}
+.member-referral-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:13px}
+.member-referral-actions span,.member-referral-notice,.member-referral-loading{color:#b9afc4;font-size:9px;line-height:1.5}
+.member-referral-notice{margin:10px 0 0;color:#8df0c7}
+@media(max-width:850px){.member-referral-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.member-referral-link{grid-column:1/-1}}
+@media(max-width:560px){.vh-hero-artwork{min-height:280px}.vh-hero-proof span{font-size:7px}.member-referral-card{padding:16px}.member-referral-head{gap:8px}.member-referral-mark{width:54px;height:54px;font-size:19px}.member-referral-grid{grid-template-columns:1fr 1fr}.member-referral-link{grid-column:1/-1}.member-referral-stat b{font-size:22px}}
