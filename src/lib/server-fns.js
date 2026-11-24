@@ -260,7 +260,6 @@ export const requestVideoDownload = createServerFn({ method: "POST" })
     const watermarkApplied = !cleanDownloads;
     const objectKey = watermarkApplied ? video.watermarked_storage_key : video.storage_key;
     if (!objectKey) throw Object.assign(new Error(watermarkApplied ? "The watermarked video version has not been prepared yet." : "The clean video version is not available yet."), { status: 409, code: "VIDEO_RENDITION_NOT_READY" });
-    const storageConnectionId = watermarkApplied ? video.watermarked_storage_connection_id : video.storage_connection_id;
     const downloadUrl = "/api/video/download/" + encodeURIComponent(video.id);
     const now = new Date(), monthKey = now.toISOString().slice(0, 7);
     let quotas = await db.DownloadQuota.filter({ user_id: user.id, month_key: monthKey }, "-created_date", 2, 0);

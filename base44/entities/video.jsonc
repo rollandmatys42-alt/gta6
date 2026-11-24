@@ -128,21 +128,69 @@
     },
     "storage_connection_id": {
       "type": "string",
-      "description": "Private storage connection identifier for the clean master."
+      "description": "Private storage connection identifier for the clean master.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "watermarked_storage_connection_id": {
       "type": "string",
-      "description": "Private storage connection identifier for the watermarked rendition."
+      "description": "Private storage connection identifier for the watermarked rendition.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "original_bytes": {
       "type": "integer",
       "minimum": 0,
-      "description": "Original master size in bytes."
+      "description": "Original master size in bytes.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "watermarked_bytes": {
       "type": "integer",
       "minimum": 0,
-      "description": "Watermarked rendition size in bytes."
+      "description": "Watermarked rendition size in bytes.",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     }
   },
   "required": [
