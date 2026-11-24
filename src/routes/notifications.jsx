@@ -4,6 +4,7 @@ import SiteFrame from "@/components/SiteFrame";
 import {getMyNotifications,markNotificationRead} from "@/lib/server-fns";
 import {useAuth} from "@/lib/AuthContext";
 import {useLocale,translate} from "@/lib/i18n";
+import "@/styles/vicehub-2026-redesign.css";
 export const Route=createFileRoute("/notifications")({ssr:false,head:()=>({meta:[{title:"Notifications — VICEHUB"},{name:"robots",content:"noindex,nofollow"}]}),component:NotificationsPage});
 function NotificationsPage(){
  const {isAuthenticated,navigateToLogin}=useAuth();const locale=useLocale(),tx=key=>translate(locale,key);const [items,setItems]=useState([]),[error,setError]=useState("");
