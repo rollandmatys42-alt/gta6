@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { useAuth } from "@/lib/AuthContext";
-import { getShopProducts, createShopCheckoutSession, confirmShopCheckoutSession } from "@/lib/server-fns";
+import { getShopProducts, getMyShopOrders, createShopCheckoutSession, confirmShopCheckoutSession } from "@/lib/server-fns";
 import "@/styles/shop-commerce.css";
 
 export const Route = createFileRoute("/shop")({
@@ -21,6 +21,7 @@ const money = (cents, currency, locale = "en-GB") => new Intl.NumberFormat(local
 function ShopPage() {
   const { isAuthenticated, navigateToLogin } = useAuth();
   const [products, setProducts] = useState([]);
+  const [myOrders, setMyOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
@@ -42,6 +43,11 @@ function ShopPage() {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+    getMyShopOrders().then(rows => setMyOrders(Array.isArray(rows) ? rows : [])).catch(() => setMyOrders([]));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
     if (params.get("checkout") === "cancelled") {
@@ -55,6 +61,7 @@ function ShopPage() {
     confirmShopCheckoutSession({ data: { sessionId } })
       .then(result => {
         setCart([]);
+        getMyShopOrders().then(rows => setMyOrders(Array.isArray(rows) ? rows : [])).catch(() => {});
         setMessage(result.status === "paid_stock_issue"
           ? "Payment received. One item needs a stock check; our team will contact you."
           : "Payment confirmed. Your order has been recorded.");
@@ -166,6 +173,8 @@ function ShopPage() {
           })}
         </div> : <div className="vh-shop-empty"><span>VH / 001</span><h3>{products.length ? "NO MATCHING ITEMS." : "THE NEXT DROP IS IN PROGRESS."}</h3><p>{products.length ? "Try another category or search term." : "New pieces will appear here when the VICEHUB team has added and approved them. No placeholder products or fake prices."}</p></div>
       }
+
+      {isAuthenticated && myOrders.length > 0 && <section className="vh-shop-orders"><div className="vh-shop-orders-head"><div><span className="vh-shop-section-label">ACCOUNT / PURCHASE HISTORY</span><h2>MY ORDERS</h2></div><small>{myOrders.length} RECENT ORDERS</small></div>{myOrders.map(order => <article className="vh-shop-order-row" key={order.id}><div><b>ORDER / {order.id.slice(-8).toUpperCase()}</b><small>{(order.items||[]).map(item => item.quantity+" × "+item.title).join(" · ")}</small></div><span className={"vh-shop-order-status "+order.status}>{order.status.replaceAll("_"," ")}</span><strong>{money(order.total_cents,order.currency)}</strong>{order.tracking_url&&<a href={order.tracking_url} target="_blank" rel="noreferrer">TRACK ↗</a>}</article>)}</section>}
 
       <section className="vh-shop-trust">
         <div><b>01 / VERIFIED LISTINGS</b><p>Products are only published after ownership or licensing status is reviewed.</p></div>
