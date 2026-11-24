@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession } from "@/lib/server-fns";
+import { getMyAccount, refreshMySubscription, listPublishedVideosPage, requestVideoDownload, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead } from "@/lib/server-fns";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/client-dashboard.css";
@@ -21,6 +21,7 @@ function DashboardPage() {
   const [account, setAccount] = useState(null);
   const [videos, setVideos] = useState([]);
   const [news, setNews] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyVideo, setBusyVideo] = useState("");
@@ -31,10 +32,11 @@ function DashboardPage() {
     setError("");
     try {
       await refreshMySubscription().catch(() => null);
-      const [accountResult, videoResult, newsResult] = await Promise.allSettled([
+      const [accountResult, videoResult, newsResult, notificationResult] = await Promise.allSettled([
         getMyAccount(),
         listPublishedVideosPage({ data: { offset: 0, limit: 6 } }),
         (async () => { const localized = await getNewsFeed({ data: { locale, limit: 4 } }); return Array.isArray(localized) && localized.length ? localized : locale === "en" ? [] : getNewsFeed({ data: { locale: "en", limit: 4 } }); })(),
+        getMyNotifications(),
       ]);
       if (accountResult.status === "fulfilled") setAccount(accountResult.value);
       else setError(accountResult.reason?.message || "Account information could not be loaded.");
@@ -42,6 +44,8 @@ function DashboardPage() {
       else setVideos([]);
       if (newsResult.status === "fulfilled") setNews(Array.isArray(newsResult.value) ? newsResult.value : []);
       else setNews([]);
+      if (notificationResult.status === "fulfilled") setNotifications(Array.isArray(notificationResult.value) ? notificationResult.value.slice(0, 6) : []);
+      else setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -57,6 +61,11 @@ function DashboardPage() {
   const planName = account?.planName || (account?.tier === "free" ? "Free member" : "Membership");
   const newest = useMemo(() => [...videos].sort((a,b) => new Date(b.published_at || 0) - new Date(a.published_at || 0)), [videos]);
 
+  const openNotification = async item => {
+    if (!item.read_at) { try { await markNotificationRead({ data: { notificationId: item.id } }); setNotifications(current => current.map(n => n.id === item.id ? { ...n, read_at: new Date().toISOString() } : n)); } catch {} }
+    if (item.target_url) window.location.assign(item.target_url);
+  };
+
   const manageBilling = async () => {
     setBillingBusy(true);
     setError("");
@@ -66,7 +75,6 @@ function DashboardPage() {
 
   const download = async video => {
     setBusyVideo(video.id);
-    setNotice("");
     setError("");
     try {
       const result = await requestVideoDownload({ data: { videoId: video.id } });
@@ -93,6 +101,14 @@ function DashboardPage() {
 
       {error && <div className="member-alert" role="alert">{error}</div>}
 
+      <section className="member-notification-hq">
+        <div className="member-notification-heading"><div><span className="member-section-kicker">VICEHUB / LIVE DISPATCH</span><h2>MISSION <em>UPDATES.</em></h2><p>Your account activity, messages and important alerts.</p></div><span className="member-alert-count">{notifications.filter(n => !n.read_at).length} NEW</span></div>
+        <div className="member-notification-layout"><div className="member-notification-list">{notifications.length ? notifications.map(item => <button type="button" className={"member-notification-item" + (!item.read_at ? " unread" : "")} key={item.id} onClick={() => openNotification(item)}><span className="member-notification-glyph">VI</span><span className="member-notification-copy"><b>{item.title}</b><small>{item.body}</small><time>{dateLabel(item.created_date, locale)}</time></span><i>↗</i></button>) : <div className="member-notification-empty">NO NEW DISPATCHES. IMPORTANT ACCOUNT UPDATES WILL APPEAR HERE.</div>}</div><Link to="/messages" className="member-message-shortcut"><span className="member-message-glyph">✉</span><b>PRIVATE MESSAGES</b><small>Open your creator inbox</small><i>OPEN INBOX ↗</i></Link></div>
+      </section>
+      <section className="member-social-connect">
+        <div className="member-social-head"><div><span className="member-section-kicker">VICEHUB / ACCOUNT LINKS</span><h2>CONNECT YOUR <em>CHANNELS.</em></h2><p>Securely authorise your own social accounts. VICEHUB never asks for your passwords.</p></div><Link to="/social">OPEN SOCIAL CONTROL ROOM ↗</Link></div>
+        <div className="member-social-grid">{[["Instagram","IG"],["TikTok","TK"],["YouTube","YT"],["Facebook","f"],["X","X"],["LinkedIn","in"]].map(([name,mark]) => <Link key={name} to={"/social?connect=" + encodeURIComponent(name)} className="member-social-connect-card"><span>{mark}</span><b>{name}</b><small>CONNECT ACCOUNT</small><i>↗</i></Link>)}</div>
+      </section>
       <section className="member-overview">
         <article className="member-plan-card">
           <div className="member-card-top"><span>YOUR MEMBERSHIP</span><b className={account?.subscriptionStatus === "active" ? "member-status active" : "member-status"}>{String(account?.subscriptionStatus || "ACCOUNT").toUpperCase()}</b></div>
