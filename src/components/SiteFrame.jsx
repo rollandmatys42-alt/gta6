@@ -21,7 +21,7 @@ const workspaceLinks = [
   ["/creators", "◎", "profile"],
   ["/messages", "✉", "messages"],
   ["/social", "↗", "social"],
-  ["/notifications", "⌖", "dispatch"],
+  ["/notifications", "✦", "dispatch"],
   ["/subscription", "◈", "subscription"],
 ];
 const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Biblioteca de vídeos", pt: "Biblioteca de vídeos", it: "Libreria video", de: "Videobibliothek" };
@@ -78,7 +78,7 @@ function DispatchIndicator({isAuthenticated}) {
       setPushMessage("Background push alerts enabled on this device.");
     }catch(error){setPushMessage(error?.message||"Push alerts could not be enabled.");}
   };
-  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-dispatch" aria-label={unread?unread+" unread dispatches":"VICEHUB dispatches"} title="VICEHUB dispatches"><span className="vh-notification-mark" aria-hidden="true"><b>VI</b><i/></span>{unread>0&&<b className="vh-notification-count">{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable dispatch alerts" title="Enable dispatch alerts">⌖</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
+  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-dispatch" aria-label={unread?unread+" unread dispatches":"VICEHUB dispatches"} title="VICEHUB dispatches"><span className="vh-notification-mark" aria-hidden="true"><svg viewBox="0 0 40 40" role="img"><path d="M20 2.5 35.5 11v18L20 37.5 4.5 29V11L20 2.5Z"/><path d="m20 7 11 6v14l-11 6-11-6V13l11-6Z"/><text x="20" y="24.5" textAnchor="middle">VI</text><path d="m30 5 1.8-3 1.8 3 3 1.8-3 1.8-1.8 3-1.8-3-3-1.8L30 5Z"/></svg></span>{unread>0&&<b className="vh-notification-count">{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable dispatch alerts" title="Enable dispatch alerts">✦</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
 }
 
 function PwaInstallButton() {
