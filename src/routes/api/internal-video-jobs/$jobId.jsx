@@ -7,7 +7,8 @@ async function omniRouteChat({messages, maxTokens = 3500, temperature = 0.2}) {
   const key = secrets.get("OMNIROUTE_API_KEY");
   const base = secrets.get("OMNIROUTE_BASE_URL");
   if (!key || !base) throw new Error("OmniRoute is not configured.");
-  const response = await fetch(base.replace(/\\/$/, "") + "/chat/completions", {
+  const cleanBase = base.endsWith("/") ? base.slice(0, -1) : base;
+  const response = await fetch(cleanBase + "/chat/completions", {
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "X-Title": "VICEHUB clip intelligence" },
     body: JSON.stringify({ model: secrets.get("OMNIROUTE_MODEL") || "auto", messages, temperature, max_tokens: maxTokens }),
@@ -43,7 +44,11 @@ Durée : ${durationSeconds} secondes.
 Transcription :
 ${String(transcript || "").slice(0, 60000)}`;
   const raw = await omniRouteChat({ messages: [{ role: "user", content: prompt }] });
-  const cleaned = raw.replace(/^\\s*```(?:json)?/i, "").replace(/```\\s*$/, "").trim();
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);
+  else if (cleaned.startsWith("```")) cleaned = cleaned.slice(3);
+  if (cleaned.endsWith("```")) cleaned = cleaned.slice(0, -3);
+  cleaned = cleaned.trim();
   const plan = JSON.parse(cleaned);
   if (!Array.isArray(plan.clips)) throw new Error("OmniRoute clip plan is missing clips.");
   const clips = plan.clips.slice(0, 6).map((clip) => ({
