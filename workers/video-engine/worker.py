@@ -252,7 +252,7 @@ class VideoWorker:
                             "progressPercent": 0,
                             "stage": "Worker reported an error",
                             "errorCode": "VIDEO_WORKER_FAILED",
-                            "errorMessage": str(exc)[:1000] or "Video processing failed.",
+                            "errorMessage": "The worker could not complete this processing job. Check worker diagnostics.",
                         })
                     except Exception:
                         log.exception("Could not report failure for job %s.", job_id)
