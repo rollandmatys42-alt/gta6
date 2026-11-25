@@ -24,6 +24,8 @@ import { Route as NewsRouteImport } from "./routes/news";
 import { Route as NewsArticleRouteImport } from "./routes/news/$slug";
 import { Route as NewsSitemapRouteImport } from "./routes/news-sitemap[.]xml";
 import { Route as GrowthCronRouteImport } from "./routes/api/agents/growth/cron";
+import { Route as InternalVideoPreviewRouteImport } from "./routes/api/internal-video-preview/$assetId";
+import { Route as InternalVideoDownloadRouteImport } from "./routes/api/internal-video-download/$assetId";
 import { Route as NotificationsRouteImport } from "./routes/notifications";
 import { Route as PrivacyRouteImport } from "./routes/privacy";
 import { Route as RefundsRouteImport } from "./routes/refunds";
@@ -57,6 +59,8 @@ const NewsRoute = NewsRouteImport.update({ id: "/news", path: "/news", getParent
 const NewsArticleRoute = NewsArticleRouteImport.update({ id: "/$slug", path: "/$slug", getParentRoute: () => NewsRoute });
 const NewsSitemapRoute = NewsSitemapRouteImport.update({ id: "/news-sitemap.xml", path: "/news-sitemap.xml", getParentRoute: () => rootRouteImport });
 const GrowthCronRoute = GrowthCronRouteImport.update({ id: "/api/agents/growth/cron", path: "/api/agents/growth/cron", getParentRoute: () => rootRouteImport });
+const InternalVideoPreviewRoute = InternalVideoPreviewRouteImport.update({ id: "/api/internal-video-preview/$assetId", path: "/api/internal-video-preview/$assetId", getParentRoute: () => rootRouteImport });
+const InternalVideoDownloadRoute = InternalVideoDownloadRouteImport.update({ id: "/api/internal-video-download/$assetId", path: "/api/internal-video-download/$assetId", getParentRoute: () => rootRouteImport });
 const NotificationsRoute = NotificationsRouteImport.update({ id: "/notifications", path: "/notifications", getParentRoute: () => rootRouteImport });
 const PrivacyRoute = PrivacyRouteImport.update({ id: "/privacy", path: "/privacy", getParentRoute: () => rootRouteImport });
 const RefundsRoute = RefundsRouteImport.update({ id: "/refunds", path: "/refunds", getParentRoute: () => rootRouteImport });
@@ -93,6 +97,8 @@ const rootRouteChildren = {
   NewsRoute: NewsRouteWithChildren,
   NewsSitemapRoute,
   GrowthCronRoute,
+  InternalVideoPreviewRoute,
+  InternalVideoDownloadRoute,
   NotificationsRoute,
   PrivacyRoute,
   RefundsRoute,
