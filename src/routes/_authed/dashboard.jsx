@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, refreshMySubscription, listPublishedVideosPage, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyAffiliateDashboard, startAffiliatePayoutOnboarding, requestAffiliatePayout, getFreeSamplePack } from "@/lib/server-fns";
+import { getMyAccount, refreshMySubscription, listPublishedVideosPage, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getFreeSamplePack } from "@/lib/server-fns";
+import { getMyAffiliateDashboard, startAffiliatePayoutOnboarding, requestAffiliatePayout } from "@/lib/affiliate-fns";
 import { downloadCleanVideo } from "@/lib/video-download";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
