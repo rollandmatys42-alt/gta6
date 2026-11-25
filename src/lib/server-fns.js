@@ -1548,25 +1548,8 @@ export const confirmStripeCheckoutSession = createServerFn({method:"POST"}).midd
     const rows=await db.UserSubscription.filter({user_id:user.id},"-created_date",1,0);
     const payload={user_id:user.id,tier_code:tierCode,status,currency,started_at:startedAt,streak_months:0,loyalty_discount_percent:Number(session.metadata?.discount_percent||0),current_monthly_price_cents:priceCents,stripe_customer_id:customerId,stripe_subscription_id:stripeSubscription.id,voluntary_cancelled:false};
     if(rows[0])await db.UserSubscription.update(rows[0].id,payload);else await db.UserSubscription.create(payload);
-    let referralCreditCreated = false;
-    const referrerUserId = String(session.metadata?.referrer_user_id || "");
-    if (referrerUserId && referrerUserId !== user.id) {
-      const existingCredit = await db.ReferralCredit.filter({ referred_user_id: user.id }, "-created_date", 1, 0);
-      if (!existingCredit.length) {
-        const paidCents = Math.max(0, Number(session.amount_total || 0) - Number(session.total_details?.amount_tax || 0));
-        const commissionCents = Math.floor(paidCents * 0.20);
-        if (commissionCents > 0) {
-          await db.ReferralCredit.create({
-            referrer_user_id: referrerUserId, referred_user_id: user.id,
-            stripe_session_id: session.id, stripe_subscription_id: stripeSubscription.id,
-            currency, amount_cents: commissionCents, available_cents: commissionCents,
-            redeemed_cents: 0, commission_rate_percent: 20, referral_discount_percent: 5,
-            status: "pending", available_at: new Date(Date.now() + 30 * 86400000).toISOString(),
-          });
-          referralCreditCreated = true;
-        }
-      }
-    }
+    // Referral commissions are created exclusively by the verified Stripe webhook to avoid client/webhook race conditions.
+    const referralCreditCreated = false;
     return {success:true,tierCode,status,currency,priceCents,startedAt,referralCreditCreated};
   });
 

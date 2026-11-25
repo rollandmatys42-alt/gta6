@@ -148,7 +148,7 @@ export const Route = createFileRoute("/api/stripe/webhook")({
           const seen = await db.StripeWebhookEvent.filter({ event_id: event.id }, "-created_date", 1, 0);
           if (seen.length) return Response.json({ received: true, duplicate: true });
           const object = event.data?.object || {};
-          if (event.type === "checkout.session.completed" && object.mode === "subscription" && object.subscription) {
+          if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type) && object.mode === "subscription" && object.subscription) {
             const subscriptionId = typeof object.subscription === "string" ? object.subscription : object.subscription.id;
             const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
             await saveStripeSubscription(db, stripeSub, {
@@ -158,6 +158,26 @@ export const Route = createFileRoute("/api/stripe/webhook")({
               price_cents: Number(object.metadata?.monthly_price_cents || 0),
               discount_percent: Number(object.metadata?.discount_percent || 0),
             });
+            const referrerUserId = String(object.metadata?.referrer_user_id || stripeSub.metadata?.referrer_user_id || "");
+            const referredUserId = String(object.metadata?.user_id || object.client_reference_id || "");
+            if (referrerUserId && referredUserId && referrerUserId !== referredUserId && object.payment_status === "paid") {
+              const existingReferral = await db.ReferralCredit.filter({ referred_user_id: referredUserId }, "-created_date", 1, 0);
+              if (!existingReferral.length) {
+                const grossCents = Number(object.amount_total || 0);
+                const taxCents = Number(object.total_details?.amount_tax || 0);
+                const eligibleCents = Math.max(0, grossCents - taxCents);
+                const commissionCents = Math.floor(eligibleCents * 0.20);
+                if (commissionCents > 0) await db.ReferralCredit.create({
+                  referrer_user_id: referrerUserId, referred_user_id: referredUserId,
+                  stripe_session_id: object.id, stripe_subscription_id: subscriptionId,
+                  currency: String(object.currency || object.metadata?.currency || "gbp").toUpperCase(),
+                  amount_cents: commissionCents, available_cents: commissionCents, reserved_cents: 0, paid_cents: 0, redeemed_cents: 0,
+                  eligible_payment_cents: eligibleCents, gross_payment_cents: grossCents, reversed_cents: 0,
+                  commission_rate_percent: 20, referral_discount_percent: 5,
+                  status: "pending", available_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+                });
+              }
+            }
           } else if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type) && object.mode === "payment" && object.payment_status === "paid" && object.metadata?.order_id) {
             const order = await db.ShopOrder.get(object.metadata.order_id).catch(() => null);
             if (!order || order.user_id !== (object.metadata.user_id || object.client_reference_id) || order.stripe_session_id !== object.id) {
