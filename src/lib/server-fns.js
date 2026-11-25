@@ -1560,7 +1560,9 @@ export const confirmStripeCheckoutSession = createServerFn({method:"POST"}).midd
             referrer_user_id: referrerUserId, referred_user_id: user.id,
             stripe_session_id: session.id, stripe_subscription_id: stripeSubscription.id,
             currency, amount_cents: commissionCents, available_cents: commissionCents,
-            redeemed_cents: 0, commission_rate_percent: 20, referral_discount_percent: 5,
+            redeemed_cents: 0, reserved_cents: 0, paid_cents: 0,
+            eligible_payment_cents: paidCents, gross_payment_cents: Number(session.amount_total || 0), reversed_cents: 0,
+            commission_rate_percent: 20, referral_discount_percent: 5,
             status: "pending", available_at: new Date(Date.now() + 30 * 86400000).toISOString(),
           });
           referralCreditCreated = true;
