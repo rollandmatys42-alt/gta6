@@ -4,9 +4,12 @@ import "@/styles/fan-admin.css";
 import "@/styles/internal-video-library.css";
 import {
   archiveInternalVideoAsset,
+  cancelInternalVideoJob,
   createInternalVideoAsset,
   createInternalVideoUploadUrl,
+  enqueueInternalVideoJob,
   listInternalVideoAssets,
+  listInternalVideoJobs,
 } from "@/lib/internal-video-fns";
 import { getStorageConnections } from "@/lib/server-fns";
 
@@ -28,6 +31,7 @@ const formatBytes = value => {
 function InternalVideoLibraryPage() {
   const { user } = Route.useRouteContext();
   const [assets, setAssets] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [storageConnections, setStorageConnections] = useState([]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -56,7 +60,7 @@ function InternalVideoLibraryPage() {
     setError("");
     try {
       const nextOffset = reset ? 0 : offset;
-      const [result, connections] = await Promise.all([
+      const [result, connections, jobRows] = await Promise.all([
         listInternalVideoAssets({
           data: {
             limit: 50,
@@ -66,11 +70,13 @@ function InternalVideoLibraryPage() {
           },
         }),
         getStorageConnections(),
+        listInternalVideoJobs({ data: { limit: 20 } }),
       ]);
       setAssets(current => reset ? result.assets : [...current, ...result.assets]);
       setOffset(result.nextOffset);
       setHasMore(result.hasMore);
       setStorageConnections(connections);
+      setJobs(jobRows);
       if (!storageConnectionId && connections.length) {
         const preferred = connections.find(item => item.enabled && item.verifiedAt);
         if (preferred) setStorageConnectionId(preferred.id);
@@ -94,6 +100,27 @@ function InternalVideoLibraryPage() {
       asset.source_url, asset.rights_status, ...(asset.tags || []),
     ].filter(Boolean).join(" ").toLowerCase().includes(term));
   }, [assets, search]);
+
+  const queueJob = async (asset, jobType) => {
+    setError("");
+    setMessage("");
+    try {
+      const result = await enqueueInternalVideoJob({ data: { assetId: asset.id, jobType } });
+      setMessage(result.message);
+      await refresh(true);
+    } catch (err) {
+      setError(err?.message || "The processing job could not be queued.");
+    }
+  };
+
+  const cancelJob = async job => {
+    try {
+      await cancelInternalVideoJob({ data: { jobId: job.id } });
+      await refresh(true);
+    } catch (err) {
+      setError(err?.message || "The queued job could not be cancelled.");
+    }
+  };
 
   const submitUpload = async event => {
     event.preventDefault();
@@ -175,6 +202,7 @@ function InternalVideoLibraryPage() {
     try {
       await archiveInternalVideoAsset({ data: { assetId: asset.id } });
       setAssets(current => current.map(item => item.id === asset.id ? { ...item, status: "archived" } : item));
+      await refresh(true);
     } catch (err) {
       setError(err?.message || "The asset could not be archived.");
     }
@@ -194,7 +222,16 @@ function InternalVideoLibraryPage() {
       </header>
       <section className="account-content internal-library-content">
         <div className="ivl-topline"><div><div className="eyebrow">VICEHUB / INTERNAL PRODUCTION</div><h1>VIDEO <em>LIBRARY.</em></h1><p className="account-intro">Private storage for original footage, generated clips and working assets. No public catalogue, subscriptions or watermarking.</p></div><div className="ivl-count"><b>{assets.length}</b><span>ASSETS LOADED</span></div></div>
-        <div className="ivl-notice"><b>PROCESSING ENGINE STATUS</b><span>This release stores and organises source videos and clips. Automatic AI selection, transcription and FFmpeg rendering will be activated when the separate VICEHUB worker service is connected. This page does not pretend those jobs are already running.</span></div>
+        <div className="ivl-notice"><b>PROCESSING ENGINE / WORKER BRIDGE</b><span>The queue and secure worker endpoints are installed. Jobs remain queued until the separate FFmpeg / Whisper worker is deployed and its private token is configured. Current enabled tasks: media analysis and transcription. Clip selection and rendering are not yet enabled.</span></div>
+        {jobs.length > 0 && <section className="ivl-library-panel ivl-jobs-panel">
+          <div className="ivl-section-heading"><div><span className="admin-kicker">WORKER / ASYNC TASKS</span><h2>PROCESSING QUEUE</h2><p>Jobs are private and linked to their original source asset.</p></div><button className="outline-btn" type="button" onClick={() => refresh(true)} disabled={loading}>REFRESH QUEUE ↻</button></div>
+          <div className="ivl-jobs-list">{jobs.map(job => <div className="ivl-job-row" key={job.id}>
+            <div><b>{job.job_type === "transcribe" ? "WHISPER TRANSCRIPTION" : "MEDIA ANALYSIS"}</b><small>{job.asset_id} · {job.stage || job.status}</small></div>
+            <div className="ivl-job-status"><span>{job.status.toUpperCase()}</span><small>{Number(job.progress_percent || 0)}%</small></div>
+            {job.status === "queued" && <button className="text-btn" type="button" onClick={() => cancelJob(job)}>CANCEL</button>}
+            {job.error_message && <small className="ivl-job-error">{job.error_message}</small>}
+          </div>)}</div>
+        </section>}
         <section className="ivl-upload-panel">
           <div className="ivl-section-heading"><div><span className="admin-kicker">INGEST / PRIVATE MASTER</span><h2>ADD VIDEO ASSET</h2><p>Upload a source video or a clip. Files are stored privately and are not sent to the public member catalogue.</p></div><span className={"ivl-storage-pill" + (readyConnections.length ? " ready" : "")}>{readyConnections.length} STORAGE ACCOUNTS READY</span></div>
           {!readyConnections.length && <div className="ivl-warning">No verified storage account is ready. <Link to="/admin/videos">Connect a private S3-compatible storage account in Video administration ↗</Link></div>}
@@ -222,7 +259,9 @@ function InternalVideoLibraryPage() {
           <div className="ivl-filters"><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title, source, tags…" aria-label="Search internal videos" /><select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Filter asset type"><option value="all">All types</option><option value="source">Original sources</option><option value="clip">Clips</option><option value="derivative">Other derivatives</option></select><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter status"><option value="all">All statuses</option><option value="stored">Stored</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="archived">Archived</option></select></div>
           {visibleAssets.length ? <div className="ivl-grid">{visibleAssets.map(asset => <article className="ivl-card" key={asset.id}>
             <div className="ivl-card-media"><video src={"/api/internal-video-assets/" + encodeURIComponent(asset.id)} preload="metadata" muted playsInline onClick={() => setPreview(asset)} /><span>{asset.asset_type === "source" ? "SOURCE" : asset.asset_type.toUpperCase()}</span></div>
-            <div className="ivl-card-body"><div className="ivl-card-title"><h3>{asset.title}</h3><small>{asset.status.toUpperCase()}</small></div><p>{asset.description || asset.category || "No description added."}</p><div className="ivl-card-meta"><span>{formatBytes(asset.file_size_bytes)}</span><span>{asset.language?.toUpperCase() || "—"}</span><span>{asset.rights_status?.replace("_", " ").toUpperCase()}</span></div>{asset.source_url && <a href={asset.source_url} target="_blank" rel="noreferrer">SOURCE REFERENCE ↗</a>}<div className="ivl-card-actions"><button type="button" className="text-btn" onClick={() => setPreview(asset)}>PREVIEW ▶</button>{asset.status !== "archived" && <button type="button" className="text-btn" onClick={() => archive(asset)}>ARCHIVE</button>}</div></div>
+            <div className="ivl-card-body"><div className="ivl-card-title"><h3>{asset.title}</h3><small>{asset.status.toUpperCase()}</small></div><p>{asset.description || asset.category || "No description added."}</p><div className="ivl-card-meta"><span>{formatBytes(asset.file_size_bytes)}</span><span>{asset.language?.toUpperCase() || "—"}</span><span>{asset.rights_status?.replace("_", " ").toUpperCase()}</span></div>{asset.source_url && <a href={asset.source_url} target="_blank" rel="noreferrer">SOURCE REFERENCE ↗</a>}
+              <div className="ivl-card-actions"><button type="button" className="text-btn" onClick={() => setPreview(asset)}>PREVIEW ▶</button>{["authorised", "not_applicable"].includes(asset.rights_status) && asset.status !== "archived" && <><button type="button" className="text-btn" onClick={() => queueJob(asset, "analyse")}>ANALYSE</button><button type="button" className="text-btn" onClick={() => queueJob(asset, "transcribe")}>TRANSCRIBE</button></>}{asset.status !== "archived" && <button type="button" className="text-btn" onClick={() => archive(asset)}>ARCHIVE</button>}</div>
+            </div>
           </article>)}</div> : <div className="ivl-empty">{loading ? "Loading internal assets…" : "No internal video assets yet. Upload a source video or a clip to start building the library."}</div>}
           {hasMore && <div className="ivl-load-more"><button className="outline-btn" type="button" onClick={() => refresh(false)} disabled={loading}>{loading ? "LOADING…" : "LOAD MORE ASSETS"}</button></div>}
         </section>
