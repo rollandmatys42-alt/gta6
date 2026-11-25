@@ -10,9 +10,11 @@
     "amount_cents": { "type": "integer", "minimum": 0 },
     "available_cents": { "type": "integer", "minimum": 0 },
     "redeemed_cents": { "type": "integer", "minimum": 0, "default": 0 },
+    "reserved_cents": { "type": "integer", "minimum": 0, "default": 0 },
+    "paid_cents": { "type": "integer", "minimum": 0, "default": 0 },
     "commission_rate_percent": { "type": "number", "default": 20 },
     "referral_discount_percent": { "type": "number", "default": 5 },
-    "status": { "type": "string", "enum": ["pending", "available", "redeemed", "reversed"], "default": "pending" },
+    "status": { "type": "string", "enum": ["pending", "available", "reserved", "paid", "redeemed", "reversed"], "default": "pending" },
     "available_at": { "type": "string", "format": "date-time" }
   },
   "required": ["referrer_user_id", "referred_user_id", "currency", "amount_cents", "available_cents", "status"],
