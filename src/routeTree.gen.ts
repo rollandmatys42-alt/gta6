@@ -10,6 +10,7 @@ import { Route as AuthedAdminOperationsRouteImport } from "./routes/_authed/admi
 import { Route as AuthedAdminAffiliatesRouteImport } from "./routes/_authed/admin/affiliates";
 import { Route as AboutRouteImport } from "./routes/about";
 import { Route as AdminRouteImport } from "./routes/admin";
+import { Route as AdminImportRouteImport } from "./routes/admin.import";
 import { Route as CommunityRouteImport } from "./routes/community";
 import { Route as ContactRouteImport } from "./routes/contact";
 import { Route as CookiesRouteImport } from "./routes/cookies";
@@ -40,6 +41,7 @@ const AuthedAdminOperationsRoute = AuthedAdminOperationsRouteImport.update({ id:
 const AuthedAdminAffiliatesRoute = AuthedAdminAffiliatesRouteImport.update({ id: "/admin/affiliates", path: "/admin/affiliates", getParentRoute: () => AuthedRoute });
 const AboutRoute = AboutRouteImport.update({ id: "/about", path: "/about", getParentRoute: () => rootRouteImport });
 const AdminRoute = AdminRouteImport.update({ id: "/admin", path: "/admin", getParentRoute: () => rootRouteImport });
+const AdminImportRoute = AdminImportRouteImport.update({ id: "/admin/import", path: "/admin/import", getParentRoute: () => rootRouteImport });
 const CommunityRoute = CommunityRouteImport.update({ id: "/community", path: "/community", getParentRoute: () => rootRouteImport });
 const ContactRoute = ContactRouteImport.update({ id: "/contact", path: "/contact", getParentRoute: () => rootRouteImport });
 const CookiesRoute = CookiesRouteImport.update({ id: "/cookies", path: "/cookies", getParentRoute: () => rootRouteImport });
@@ -74,6 +76,7 @@ const rootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   AboutRoute,
   AdminRoute,
+  AdminImportRoute,
   CommunityRoute,
   ContactRoute,
   CookiesRoute,
