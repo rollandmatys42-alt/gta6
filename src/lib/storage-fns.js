@@ -108,9 +108,18 @@ export async function verifyStorageConnection({ entities, connectionId, userId }
   const row = (await allConnectionRows(entities)).find(item => item.setting_key === PREFIX + connectionId);
   if (!row) throw Object.assign(new Error("Storage connection not found."), { status: 404 });
   const connection = await readConnection(row);
-  await verifyCredentials(connection);
+  try {
+    await verifyCredentials(connection);
+  } catch (error) {
+    const parsed = JSON.parse(row.setting_value || "{}");
+    parsed.public.verifiedAt = null;
+    parsed.public.lastCheckFailedAt = new Date().toISOString();
+    await entities.SiteSetting.update(row.id, { setting_value: JSON.stringify(parsed), updated_by: userId });
+    throw error;
+  }
   const parsed = JSON.parse(row.setting_value || "{}");
   parsed.public.verifiedAt = new Date().toISOString();
+  parsed.public.lastCheckFailedAt = null;
   await entities.SiteSetting.update(row.id, { setting_value: JSON.stringify(parsed), updated_by: userId });
   return { ok: true, verifiedAt: parsed.public.verifiedAt };
 }
