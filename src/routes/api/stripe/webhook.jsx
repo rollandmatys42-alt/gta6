@@ -129,6 +129,70 @@ async function saveStripeSubscription(db, stripeSub, fallback = {}) {
   return true;
 }
 
+async function reverseAffiliateCommissions(db, invoiceId, refundedCents, grossCents, eventId) {
+  if (!invoiceId || refundedCents <= 0) return;
+  const credits = await db.ReferralCredit.filter({ stripe_invoice_id: invoiceId }, "-created_date", 100, 0);
+  for (const credit of credits) {
+    const original = Number(credit.amount_cents || 0);
+    const basis = Number(credit.gross_payment_cents || grossCents || 0);
+    const targetReversed = basis > 0 ? Math.min(original, Math.floor(original * Math.min(refundedCents, basis) / basis)) : original;
+    const delta = targetReversed - Number(credit.reversed_cents || 0);
+    if (delta <= 0) continue;
+    let remaining = delta;
+    const available = Number(credit.available_cents || 0);
+    const reserved = Number(credit.reserved_cents || 0);
+    const paid = Number(credit.paid_cents || 0);
+    const fromAvailable = Math.min(available, remaining); remaining -= fromAvailable;
+    const fromReserved = Math.min(reserved, remaining); remaining -= fromReserved;
+    const fromPaid = Math.min(paid, remaining); remaining -= fromPaid;
+    let transferredReserved = 0;
+    if (fromReserved > 0) {
+      const payoutRows = await db.AffiliatePayoutRequest.filter({ user_id: credit.referrer_user_id, status: { $in: ["requested", "processing", "failed"] } }, "-created_date", 500, 0);
+      let toRelease = fromReserved;
+      for (const payout of payoutRows) {
+        const allocations = Array.isArray(payout.allocations) ? payout.allocations.map(x => ({ ...x })) : [];
+        let changed = false;
+        for (const allocation of allocations) {
+          if (allocation.credit_id !== credit.id || toRelease <= 0) continue;
+          const reduction = Math.min(Number(allocation.amount_cents || 0), toRelease);
+          if (payout.stripe_transfer_id) transferredReserved += reduction;
+          else { allocation.amount_cents = Math.max(0, Number(allocation.amount_cents || 0) - reduction); changed = true; }
+          toRelease -= reduction;
+        }
+        if (changed) {
+          const kept = allocations.filter(x => Number(x.amount_cents || 0) > 0);
+          const newAmount = kept.reduce((sum, x) => sum + Number(x.amount_cents || 0), 0);
+          await db.AffiliatePayoutRequest.update(payout.id, {
+            allocations: kept, amount_cents: newAmount,
+            ...(newAmount === 0 ? { status: "rejected", processed_at: new Date().toISOString() } : {}),
+            admin_note: [payout.admin_note, "Commission reduced automatically following a refund on the referred subscription."].filter(Boolean).join(" ").slice(0, 1000),
+          });
+        }
+        if (toRelease <= 0) break;
+      }
+    }
+    const recoveryCents = fromPaid + transferredReserved + remaining;
+    if (recoveryCents > 0) {
+      const prior = await db.AffiliateCommissionAdjustment.filter({ stripe_event_id: eventId, referral_credit_id: credit.id }, "-created_date", 1, 0);
+      if (!prior.length) await db.AffiliateCommissionAdjustment.create({
+        user_id: credit.referrer_user_id, referral_credit_id: credit.id, stripe_invoice_id: invoiceId,
+        stripe_event_id: eventId, currency: credit.currency, amount_cents: recoveryCents,
+        reason: "A referred subscription payment was refunded after the commission had been reserved or paid.", status: "open",
+      });
+    }
+    const availableAfter = Math.max(0, available - fromAvailable);
+    const reservedAfter = Math.max(0, reserved - fromReserved);
+    const fullyReversed = targetReversed >= original;
+    let status = credit.status;
+    if (fullyReversed) status = "reversed";
+    else if (reservedAfter > 0) status = "reserved";
+    else if (availableAfter > 0) status = credit.status === "pending" ? "pending" : "available";
+    else if (paid > 0) status = "paid";
+    else status = "reversed";
+    await db.ReferralCredit.update(credit.id, { reversed_cents: targetReversed, available_cents: availableAfter, reserved_cents: reservedAfter, status });
+  }
+}
+
 export const Route = createFileRoute("/api/stripe/webhook")({
   server: {
     handlers: {
@@ -151,6 +215,8 @@ export const Route = createFileRoute("/api/stripe/webhook")({
           if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type) && object.mode === "subscription" && object.subscription) {
             const subscriptionId = typeof object.subscription === "string" ? object.subscription : object.subscription.id;
             const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
+            const latestInvoiceRef = stripeSub.latest_invoice;
+            const referralInvoiceId = typeof latestInvoiceRef === "string" ? latestInvoiceRef : latestInvoiceRef?.id || "";
             await saveStripeSubscription(db, stripeSub, {
               user_id: object.metadata?.user_id || object.client_reference_id,
               tier_code: object.metadata?.tier_code,
@@ -169,7 +235,7 @@ export const Route = createFileRoute("/api/stripe/webhook")({
                 const commissionCents = Math.floor(eligibleCents * 0.20);
                 if (commissionCents > 0) await db.ReferralCredit.create({
                   referrer_user_id: referrerUserId, referred_user_id: referredUserId,
-                  stripe_session_id: object.id, stripe_subscription_id: subscriptionId,
+                  stripe_session_id: object.id, stripe_subscription_id: subscriptionId, stripe_invoice_id: referralInvoiceId,
                   currency: String(object.currency || object.metadata?.currency || "gbp").toUpperCase(),
                   amount_cents: commissionCents, available_cents: commissionCents, reserved_cents: 0, paid_cents: 0, redeemed_cents: 0,
                   eligible_payment_cents: eligibleCents, gross_payment_cents: grossCents, reversed_cents: 0,
@@ -240,6 +306,7 @@ export const Route = createFileRoute("/api/stripe/webhook")({
                 refund_amount_cents: Number(object.amount_refunded || 0),
                 source_event_id: event.id,
               });
+              await reverseAffiliateCommissions(db, invoiceId, Number(object.amount_refunded || 0), Number(object.amount || 0), event.id);
             }
           }
           await db.StripeWebhookEvent.create({ event_id: event.id, event_type: event.type, processed_at: new Date().toISOString() });

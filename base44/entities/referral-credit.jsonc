@@ -6,6 +6,7 @@
     "referred_user_id": { "type": "string" },
     "stripe_session_id": { "type": "string" },
     "stripe_subscription_id": { "type": "string" },
+    "stripe_invoice_id": { "type": "string" },
     "currency": { "type": "string", "enum": ["GBP", "EUR", "USD"] },
     "amount_cents": { "type": "integer", "minimum": 0 },
     "eligible_payment_cents": { "type": "integer", "minimum": 0 },
