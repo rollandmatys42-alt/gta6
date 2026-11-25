@@ -2,7 +2,7 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import {createFileRoute,Link} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import {useAuth} from "@/lib/AuthContext";
-import {listPublicInternalClips,requestInternalClipDownload} from "@/lib/internal-video-fns";
+import {getInternalClipDownloadAccess,listPublicInternalClips,requestInternalClipDownload} from "@/lib/internal-video-fns";
 import "@/styles/vicehub-library.css";
 
 export const Route=createFileRoute("/library")({
@@ -32,6 +32,7 @@ function ClientClipLibrary(){
  const[selected,setSelected]=useState(null);
  const[busy,setBusy]=useState(false);
  const[downloading,setDownloading]=useState("");
+ const[downloadAccess,setDownloadAccess]=useState(null);
  const[error,setError]=useState("");
 
  const params=useMemo(()=>({
@@ -53,6 +54,15 @@ function ClientClipLibrary(){
  },[params]);
 
  useEffect(()=>{refresh();},[refresh]);
+
+ useEffect(()=>{
+  let live=true;
+  if(!isAuthenticated){setDownloadAccess({canDownload:false,reason:"sign_in"});return ()=>{live=false;};}
+  setDownloadAccess(null);
+  getInternalClipDownloadAccess({data:{}}).then(result=>{if(live)setDownloadAccess(result);})
+   .catch(()=>{if(live)setDownloadAccess({canDownload:false,reason:"membership_check_failed"});});
+  return ()=>{live=false;};
+ },[isAuthenticated]);
 
  const languages=useMemo(()=>[...new Set(clips.map(x=>x.language).filter(x=>x&&x!=="und"))].sort(),[clips]);
  const countries=useMemo(()=>[...new Set(clips.flatMap(x=>x.target_countries||[]))].sort(),[clips]);
@@ -76,19 +86,24 @@ function ClientClipLibrary(){
   finally{setBusy(false);}
  };
 
- const preview=clip=>{
-  if(!isAuthenticated){setError("Sign in to preview clips.");return;}
-  setError("");setSelected(clip);
- };
+ const preview=clip=>{setError("");setSelected(clip);};
  const download=async clip=>{
-  if(!isAuthenticated){setError("Sign in to download clips.");return;}
+  if(!isAuthenticated){window.location.assign("/sign-in");return;}
+  if(!downloadAccess?.canDownload){
+   if(downloadAccess?.reason==="limit_reached"){setError("Your monthly download allowance has been used. It will reset at the start of next month.");return;}
+   if(["paid_subscription_required","clean_downloads_not_included","downloads_not_included"].includes(downloadAccess?.reason)){window.location.assign("/subscription");return;}
+   setError("Your download entitlement could not be verified. Please refresh the page or contact support.");return;
+  }
   setDownloading(clip.id);setError("");
   try{
    const r=await requestInternalClipDownload({data:{assetId:clip.id}});
+   setDownloadAccess(current=>current?{...current,downloadsRemaining:r.downloadsRemaining,canDownload:r.downloadsRemaining>0,reason:r.downloadsRemaining>0?null:"limit_reached"}:current);
    window.location.assign(r.downloadUrl);
   }catch(e){setError(e?.message||"Download could not be authorised.");}
   finally{setDownloading("");}
  };
+ const downloadLabel=()=>!isAuthenticated?"SIGN IN TO DOWNLOAD":downloadAccess===null?"CHECKING MEMBERSHIP…":downloadAccess.canDownload?"↓ DOWNLOAD":downloadAccess.reason==="limit_reached"?"MONTHLY LIMIT REACHED":"UNLOCK DOWNLOADS";
+ const downloadDisabled=()=>downloading!==""||downloadAccess===null||(isAuthenticated&&downloadAccess?.reason==="limit_reached");
  const duration=s=>{const n=Math.max(0,Number(s)||0);return Math.floor(n/60)+":"+String(n%60).padStart(2,"0");};
  const VideoCard=({clip,index=0,rank})=><article className="vh-card" key={clip.id}>
   <button type="button" className="vh-card-art" onClick={()=>preview(clip)} aria-label={"Preview "+clip.title}>
@@ -101,7 +116,7 @@ function ClientClipLibrary(){
    <div className="vh-card-meta"><span>{clip.category||"VIDEO"}</span><span>{clip.language&&clip.language!=="und"?clip.language.toUpperCase():"MULTI"}</span></div>
    <h3>{clip.title}</h3>
    <p>{clip.description||"A selected clip from the VICEHUB video library."}</p>
-   <div className="vh-card-foot"><span>{clip.download_count_30d>0?clip.download_count_30d+" DOWNLOADS / 30 DAYS":clip.viral_potential_score!=null?"✦ "+clip.viral_potential_score+"/100 VIRAL SCORE":"VICEHUB COLLECTION"}</span><button type="button" onClick={()=>download(clip)} disabled={downloading===clip.id}>{downloading===clip.id?"…":"↓ DOWNLOAD"}</button></div>
+   <div className="vh-card-foot"><span>{clip.download_count_30d>0?clip.download_count_30d+" DOWNLOADS / 30 DAYS":clip.viral_potential_score!=null?"✦ "+clip.viral_potential_score+"/100 VIRAL SCORE":"VICEHUB COLLECTION"}</span><button type="button" onClick={()=>download(clip)} disabled={downloadDisabled()}>{downloading===clip.id?"…":downloadLabel()}</button></div>
   </div>
  </article>;
 
@@ -146,7 +161,7 @@ function ClientClipLibrary(){
 
    {lead&&<section className="vh-spotlight">
     <div className="vh-spotlight-art">{lead.thumbnail_url?<img src={lead.thumbnail_url} alt={lead.title}/>:<img src={EDITORIAL_IMAGES[1]} alt="Illustrative Leonida artwork"/>}<span>01 / EDITOR'S SPOTLIGHT</span><button type="button" onClick={()=>preview(lead)}>▶</button></div>
-    <div className="vh-spotlight-copy"><span className="vh-eyebrow"><i/> HAND-PICKED BY VICEHUB</span><h2>{lead.title}</h2><p>{lead.description||"A featured selection from the VICEHUB editorial team."}</p><div className="vh-spotlight-tags">{[lead.category,lead.language,...(lead.target_countries||[])].filter(Boolean).map((x,i)=><span key={x+i}>{x}</span>)}</div><div className="vh-spotlight-actions"><button type="button" onClick={()=>preview(lead)}>▶ WATCH PREVIEW</button><button type="button" onClick={()=>download(lead)} disabled={downloading===lead.id}>{downloading===lead.id?"PREPARING…":"↓ DOWNLOAD CLIP"}</button></div></div>
+    <div className="vh-spotlight-copy"><span className="vh-eyebrow"><i/> HAND-PICKED BY VICEHUB</span><h2>{lead.title}</h2><p>{lead.description||"A featured selection from the VICEHUB editorial team."}</p><div className="vh-spotlight-tags">{[lead.category,lead.language,...(lead.target_countries||[])].filter(Boolean).map((x,i)=><span key={x+i}>{x}</span>)}</div><div className="vh-spotlight-actions"><button type="button" onClick={()=>preview(lead)}>▶ WATCH PREVIEW</button><button type="button" onClick={()=>download(lead)} disabled={downloadDisabled()}>{downloading===lead.id?"PREPARING…":downloadLabel()}</button></div></div>
    </section>}
 
    <Section eyebrow="SELECTED BY OUR EDITORS / 01" title="À LA UNE" description="The clips currently selected by the VICEHUB editorial team." items={collections.featured} empty="New featured clips will appear here as soon as the editorial team selects them." id="featured"/>
@@ -154,7 +169,7 @@ function ClientClipLibrary(){
 
    <section className="vh-week-feature">
     <div className="vh-week-label"><span>THE WEEKLY SPOTLIGHT</span><b>VIDEO<br/>OF THE<br/><em>WEEK.</em></b><small>TOP DOWNLOADED · LAST 7 DAYS</small></div>
-    {week?<div className="vh-week-content"><button type="button" className="vh-week-art" onClick={()=>preview(week)}>{week.thumbnail_url?<img src={week.thumbnail_url} alt={week.title}/>:<img src={EDITORIAL_IMAGES[2]} alt="Illustrative Port Gellhorn artwork"/>}<i>▶</i></button><div className="vh-week-copy"><span>THE COMMUNITY'S MOST DOWNLOADED THIS WEEK</span><h2>{week.title}</h2><p>{week.description||"The clip with the highest number of confirmed downloads in the last seven days."}</p><strong>{week.download_count_7d} <small>CONFIRMED DOWNLOADS</small></strong><button type="button" onClick={()=>download(week)} disabled={downloading===week.id}>{downloading===week.id?"PREPARING…":"↓ DOWNLOAD THIS CLIP"}</button></div></div>:<div className="vh-week-empty"><b>THE NEXT WEEKLY WINNER IS WAITING.</b><p>The video of the week is selected automatically from confirmed downloads over the last seven days. It will appear here when a clip has download activity.</p></div>}
+    {week?<div className="vh-week-content"><button type="button" className="vh-week-art" onClick={()=>preview(week)}>{week.thumbnail_url?<img src={week.thumbnail_url} alt={week.title}/>:<img src={EDITORIAL_IMAGES[2]} alt="Illustrative Port Gellhorn artwork"/>}<i>▶</i></button><div className="vh-week-copy"><span>THE COMMUNITY'S MOST DOWNLOADED THIS WEEK</span><h2>{week.title}</h2><p>{week.description||"The clip with the highest number of confirmed downloads in the last seven days."}</p><strong>{week.download_count_7d} <small>CONFIRMED DOWNLOADS</small></strong><button type="button" onClick={()=>download(week)} disabled={downloadDisabled()}>{downloading===week.id?"PREPARING…":downloadLabel()}</button></div></div>:<div className="vh-week-empty"><b>THE NEXT WEEKLY WINNER IS WAITING.</b><p>The video of the week is selected automatically from confirmed downloads over the last seven days. It will appear here when a clip has download activity.</p></div>}
    </section>
 
    <Section eyebrow="COMMUNITY ACTIVITY / LAST 30 DAYS / 03" title="MOST DOWNLOADED" description="Ranked by completed, confirmed downloads — not views or AI predictions." items={collections.mostDownloaded} empty="The ranking will update automatically after the first confirmed downloads." ranked id="most-downloaded"/>
@@ -174,7 +189,7 @@ function ClientClipLibrary(){
 
    <footer className="vh-library-footer"><span>VICEHUB / LEONIDA VIDEO ARCHIVE</span><p>Download rankings use completed download events recorded by VICEHUB. Weekly and monthly lists update as new downloads are completed. AI viral potential is an estimate, not a verified engagement result. All clips remain subject to their usage rights and membership limits. Decorative artwork: <a href="https://www.rockstargames.com/VI/media/screenshots" target="_blank" rel="noreferrer">official Rockstar Games media gallery</a>.</p></footer>
 
-   {selected&&<div className="vh-preview-modal" role="dialog" aria-modal="true" aria-label={selected.title} onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null);}}><div className="vh-preview-panel"><div className="vh-preview-head"><div><span>VICEHUB / SECURE PREVIEW</span><b>{selected.title}</b></div><button type="button" onClick={()=>setSelected(null)} aria-label="Close preview">×</button></div><video controls autoPlay playsInline src={"/api/internal-video-preview/"+encodeURIComponent(selected.id)}/><div className="vh-preview-foot"><span>Preview access requires a signed-in account.</span><span>Downloads depend on your active membership allowance.</span></div></div></div>}
+   {selected&&<div className="vh-preview-modal" role="dialog" aria-modal="true" aria-label={selected.title} onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null);}}><div className="vh-preview-panel"><div className="vh-preview-head"><div><span>VICEHUB / SECURE PREVIEW</span><b>{selected.title}</b></div><button type="button" onClick={()=>setSelected(null)} aria-label="Close preview">×</button></div><video controls autoPlay playsInline src={"/api/internal-video-preview/"+encodeURIComponent(selected.id)}/><div className="vh-preview-foot"><span>Preview available for published clips. Usage rights remain applicable.</span><span>{downloadAccess?.canDownload?downloadAccess.downloadsRemaining+" downloads remaining this month":"Downloads require an eligible paid membership."}</span></div></div></div>}
   </main>
  </SiteFrame>;
 }

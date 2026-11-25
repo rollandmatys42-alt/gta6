@@ -161,3 +161,8 @@
 .vh-library .vh-spotlight{background:radial-gradient(ellipse at 10% 0%,rgba(255,79,154,.12),transparent 48%),linear-gradient(140deg,#21132e,#0c0915)}
 @media(max-width:760px){.vh-library .vh-leonida-gallery{grid-template-columns:1fr 1fr}.vh-library .vh-leonida-city{grid-column:1/-1;min-height:185px}.vh-library .vh-leonida-tile{min-height:145px;padding:13px}.vh-library .vh-leonida-tile>b{font-size:23px}}
 @media(max-width:420px){.vh-library .vh-leonida-gallery{grid-template-columns:1fr}.vh-library .vh-leonida-city{grid-column:auto}.vh-library .vh-leonida-tile{min-height:160px}}
+
+/* Subscriber download actions */
+.vh-card-foot button:disabled,.vh-spotlight-actions button:disabled,.vh-week-copy>button:disabled{opacity:.48;cursor:not-allowed}
+.vh-preview-panel video{aspect-ratio:16/9;object-fit:contain}
+@media(max-width:600px){.vh-preview-modal{padding:8px}.vh-preview-panel{padding:10px}.vh-preview-head b{font-size:14px}.vh-preview-foot{font-size:9px}}
