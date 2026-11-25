@@ -19,9 +19,11 @@ export const createExternalVideoSource = createServerFn({ method: "POST" })
   .validator(z.object({
     sourceUrl: z.string().trim().url().max(1000),
     title: z.string().trim().max(180).optional().default(""),
+    rightsAttested: z.boolean(),
   }))
   .handler(async ({ data, context }) => {
     requireAdmin(context);
+    if (!data.rightsAttested) throw Object.assign(new Error("Confirm the usage rights before importing this source."), { status: 400, code: "RIGHTS_ATTESTATION_REQUIRED" });
     const url = new URL(data.sourceUrl);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
       throw Object.assign(new Error("Use a public HTTP or HTTPS video URL without embedded credentials."), { status: 400, code: "INVALID_SOURCE_URL" });
