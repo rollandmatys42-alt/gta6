@@ -421,7 +421,7 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
       })(),
       duration_seconds: Number(asset.duration_seconds || 0),
       thumbnail_url: asset.thumbnail_url || "",
-      preview_url: asset.preview_url || (asset.google_drive_file_id ? "https://drive.google.com/file/d/" + encodeURIComponent(asset.google_drive_file_id) + "/preview" : asset.storage_url || asset.source_url || ""),
+      preview_url: asset.preview_url || ((asset.preview_drive_file_id || asset.google_drive_file_id) ? "https://drive.google.com/file/d/" + encodeURIComponent(asset.preview_drive_file_id || asset.google_drive_file_id) + "/preview" : asset.storage_url || asset.source_url || ""),
       viral_potential_score: Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null,
       public_published_at: asset.public_published_at || asset.created_date || null,
       download_count_7d: counts7d.get(asset.id) || 0,
