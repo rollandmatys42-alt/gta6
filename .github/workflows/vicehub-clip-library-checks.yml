@@ -14,6 +14,8 @@ jobs:
         run: >-
           npx --yes esbuild
           src/routes/admin.jsx
+          src/routes/legacy-home.jsx
+          src/components/SiteFrame.jsx
           src/routes/admin.import.jsx
           src/routes/admin.video-library.jsx
           src/routes/library.jsx

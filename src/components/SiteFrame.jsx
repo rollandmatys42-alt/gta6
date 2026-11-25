@@ -14,18 +14,16 @@ import { useLocale, setSiteLocale, translate } from "@/lib/i18n";
 import { getMyNotifications, getPushNotificationConfig, savePushSubscription } from "@/lib/server-fns";
 import "@/styles/vicehub-2026-redesign.css";
 
-const links = [["/", "nav.home"], ["/library", "nav.library"], ["/news", "nav.news"], ["/creators", "nav.creators"]];
+const links = [["/", "nav.home"], ["/library", "nav.library"]];
 const workspaceLinks = [
   ["/dashboard", "⌂", "overview"],
   ["/library", "▤", "library"],
-  ["/news", "▧", "news"],
-  ["/creators", "◎", "profile"],
   ["/messages", "✉", "messages"],
   ["/social", "↗", "social"],
   ["/notifications", "✦", "dispatch"],
   ["/subscription", "◈", "subscription"],
 ];
-const libraryLabels = { en: "Video library", fr: "Bibliothèque vidéo", es: "Biblioteca de vídeos", pt: "Biblioteca de vídeos", it: "Libreria video", de: "Videobibliothek" };
+const libraryLabels = { en: "Clip library", fr: "Bibliothèque de clips", es: "Biblioteca de clips", pt: "Biblioteca de clips", it: "Libreria di clip", de: "Clip-Bibliothek" };
 
 
 function decodeVapidKey(value){
@@ -101,7 +99,7 @@ function PwaInstallButton() {
   return <span className="vh-pwa-install-wrap"><button type="button" className="vh-pwa-install" onClick={install}>↓ INSTALL APP</button>{message&&<span className="vh-pwa-install-message" role="status">{message}</span>}</span>;
 }
 
-export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ", workspace = false, activeKey = "" }) {
+export default function SiteFrame({ children, eyebrow = "VICEHUB / SHORT-FORM CLIP LIBRARY", workspace = false, activeKey = "" }) {
   const locale = useLocale();
   const { isAuthenticated, logout } = useAuth();
   const [open, setOpen] = useState(false);
@@ -112,7 +110,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
   return <div className={"platform-shell fh-shell" + (workspace ? " vh-workspace-mode" : "")}>
     {workspace ? <>
       <aside className="vh-workspace-sidebar">
-        <Link to="/dashboard" className="vh-workspace-brand"><span className="vh-workspace-mark">VI</span><span>VICE<b>HUB</b><small>MEMBER HQ / LEONIDA</small></span></Link>
+        <Link to="/dashboard" className="vh-workspace-brand"><span className="vh-workspace-mark">VI</span><span>VICE<b>HUB</b><small>MEMBER WORKSPACE</small></span></Link>
         <div className="vh-workspace-caption">MEMBER NAVIGATION</div>
         <nav className="vh-workspace-nav" aria-label="Member workspace navigation">
           {workspaceLinks.map(([href, icon, key]) => <Link key={href} to={href} className={activeKey === key ? "active" : ""} aria-current={activeKey === key ? "page" : undefined}>
@@ -137,11 +135,11 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
     </> : <>
       <header className="fh-header">
         <div className="fh-header-inner">
-          <Link to="/" className="fh-brand" onClick={close}><span className="fh-brand-mark">VI</span><span className="fh-brand-text">VICE<b>HUB</b><small>GTA VI FAN DROPS</small></span></Link>
+          <Link to="/" className="fh-brand" onClick={close}><span className="fh-brand-mark">VI</span><span className="fh-brand-text">VICE<b>HUB</b><small>SHORT-FORM VIDEO CLIPS</small></span></Link>
           <button type="button" className="fh-burger" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}><i /><i /><i /></button>
           <nav className={"fh-nav" + (open ? " open" : "")} aria-label="Main">
             {links.map(([href, key]) => <Link key={href} to={href} className="fh-nav-link" activeProps={{ className: "fh-nav-link active" }} activeOptions={{ exact: href === "/" }} onClick={close}>{label(key)}</Link>)}
-            <a href="/#plans" className="fh-nav-link" onClick={close}>Pricing</a>
+            <Link to="/subscription" className="fh-nav-link" onClick={close}>Membership</Link>
             <div className="fh-nav-actions"><DispatchIndicator isAuthenticated={isAuthenticated}/><PwaInstallButton/>
               <select className="fh-lang" aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select>
               {isAuthenticated
@@ -154,9 +152,9 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / GTA VI FAN HQ
       <main className="platform-main"><div className="eyebrow">{eyebrow}</div>{children}</main>
       <footer className="fh-footer">
         <div className="fh-footer-grid">
-          <div><div className="fh-brand-text">VICE<b>HUB</b></div><p>Weekly vertical GTA VI videos for TikTok, Instagram and YouTube Shorts. Download, post on your own channels, grow your page.</p></div>
-          <div><h4>Explore</h4><Link to="/library">Video library</Link><Link to="/news">GTA VI news</Link><Link to="/creators">Creators</Link></div>
-          <div><h4>Account</h4><Link to="/dashboard">My account</Link><a href="/#plans">Pricing</a><Link to="/social">Social planner</Link></div>
+          <div><div className="fh-brand-text">VICE<b>HUB</b></div><p>Curated short-form video clips across topics, languages and markets. Preview and download according to your membership.</p></div>
+          <div><h4>Explore</h4><Link to="/library">Video library</Link><Link to="/social">Social planner</Link><Link to="/creators">Creators</Link></div>
+          <div><h4>Account</h4><Link to="/dashboard">My account</Link><Link to="/subscription">Membership</Link><Link to="/social">Social planner</Link></div>
           <div><h4>Legal</h4><Link to="/terms">{translate(locale, "footer.terms")}</Link><Link to="/privacy">{translate(locale, "footer.privacy")}</Link><Link to="/copyright">{translate(locale, "footer.copyright")}</Link><Link to="/cookies">Cookies</Link><Link to="/refunds">Refunds</Link><Link to="/contact">Contact</Link></div>
         </div>
         <div className="fh-footer-bottom"><span>{translate(locale, "footer.independent")}</span><small>{translate(locale, "footer.disclaimer")}</small></div>
