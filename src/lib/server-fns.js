@@ -520,6 +520,16 @@ export const publishInternalAssetToCatalogue = createServerFn({ method: "POST" }
       throw Object.assign(new Error("Both source and watermarked storage accounts must remain enabled and verified."), { status: 409, code: "STORAGE_CONNECTION_NOT_READY" });
     }
     let video = asset.public_video_id ? await entities.Video.get(asset.public_video_id).catch(() => null) : null;
+    if (!video) {
+      const matchingDrafts = await entities.Video.filter(
+        { storage_key: asset.storage_key, source_reference: asset.rights_evidence_url },
+        "-created_date", 1, 0,
+      );
+      video = matchingDrafts[0] || null;
+      if (video && !asset.public_video_id) {
+        await entities.InternalVideoAsset.update(asset.id, { public_video_id: video.id, public_video_status: video.status || "draft" });
+      }
+    }
     const alreadyPublished = video?.status === "published";
     if (alreadyPublished) {
       return { video, alreadyPublished: true, message: "This internal asset is already published in the client catalogue." };

@@ -58,7 +58,6 @@ async function createWatermarkedRendition(file, onProgress) {
   const video = document.createElement("video");
   const sourceUrl = URL.createObjectURL(file);
   let recorder = null, raf = 0, videoStream = null, canvasStream = null;
-  video.src = sourceUrl;
   video.preload = "auto";
   video.playsInline = true;
   video.muted = false;
@@ -66,6 +65,7 @@ async function createWatermarkedRendition(file, onProgress) {
     await new Promise((resolve, reject) => {
       video.onloadedmetadata = resolve;
       video.onerror = () => reject(new Error("The source video could not be decoded."));
+      video.src = sourceUrl;
       video.load();
     });
     if (!video.videoWidth || !video.videoHeight || !Number.isFinite(video.duration)) throw new Error("The source video has invalid dimensions or duration.");
