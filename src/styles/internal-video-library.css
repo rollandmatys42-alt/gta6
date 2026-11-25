@@ -40,3 +40,6 @@
 .ivl-job-status{display:flex;align-items:center;gap:10px;color:#b9d1f8;font-size:10px;letter-spacing:.08em}
 .ivl-job-error{grid-column:1/-1;color:#ffb6bd!important}
 @media(max-width:700px){.ivl-job-row{grid-template-columns:1fr auto}.ivl-job-row>button{grid-column:2}.ivl-job-status{grid-column:1;grid-row:2}}
+
+.ivl-published-label{display:inline-flex;margin:8px 0;padding:6px 9px;border:1px solid #45d6a655;border-radius:999px;color:#72e6b8;font-size:9px;font-weight:900;letter-spacing:.08em}
+.ivl-publish-modal{max-width:620px}.ivl-publish-modal>p{color:#b9b0c0;font-size:12px;line-height:1.7}.ivl-publish-modal>label{display:grid;gap:7px;margin:14px 0;color:#e9e1ef;font-size:11px;font-weight:800}.ivl-publish-modal input:not([type=checkbox]),.ivl-publish-modal select{width:100%;padding:11px;border:1px solid #ffffff25;border-radius:8px;background:#100b1b;color:#fff}.ivl-publish-modal .ivl-publish-check{display:flex;align-items:center;gap:10px}.ivl-publish-modal .ivl-publish-check input{width:auto}

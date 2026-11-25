@@ -487,6 +487,84 @@ export const publishVideo = createServerFn({ method: "POST" })
     return published;
   });
 
+
+export const publishInternalAssetToCatalogue = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    assetId: z.string().min(1).max(128),
+    category: z.enum(["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]),
+    language: z.enum(["en", "fr", "es", "pt", "it", "de"]).default("en"),
+    isFeatured: z.boolean().default(false),
+    creatorName: z.string().max(80).optional(),
+    watermarkedStorageKey: z.string().min(1).max(600),
+    watermarkedStorageConnectionId: z.string().min(1).max(128),
+    watermarkedBytes: z.number().int().positive(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const entities = context.getBase44().asServiceRole.entities;
+    const asset = await entities.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.status === "archived" || !String(asset.storage_key || "").startsWith("videos/internal-library/")) {
+      throw Object.assign(new Error("The internal source asset is unavailable."), { status: 404, code: "INTERNAL_ASSET_NOT_FOUND" });
+    }
+    if (asset.rights_status !== "authorised" || !asset.rights_evidence_url) {
+      throw Object.assign(new Error("Only assets with authorised rights and a recorded rights-evidence URL can be published to the client catalogue."), { status: 409, code: "INTERNAL_ASSET_RIGHTS_NOT_CLEARED" });
+    }
+    if (!data.watermarkedStorageKey.startsWith("videos/watermarked/")) {
+      throw Object.assign(new Error("The protected rendition must be stored in the private watermarked path."), { status: 400, code: "INVALID_WATERMARKED_PATH" });
+    }
+    const connections = await listStorageConnections(entities);
+    const originalConnection = connections.find(item => item.id === asset.storage_connection_id && item.enabled && item.verifiedAt);
+    const watermarkedConnection = connections.find(item => item.id === data.watermarkedStorageConnectionId && item.enabled && item.verifiedAt);
+    if (!originalConnection || !watermarkedConnection) {
+      throw Object.assign(new Error("Both source and watermarked storage accounts must remain enabled and verified."), { status: 409, code: "STORAGE_CONNECTION_NOT_READY" });
+    }
+    let video = asset.public_video_id ? await entities.Video.get(asset.public_video_id).catch(() => null) : null;
+    const alreadyPublished = video?.status === "published";
+    if (alreadyPublished) {
+      return { video, alreadyPublished: true, message: "This internal asset is already published in the client catalogue." };
+    }
+    const videoData = {
+      title: String(asset.title || "VICEHUB video").slice(0, 140),
+      description: String(asset.description || "").slice(0, 3000),
+      category: data.category,
+      language: data.language,
+      is_featured: !!data.isFeatured,
+      tags: Array.isArray(asset.tags) ? asset.tags.slice(0, 20) : [],
+      duration_seconds: Number(asset.duration_seconds || 0),
+      creator_name: String(data.creatorName || "VICEHUB").slice(0, 80),
+      source_reference: asset.rights_evidence_url,
+      license_status: "verified",
+      storage_key: asset.storage_key,
+      watermarked_storage_key: data.watermarkedStorageKey,
+      storage_connection_id: asset.storage_connection_id,
+      watermarked_storage_connection_id: data.watermarkedStorageConnectionId,
+      original_bytes: Number(asset.file_size_bytes || 0),
+      watermarked_bytes: data.watermarkedBytes,
+      uploaded_by: context.user.id,
+    };
+    if (video) {
+      video = await entities.Video.update(video.id, { ...videoData, status: "draft" });
+    } else {
+      video = await entities.Video.create({ ...videoData, status: "draft" });
+      await entities.InternalVideoAsset.update(asset.id, { public_video_id: video.id, public_video_status: "draft" });
+    }
+    const published = await entities.Video.update(video.id, { status: "published", published_at: new Date().toISOString() });
+    await entities.InternalVideoAsset.update(asset.id, {
+      public_video_id: published.id,
+      public_video_status: "published",
+      public_published_at: new Date().toISOString(),
+    });
+    await recordStorageUsage({ entities, connectionId: data.watermarkedStorageConnectionId, bytes: data.watermarkedBytes });
+    await notifyAllMembers(context.getBase44().asServiceRole, {
+      type: "system",
+      title: "New VICEHUB video drop",
+      body: published.title + " is now available in the video library.",
+      target_url: "/library",
+    });
+    return { video: published, alreadyPublished: false, message: "The video is now published in the client catalogue." };
+  });
+
 export const getMyAccount = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .handler(async ({ context }) => {

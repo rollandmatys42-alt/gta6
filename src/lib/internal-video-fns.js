@@ -129,6 +129,9 @@ export const createInternalVideoAsset = createServerFn({ method: "POST" })
     originalFilename: z.string().trim().min(1).max(180),
     mimeType: z.enum(["video/mp4", "video/quicktime"]),
     fileSizeBytes: z.number().int().positive(),
+    durationSeconds: z.number().int().min(0).max(86400).optional(),
+    width: z.number().int().min(0).max(16384).optional(),
+    height: z.number().int().min(0).max(16384).optional(),
   }))
   .handler(async ({ data, context }) => {
     requireAdmin(context);
@@ -160,6 +163,9 @@ export const createInternalVideoAsset = createServerFn({ method: "POST" })
       original_filename: data.originalFilename,
       mime_type: data.mimeType,
       file_size_bytes: data.fileSizeBytes,
+      ...(data.durationSeconds !== undefined ? { duration_seconds: data.durationSeconds } : {}),
+      ...(data.width !== undefined ? { width: data.width } : {}),
+      ...(data.height !== undefined ? { height: data.height } : {}),
       created_by: context.user.id,
     });
     let usageRecorded = true;
