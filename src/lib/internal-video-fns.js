@@ -282,3 +282,29 @@ export const archiveInternalVideoAsset = createServerFn({ method: "POST" })
     }
     return db.InternalVideoAsset.update(asset.id, { status: "archived" });
   });
+
+export const reviewInternalVideoAsset = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    assetId: z.string().min(1).max(128),
+    reviewStatus: z.enum(["needs_review", "approved", "rejected"]).optional(),
+    publicVideoStatus: z.enum(["draft", "published"]).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const db = context.getBase44().asServiceRole.entities;
+    const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.asset_type !== "clip" || asset.status !== "ready") {
+      throw Object.assign(new Error("Only completed clip assets can be reviewed or published."), { status: 409, code: "CLIP_NOT_READY" });
+    }
+    const reviewStatus = data.reviewStatus || asset.review_status || "needs_review";
+    const publicVideoStatus = data.publicVideoStatus || asset.public_video_status || "draft";
+    if (publicVideoStatus === "published" && (!["approved"].includes(reviewStatus) || !["authorised", "not_applicable"].includes(asset.rights_status))) {
+      throw Object.assign(new Error("Approve the clip and confirm its rights before publishing it to the client library."), { status: 409, code: "CLIP_NOT_APPROVED" });
+    }
+    return db.InternalVideoAsset.update(asset.id, {
+      review_status: reviewStatus,
+      public_video_status: publicVideoStatus,
+      ...(publicVideoStatus === "published" ? { public_published_at: new Date().toISOString() } : {}),
+    });
+  });
