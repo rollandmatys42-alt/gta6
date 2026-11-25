@@ -43,21 +43,27 @@ async function unlockMaturedCredits(db, credits) {
 }
 export const getMyAffiliateDashboard = createServerFn({ method: "GET" }).middleware([requireUser]).handler(async ({ context }) => {
   const db = dbFor(context), user = context.user, profile = await ensureProfile(db, user.id);
-  const [credits, requests] = await Promise.all([
+  const [credits, requests, adjustments] = await Promise.all([
     db.ReferralCredit.filter({ referrer_user_id: user.id }, "-created_date", 2000, 0),
     db.AffiliatePayoutRequest.filter({ user_id: user.id }, "-created_date", 100, 0),
+    db.AffiliateCommissionAdjustment.filter({ user_id: user.id, status: "open" }, "-created_date", 500, 0),
   ]);
   await unlockMaturedCredits(db, credits);
-  const balances = Object.fromEntries(currencies.map(c => [c, { pendingCents: 0, availableCents: 0, reservedCents: 0, paidCents: 0, earnedCents: 0 }]));
+  const balances = Object.fromEntries(currencies.map(c => [c, { pendingCents: 0, availableCents: 0, reservedCents: 0, paidCents: 0, earnedCents: 0, reversedCents: 0, recoveryDueCents: 0 }]));
   for (const credit of credits) {
     const currency = String(credit.currency || "GBP").toUpperCase();
-    if (!balances[currency] || credit.status === "reversed") continue;
+    if (!balances[currency]) continue;
     const b = balances[currency];
     b.earnedCents += Number(credit.amount_cents || 0);
+    b.reversedCents += Number(credit.reversed_cents || 0);
     if (credit.status === "pending") b.pendingCents += Number(credit.available_cents ?? credit.amount_cents ?? 0);
     if (credit.status === "available") b.availableCents += Number(credit.available_cents ?? 0);
     if (credit.status === "reserved") b.reservedCents += Number(credit.reserved_cents ?? credit.available_cents ?? 0);
-    if (credit.status === "paid") b.paidCents += Number(credit.paid_cents ?? credit.amount_cents ?? 0);
+    if (credit.status === "paid" || credit.status === "reversed") b.paidCents += Number(credit.paid_cents || 0);
+  }
+  for (const adjustment of adjustments) {
+    const currency = String(adjustment.currency || "GBP").toUpperCase();
+    if (balances[currency]) balances[currency].recoveryDueCents += Number(adjustment.amount_cents || 0);
   }
   let connect = { status: profile.stripe_connect_status || "not_started", payoutsEnabled: !!profile.payouts_enabled, accountId: profile.stripe_connect_account_id || "" };
   if (profile.stripe_connect_account_id) {
@@ -67,7 +73,7 @@ export const getMyAffiliateDashboard = createServerFn({ method: "GET" }).middlew
       await db.ReferralProfile.update(profile.id, { stripe_connect_status: connect.status, payouts_enabled: connect.payoutsEnabled });
     } catch {}
   }
-  return { code: profile.referral_code, referralCount: credits.filter(c => c.status !== "reversed").length, balances, requests, connect, minimumPayoutCents: MIN_PAYOUT_CENTS };
+  return { code: profile.referral_code, referralCount: credits.filter(c => c.status !== "reversed").length, balances, requests, adjustments, connect, minimumPayoutCents: MIN_PAYOUT_CENTS };
 });
 export const startAffiliatePayoutOnboarding = createServerFn({ method: "POST" }).middleware([requireUser])
   .validator(z.object({ country: z.enum(["GB", "FR", "IE", "DE", "ES", "IT", "NL", "BE", "LU", "US", "CA"]) }))
@@ -124,24 +130,28 @@ export const requestAffiliatePayout = createServerFn({ method: "POST" }).middlew
 export const getAdminAffiliateData = createServerFn({ method: "GET" }).middleware([requireUser]).handler(async ({ context }) => {
   requireAdmin(context);
   const db = dbFor(context);
-  const [profiles, credits, payouts, users] = await Promise.all([
+  const [profiles, credits, payouts, users, adjustments] = await Promise.all([
     db.ReferralProfile.list("-created_date", 2000, 0), db.ReferralCredit.list("-created_date", 5000, 0),
     db.AffiliatePayoutRequest.list("-created_date", 2000, 0), db.User.list("-created_date", 5000, 0),
+    db.AffiliateCommissionAdjustment.list("-created_date", 2000, 0),
   ]);
   const userMap = Object.fromEntries(users.map(u => [u.id, { id: u.id, email: u.email, name: u.full_name || u.name || u.email }]));
   const enrichedProfiles = profiles.map(p => ({ ...p, user: userMap[p.user_id] || { id: p.user_id, email: "Unknown member" } }));
   const enrichedCredits = credits.map(c => ({ ...c, referrer: userMap[c.referrer_user_id], referred: userMap[c.referred_user_id] }));
   const enrichedPayouts = payouts.map(p => ({ ...p, user: userMap[p.user_id] }));
-  const summary = Object.fromEntries(currencies.map(c => [c, { pending: 0, available: 0, reserved: 0, paid: 0, payoutRequests: 0 }]));
+  const enrichedAdjustments = adjustments.map(a => ({ ...a, user: userMap[a.user_id] }));
+  const summary = Object.fromEntries(currencies.map(c => [c, { pending: 0, available: 0, reserved: 0, paid: 0, reversed: 0, recoveryDue: 0, payoutRequests: 0 }]));
   for (const c of credits) {
-    const b = summary[String(c.currency || "GBP").toUpperCase()]; if (!b || c.status === "reversed") continue;
+    const b = summary[String(c.currency || "GBP").toUpperCase()]; if (!b) continue;
+    b.reversed += Number(c.reversed_cents || 0);
     if (c.status === "pending") b.pending += Number(c.available_cents ?? c.amount_cents ?? 0);
     if (c.status === "available") b.available += Number(c.available_cents ?? 0);
     if (c.status === "reserved") b.reserved += Number(c.reserved_cents ?? 0);
-    if (c.status === "paid") b.paid += Number(c.paid_cents ?? c.amount_cents ?? 0);
+    if (c.status === "paid" || c.status === "reversed") b.paid += Number(c.paid_cents || 0);
   }
+  for (const a of adjustments) if (summary[a.currency] && a.status === "open") summary[a.currency].recoveryDue += Number(a.amount_cents || 0);
   for (const p of payouts) if (summary[p.currency] && ["requested", "processing", "failed"].includes(p.status)) summary[p.currency].payoutRequests += Number(p.amount_cents || 0);
-  return { profiles: enrichedProfiles, credits: enrichedCredits, payouts: enrichedPayouts, summary, minimumPayoutCents: MIN_PAYOUT_CENTS };
+  return { profiles: enrichedProfiles, credits: enrichedCredits, payouts: enrichedPayouts, adjustments: enrichedAdjustments, summary, minimumPayoutCents: MIN_PAYOUT_CENTS };
 });
 export const processAffiliatePayout = createServerFn({ method: "POST" }).middleware([requireUser])
   .validator(z.object({ payoutId: z.string().min(1), action: z.enum(["send", "reject"]), adminNote: z.string().max(1000).optional() }))
