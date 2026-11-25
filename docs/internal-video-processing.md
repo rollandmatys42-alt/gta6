@@ -49,6 +49,8 @@ The enqueue and claim paths both require `rights_status` to be `authorised` or `
 - Keep concurrency and resource limits based on measured CPU/RAM/disk capacity.
 - Run real MP4 and MOV tests for analysis and clip export, verify the Drive file ID and output metadata, test expired resumable sessions, worker restart/lease recovery and temporary-disk exhaustion.
 - Keep the worker single-replica until the queue claim is atomic.
+- Worker progress updates are monotonic; heartbeat callbacks cannot move the UI progress backward.
+- Authenticated Drive source reads are restricted to the configured VICEHUB host, and Google resumable upload sessions are restricted to Google API hosts.
 
 ## Current implementation location
 - `workers/video-engine/worker.py`: sequential FastAPI worker, FFprobe metadata extraction, FFmpeg clip rendering, optional faster-whisper transcription, streaming source download, Google Drive resumable output upload and 60-minute orphan cleanup.
