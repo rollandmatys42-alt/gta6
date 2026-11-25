@@ -1,199 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import {useCallback,useEffect,useMemo,useState} from "react";
+import {createFileRoute,Link} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import "@/styles/video-library.css";
-import { getVideoPreviewUrl, listPublishedVideosPage, getPublicFreeSamplePack } from "@/lib/server-fns";
-import { downloadCleanVideo } from "@/lib/video-download";
-import { useAuth } from "@/lib/AuthContext";
-import { useLocale } from "@/lib/i18n";
-import "@/styles/vicehub-2026-redesign.css";
-
-export const Route = createFileRoute("/library")({
-  ssr: false,
-  head: () => ({
-    meta: [
-      { title: "Video Library — VICEHUB" },
-      { name: "description", content: "Explore the VICEHUB GTA VI video library: verified footage, cinematics, gameplay, shorts and creator edit packs." },
-      { name: "robots", content: "index,follow" },
-    ],
-  }),
-  component: VideoLibraryPage,
-});
-
-const categories = ["All", "Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"];
-const languages = ["All", "en", "fr", "es", "pt", "it", "de"];
-const words = {
-  en: { kicker:"THE DROP ZONE / VERIFIED VIDEO LIBRARY", title:"FIND YOUR NEXT", titleAccent:"ICONIC MOMENT.", intro:"A curated GTA VI creator library. Discover cinematic footage, gameplay, locations and short-form drops — then preview and download within your membership.", search:"Search titles, creators or tags…", category:"CATEGORY", language:"LANGUAGE", all:"All", featured:"VIDEO OF THE MOMENT", latest:"LATEST DROPS", results:"RESULTS", loading:"Loading the catalogue…", empty:"No videos match these filters. Try another category or language.", more:"LOAD MORE VIDEOS", end:"YOU'VE REACHED THE END OF THE LIBRARY.", preview:"WATCH PREVIEW", download:"DOWNLOAD", creator:"CREATOR", rights:"RIGHTS VERIFIED", close:"CLOSE", preparing:"Preparing secure watermarked preview…", previewError:"The preview is temporarily unavailable.", downloadError:"Download could not be authorised.", minutes:"MIN", noImage:"VICEHUB / VERIFIED DROP" },
-  fr: { kicker:"THE DROP ZONE / BIBLIOTHÈQUE VÉRIFIÉE", title:"TROUVEZ VOTRE PROCHAIN", titleAccent:"MOMENT ICONIQUE.", intro:"Une bibliothèque GTA VI sélectionnée pour les créateurs. Découvrez cinématiques, gameplay, lieux et formats courts, puis prévisualisez et téléchargez selon votre abonnement.", search:"Rechercher un titre, créateur ou hashtag…", category:"CATÉGORIE", language:"LANGUE", all:"Tout", featured:"VIDÉO DU MOMENT", latest:"DERNIERS CONTENUS", results:"RÉSULTATS", loading:"Chargement du catalogue…", empty:"Aucune vidéo ne correspond à ces filtres. Essayez une autre catégorie ou langue.", more:"CHARGER PLUS DE VIDÉOS", end:"VOUS ÊTES AU BOUT DE LA BIBLIOTHÈQUE.", preview:"VOIR L'APERÇU", download:"TÉLÉCHARGER", creator:"CRÉATEUR", rights:"DROITS VÉRIFIÉS", close:"FERMER", preparing:"Préparation de l'aperçu protégé…", previewError:"L'aperçu est temporairement indisponible.", downloadError:"Le téléchargement n'a pas pu être autorisé.", minutes:"MIN", noImage:"VICEHUB / CONTENU VÉRIFIÉ" },
-  es: { kicker:"THE DROP ZONE / BIBLIOTECA VERIFICADA", title:"ENCUENTRA TU PRÓXIMO", titleAccent:"MOMENTO ICÓNICO.", intro:"Una biblioteca GTA VI seleccionada para creadores. Descubre cinemáticas, gameplay, ubicaciones y clips cortos; previsualiza y descarga según tu membresía.", search:"Buscar títulos, creadores o etiquetas…", category:"CATEGORÍA", language:"IDIOMA", all:"Todo", featured:"VÍDEO DEL MOMENTO", latest:"ÚLTIMOS VÍDEOS", results:"RESULTADOS", loading:"Cargando catálogo…", empty:"No hay vídeos para estos filtros. Prueba otra categoría o idioma.", more:"CARGAR MÁS VÍDEOS", end:"HAS LLEGADO AL FINAL DE LA BIBLIOTECA.", preview:"VER VISTA PREVIA", download:"DESCARGAR", creator:"CREADOR", rights:"DERECHOS VERIFICADOS", close:"CERRAR", preparing:"Preparando vista previa protegida…", previewError:"La vista previa no está disponible temporalmente.", downloadError:"No se pudo autorizar la descarga.", minutes:"MIN", noImage:"VICEHUB / VÍDEO VERIFICADO" },
-  pt: { kicker:"THE DROP ZONE / BIBLIOTECA VERIFICADA", title:"ENCONTRE O SEU PRÓXIMO", titleAccent:"MOMENTO ICÓNICO.", intro:"Uma biblioteca GTA VI selecionada para criadores. Descubra cinemáticas, gameplay, locais e vídeos curtos; pré-visualize e transfira conforme a sua subscrição.", search:"Pesquisar títulos, criadores ou etiquetas…", category:"CATEGORIA", language:"IDIOMA", all:"Todos", featured:"VÍDEO DO MOMENTO", latest:"VÍDEOS RECENTES", results:"RESULTADOS", loading:"A carregar a biblioteca…", empty:"Não existem vídeos para estes filtros. Experimente outra categoria ou idioma.", more:"CARREGAR MAIS VÍDEOS", end:"CHEGOU AO FIM DA BIBLIOTECA.", preview:"VER PRÉ-VISUALIZAÇÃO", download:"TRANSFERIR", creator:"CRIADOR", rights:"DIREITOS VERIFICADOS", close:"FECHAR", preparing:"A preparar pré-visualização protegida…", previewError:"A pré-visualização está temporariamente indisponível.", downloadError:"Não foi possível autorizar a transferência.", minutes:"MIN", noImage:"VICEHUB / VÍDEO VERIFICADO" },
-  it: { kicker:"THE DROP ZONE / LIBRERIA VERIFICATA", title:"TROVA IL TUO PROSSIMO", titleAccent:"MOMENTO ICONICO.", intro:"Una libreria GTA VI selezionata per i creator. Scopri cinematiche, gameplay, luoghi e clip brevi; visualizza e scarica in base al tuo abbonamento.", search:"Cerca titoli, creator o tag…", category:"CATEGORIA", language:"LINGUA", all:"Tutti", featured:"VIDEO DEL MOMENTO", latest:"ULTIMI VIDEO", results:"RISULTATI", loading:"Caricamento della libreria…", empty:"Nessun video corrisponde ai filtri. Prova un'altra categoria o lingua.", more:"CARICA ALTRI VIDEO", end:"HAI RAGGIUNTO LA FINE DELLA LIBRERIA.", preview:"GUARDA ANTEPRIMA", download:"SCARICA", creator:"CREATOR", rights:"DIRITTI VERIFICATI", close:"CHIUDI", preparing:"Preparazione dell'anteprima protetta…", previewError:"Anteprima temporaneamente non disponibile.", downloadError:"Download non autorizzato.", minutes:"MIN", noImage:"VICEHUB / VIDEO VERIFICATO" },
-  de: { kicker:"THE DROP ZONE / GEPRÜFTE VIDEOBIBLIOTHEK", title:"FINDE DEINEN NÄCHSTEN", titleAccent:"IKONISCHEN MOMENT.", intro:"Eine kuratierte GTA-VI-Bibliothek für Creator. Entdecke Cinematics, Gameplay, Orte und Kurzclips und lade sie gemäß deiner Mitgliedschaft herunter.", search:"Titel, Creator oder Tags suchen…", category:"KATEGORIE", language:"SPRACHE", all:"Alle", featured:"VIDEO DES MOMENTS", latest:"NEUESTE VIDEOS", results:"ERGEBNISSE", loading:"Bibliothek wird geladen…", empty:"Keine Videos passen zu diesen Filtern. Wähle eine andere Kategorie oder Sprache.", more:"WEITERE VIDEOS LADEN", end:"DU HAST DAS ENDE DER BIBLIOTHEK ERREICHT.", preview:"VORSCHAU ANSEHEN", download:"HERUNTERLADEN", creator:"CREATOR", rights:"RECHTE GEPRÜFT", close:"SCHLIESSEN", preparing:"Geschützte Vorschau wird vorbereitet…", previewError:"Vorschau vorübergehend nicht verfügbar.", downloadError:"Download konnte nicht autorisiert werden.", minutes:"MIN", noImage:"VICEHUB / GEPRÜFTER DROP" },
-};
-
-const videoThumbnail = (video, fallback = "https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=1920") => video?.thumbnail_url || video?.thumbnailUrl || video?.poster_url || video?.posterUrl || video?.cover_image_url || video?.coverImageUrl || video?.image_url || video?.preview_image_url || video?.previewImageUrl || fallback;
-
-function VideoLibraryPage() {
-  const { isAuthenticated } = useAuth();
-  const locale = useLocale();
-  const t = words[locale] || words.en;
-  const [category, setCategory] = useState("All");
-  const [language, setLanguage] = useState("All");
-  const [duration, setDuration] = useState("All");
-  const [sort, setSort] = useState("newest");
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const requestSequence = useRef(0);
-  const [videos, setVideos] = useState([]);
-  const [samplePack, setSamplePack] = useState({ready:false,videos:[]});
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
-  const [selected, setSelected] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState("");
-  const [previewMessage, setPreviewMessage] = useState("");
-  const [downloadMessage, setDownloadMessage] = useState("");
-
-  useEffect(() => { getPublicFreeSamplePack().then(setSamplePack).catch(() => setSamplePack({ready:false,videos:[]})); }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
-    return () => window.clearTimeout(timer);
-  }, [query]);
-
-  const fetchPage = useCallback(async ({ reset = false } = {}) => {
-    const requestId = ++requestSequence.current;
-    const nextOffset = reset ? 0 : offset;
-    if (reset) setLoading(true); else setLoadingMore(true);
-    setError("");
-    try {
-      const result = await listPublishedVideosPage({
-        data: {
-          category: category === "All" ? undefined : category,
-          language: language === "All" ? undefined : language,
-          search: debouncedQuery || undefined,
-          duration: duration === "All" ? undefined : duration,
-          sort,
-          offset: nextOffset,
-          limit: 24,
-        },
-      });
-      if (requestId !== requestSequence.current) return;
-      setVideos(current => reset ? result.videos : [...current, ...result.videos]);
-      setOffset(result.nextOffset);
-      setHasMore(result.hasMore);
-    } catch (err) {
-      if (requestId === requestSequence.current) setError(err?.message || "The video catalogue could not be loaded.");
-    } finally {
-      if (requestId === requestSequence.current) {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    }
-  }, [category, language, duration, sort, debouncedQuery, offset]);
-
-  useEffect(() => {
-    setVideos([]);
-    setOffset(0);
-    setHasMore(false);
-    fetchPage({ reset: true });
-  }, [category, language, duration, sort, debouncedQuery]);
-
-  const filtered = videos;
-
-  const featured = videos.find(video => video.is_featured) || videos[0] || null;
-  const gridVideos = filtered.filter(video => video.id !== featured?.id);
-  const openPreview = async video => {
-    setSelected(video);
-    setPreviewUrl("");
-    setPreviewMessage(t.preparing);
-    try {
-      const result = await getVideoPreviewUrl({ data: { videoId: video.id } });
-      setPreviewUrl(result.previewUrl);
-      setPreviewMessage("");
-    } catch (err) {
-      setPreviewMessage(err?.message || t.previewError);
-    }
-  };
-  const download = async video => {
-    setDownloadMessage("Authorising secure download…");
-    try {
-      await downloadCleanVideo({
-        videoId: video.id,
-        title: video.title,
-        onProgress: setDownloadMessage,
-      });
-      setDownloadMessage("Clean video verified. Your download has started.");
-    } catch (err) {
-      setDownloadMessage(err?.message || t.downloadError);
-    }
-  };
-  const closePreview = () => {
-    setSelected(null);
-    setPreviewUrl("");
-    setPreviewMessage("");
-  };
-  const categoryLabel = value => value === "All" ? t.all : value;
-  const languageLabel = value => value === "All" ? t.all : ({en:"English",fr:"Français",es:"Español",pt:"Português",it:"Italiano",de:"Deutsch"}[value] || value);
-  const formatDuration = seconds => seconds ? Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0") : "VIDEO";
-
-  return <SiteFrame eyebrow="VICEHUB / VIDEO LIBRARY" workspace={isAuthenticated} activeKey="library">
-    <div className="vh-lib2-page">
-      <div className="vh-lib2-ticker"><span>VICEHUB / THE DROP ZONE</span><b>GTA VI CREATOR LIBRARY</b><span>CURATED FOOTAGE · CINEMATICS · GAMEPLAY · SHORTS</span></div>
-      <section className="vh-lib2-hero">
-        <div className="vh-lib2-hero-copy">
-          <span className="vh-lib2-kicker"><i/> THE GTA VI CREATOR DESTINATION</span>
-          <h1>YOUR NEXT<br/><em>VIRAL MOMENT.</em></h1>
-          <p>{t.intro}</p>
-          <div className="vh-lib2-hero-actions"><a href="#vh-lib2-catalog">EXPLORE THE DROPS <b>↘</b></a><span>VICE CITY · LEONIDA · 2026</span></div>
-          <div className="vh-lib2-stats"><div><b>{videos.length.toString().padStart(2,"0")}</b><span>AVAILABLE DROPS</span></div><div><b>9:16</b><span>CREATOR READY</span></div><div><b>06</b><span>LANGUAGES</span></div></div>
-        </div>
-        <div className="vh-lib2-hero-art"><div className="vh-lib2-art-frame"><img src={featured ? videoThumbnail(featured) : "https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=3840"} alt="GTA VI Vice City artwork"/><span className="vh-lib2-art-tag">VICEHUB ORIGINALS</span><span className="vh-lib2-art-caption"><small>THE DROP ZONE</small><b>MADE FOR THE FEED.</b></span></div></div>
-        <span className="vh-lib2-hero-index">V / 06</span>
-      </section>
-      <section className="vh-lib2-free-pack">
-        <div className="vh-lib2-free-pack-head"><div><span className="vh-lib2-kicker">FREE CREATOR STARTER PACK / 01</span><h2>TRY THE DROP ZONE. <em>ON US.</em></h2><p>Create a free account and download the same three selected videos as every other new member. One download per video, once per account.</p></div><span className="vh-lib2-free-pack-stamp">3 FREE<br/>DOWNLOADS</span></div>
-        {samplePack.ready ? <div className="vh-lib2-free-pack-grid">{samplePack.videos.map((video,index)=><article className="vh-lib2-free-pack-card" key={video.id}><div className="vh-lib2-free-pack-image"><img src={videoThumbnail(video)} alt={video.title ? `${video.title} thumbnail` : "GTA VI video thumbnail"} loading="lazy" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src="https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=1920";}}/><span>FREE DROP 0{index+1}</span></div><div><small>{video.category} · {(video.language||"en").toUpperCase()}</small><b>{video.title}</b><p>{video.description}</p></div></article>)}</div> : <div className="vh-lib2-free-pack-empty">The three fixed sample videos will appear here as soon as the rights-cleared pack is selected and published. The same three videos will be offered to every new account.</div>}
-        <Link to={isAuthenticated?"/dashboard":"/register"} className="vh-lib2-free-pack-cta">{isAuthenticated?"OPEN YOUR FREE SAMPLE PACK":samplePack.ready?"CREATE A FREE ACCOUNT TO DOWNLOAD":"CREATE A FREE ACCOUNT / FREE PACK COMING SOON"} ↗</Link>
-      </section>
-      <section className="vh-lib2-feature">
-        <div className="vh-lib2-section-label"><span>01 / EDITOR'S SELECTION</span><b>{t.featured}</b></div>
-        {featured ? <button type="button" className="vh-lib2-feature-card" onClick={() => openPreview(featured)}>
-          <div className="vh-lib2-feature-image"><img src={videoThumbnail(featured)} alt={featured.title ? `${featured.title} thumbnail` : "Vice City video artwork"} loading="lazy" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src="https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=1920";}}/><span className="vh-lib2-feature-play">▶</span></div>
-          <div className="vh-lib2-feature-copy"><span className="vh-lib2-kicker">FEATURED DROP · {(featured.language || "en").toUpperCase()}</span><h2>{featured.title}</h2><p>{featured.creator_name || "VICEHUB COMMUNITY"} <span>·</span> {featured.category || "GTA VI"}</p><b>{t.preview} <i>↗</i></b></div>
-        </button> : <div className="vh-lib2-feature-empty">{loading ? t.loading : t.empty}</div>}
-      </section>
-      <section className="vh-lib2-catalog" id="vh-lib2-catalog">
-        <div className="vh-lib2-catalog-head"><div><span className="vh-lib2-kicker">02 / BROWSE THE COLLECTION</span><h2>THE <em>LATEST DROPS.</em></h2><p>Find the right footage. Preview it. Download it. Create.</p></div><span className="vh-lib2-result-count">{filtered.length.toString().padStart(2,"0")} <small>{t.results}</small></span></div>
-        <div className="vh-lib2-filter-panel">
-          <label className="vh-lib2-search"><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search}/></label>
-          <label className="vh-lib2-language"><span>{t.language}</span><select value={language} onChange={event => setLanguage(event.target.value)}>{languages.map(value => <option key={value} value={value}>{languageLabel(value)}</option>)}</select></label>
-          <div className="vh-lib2-extra-filters">
-            <label className="vh-lib2-language"><span>VIDEO LENGTH</span><select value={duration} onChange={event => setDuration(event.target.value)}><option value="All">Any duration</option><option value="under_1">Under 1 minute</option><option value="1_5">1–5 minutes</option><option value="5_15">5–15 minutes</option><option value="over_15">Over 15 minutes</option></select></label>
-            <label className="vh-lib2-language"><span>SORT BY</span><select value={sort} onChange={event => setSort(event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="shortest">Shortest first</option><option value="longest">Longest first</option></select></label>
-          </div>
-        </div>
-        <div className="vh-lib2-categories" aria-label={t.category}>{categories.map(value => <button key={value} type="button" className={category === value ? "active" : ""} onClick={() => setCategory(value)}>{categoryLabel(value)}</button>)}</div>
-        {error && <div className="vh-lib2-alert" role="alert">{error}</div>}{downloadMessage && <div className="vh-lib2-alert" role="status">{downloadMessage}</div>}
-        <div className="vh-lib2-grid">{loading && videos.length === 0 ? <div className="vh-lib2-empty">{t.loading}</div> : filtered.length === 0 ? <div className="vh-lib2-empty">{t.empty}</div> : gridVideos.map((video,index) => <article className="vh-lib2-card" key={video.id}>
-          <button type="button" className="vh-lib2-poster" onClick={() => openPreview(video)} aria-label={t.preview + ": " + video.title}>
-            <img src={videoThumbnail(video, index%2===0 ? "https://www.rockstargames.com/VI/_next/static/media/Lucia_Caminos_12.0saq9ns-~xj03.jpg?akim=1&imdensity=1&imwidth=1920" : "https://www.rockstargames.com/VI/_next/static/media/VINTAGE_VICE_CITY_PACK_01.05zaof7o1uz.3.jpg?akim=1&imdensity=1&imwidth=1920")} alt={video.title ? `${video.title} thumbnail` : "GTA VI video artwork"} loading="lazy" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src="https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=1920";}}/>
-            <span className="vh-lib2-poster-number">{String(index+1).padStart(2,"0")}</span><span className="vh-lib2-poster-duration">{formatDuration(video.duration_seconds)}</span><span className="vh-lib2-poster-play">▶</span>
-          </button>
-          <div className="vh-lib2-card-info"><div className="vh-lib2-card-meta"><span>{video.category || "GTA VI"}</span><span>{(video.language || "en").toUpperCase()}</span></div><h3>{video.title}</h3><p>{video.creator_name || "VICEHUB COMMUNITY"}</p><div className="vh-lib2-card-actions"><button type="button" onClick={() => openPreview(video)}>{t.preview}</button><button type="button" onClick={() => download(video)}>{t.download} ↓</button></div></div>
-        </article>)}</div>
-        <div className="vh-lib2-pagination">{hasMore ? <button type="button" onClick={() => fetchPage()} disabled={loadingMore}>{loadingMore ? t.loading : t.more} ↗</button> : !loading && videos.length > 0 ? <span>{t.end}</span> : null}</div>
-      </section>
-      <section className="vh-lib2-bottom-banner"><div><span className="vh-lib2-kicker">VICEHUB / CREATOR HQ</span><h2>MAKE THE CITY<br/><em>YOUR CONTENT.</em></h2></div><a href="/dashboard">ENTER CREATOR HQ ↗</a></section>
-    </div>
-    {selected && <div className="vh-lib2-modal-backdrop" role="presentation" onClick={closePreview}><section className="vh-lib2-modal" role="dialog" aria-modal="true" aria-label={selected.title} onClick={event => event.stopPropagation()}>
-      <div className="vh-lib2-modal-head"><div><span>{t.rights}</span><h2>{selected.title}</h2></div><button type="button" onClick={closePreview} aria-label={t.close}>×</button></div>
-      {previewUrl ? <video className="vh-lib2-player" src={previewUrl} controls playsInline autoPlay/> : <div className="vh-lib2-preview-loading">{previewMessage}</div>}
-      <div className="vh-lib2-modal-meta"><span>{t.creator}: {selected.creator_name || "VICEHUB COMMUNITY"}</span><span>{selected.category} · {(selected.language || "en").toUpperCase()}</span></div>
-      <div className="vh-lib2-modal-actions"><button type="button" onClick={closePreview}>{t.close}</button><button type="button" onClick={() => download(selected)}>{t.download} ↓</button></div>
-      {!isAuthenticated && <p className="vh-lib2-modal-note">Sign in to download videos and manage your monthly allowance.</p>}
-    </section></div>}
-  </SiteFrame>;
+import {useAuth} from "@/lib/AuthContext";
+import {listPublicInternalClips,requestInternalClipDownload} from "@/lib/internal-video-fns";
+export const Route=createFileRoute("/library")({ssr:false,head:()=>({meta:[{title:"VICEHUB — Clip Library"},{name:"description",content:"Discover, preview and download curated short-form video clips from the VICEHUB library."}]}),component:ClientClipLibrary});
+function ClientClipLibrary(){
+ const{isAuthenticated}=useAuth();const[clips,setClips]=useState([]);const[nextOffset,setNextOffset]=useState(0);const[hasMore,setHasMore]=useState(false);const[query,setQuery]=useState("");const[category,setCategory]=useState("all");const[language,setLanguage]=useState("all");const[country,setCountry]=useState("all");const[selected,setSelected]=useState(null);const[busy,setBusy]=useState(false);const[downloading,setDownloading]=useState("");const[error,setError]=useState("");
+ const refresh=useCallback(async()=>{setBusy(true);setError("");try{const r=await listPublicInternalClips({data:{search:query.trim()||undefined,category:category==="all"?undefined:category,language:language==="all"?undefined:language,country:country==="all"?undefined:country,limit:48,offset:0}});setClips(r.assets||[]);setNextOffset(r.nextOffset||0);setHasMore(!!r.hasMore);}catch(e){setError(e?.message||"The clip library could not be loaded.");}finally{setBusy(false);}},[query,category,language,country]);
+ useEffect(()=>{refresh();},[refresh]);
+ const categories=useMemo(()=>["Gaming","News","Comedy","Sport","Technology","Interview","Education","Other"],[]);
+ const languages=useMemo(()=>[...new Set(clips.map(x=>x.language).filter(x=>x&&x!=="und"))].sort(),[clips]);
+ const countries=useMemo(()=>[...new Set(clips.flatMap(x=>x.target_countries||[]))].sort(),[clips]);
+ const loadMore=async()=>{if(!hasMore||busy)return;setBusy(true);setError("");try{const r=await listPublicInternalClips({data:{search:query.trim()||undefined,category:category==="all"?undefined:category,language:language==="all"?undefined:language,country:country==="all"?undefined:country,limit:48,offset:nextOffset}});setClips(current=>[...current,...(r.assets||[])]);setNextOffset(r.nextOffset||nextOffset);setHasMore(!!r.hasMore);}catch(e){setError(e?.message||"More clips could not be loaded.");}finally{setBusy(false);}};
+ const preview=clip=>{if(!isAuthenticated){setError("Sign in to preview and download clips.");return;}setError("");setSelected(clip);};
+ const download=async clip=>{if(!isAuthenticated){setError("Sign in to download clips.");return;}setDownloading(clip.id);setError("");try{const r=await requestInternalClipDownload({data:{assetId:clip.id}});window.location.assign(r.downloadUrl);}catch(e){setError(e?.message||"Download could not be authorised.");}finally{setDownloading("");}};
+ return <SiteFrame eyebrow="VICEHUB / CLIP LIBRARY"><main style={{padding:"20px 0 60px",color:"#f4f6fb"}}><header style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",marginBottom:42}}><div><p style={{color:"#a6f36b",fontSize:10,letterSpacing:".2em",fontWeight:900}}>THE VICEHUB CLIP LIBRARY</p><h1 style={{fontSize:"clamp(36px,6vw,64px)",lineHeight:1,margin:"12px 0"}}>Find your next <span style={{color:"#a6f36b"}}>best clip.</span></h1><p style={{maxWidth:680,color:"#9ca8bb",lineHeight:1.7}}>Discover short-form clips, preview them before downloading and filter by subject, language and target market.</p></div><Link to={isAuthenticated?"/dashboard":"/sign-in"} style={{color:"#a6f36b"}}>{isAuthenticated?"My account":"Sign in"} ↗</Link></header>
+ <section style={{display:"grid",gridTemplateColumns:"minmax(200px,2fr) repeat(3,minmax(120px,1fr))",gap:10,marginBottom:24}}><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search titles, topics or tags…" style={field}/><select value={category} onChange={e=>setCategory(e.target.value)} style={field}><option value="all">All categories</option>{categories.map(x=><option key={x}>{x}</option>)}</select><select value={language} onChange={e=>setLanguage(e.target.value)} style={field}><option value="all">All languages</option>{languages.map(x=><option key={x}>{x}</option>)}</select><select value={country} onChange={e=>setCountry(e.target.value)} style={field}><option value="all">All markets</option>{countries.map(x=><option key={x}>{x}</option>)}</select></section>
+ {error&&<p role="alert" style={{padding:12,borderRadius:9,background:"#3b1920",color:"#ffb4bd"}}>{error}</p>}
+ <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,color:"#9ca8bb",fontSize:12}}><span>{clips.length} published clips</span><button onClick={refresh} disabled={busy} style={buttonSecondary}>{busy?"Loading…":"Refresh"}</button></div>
+ <p style={{color:"#8998ac",fontSize:11,marginBottom:16}}>AI viral potential is an estimate based on the opening hook, emotion, clarity, shareability and pacing. It is not a view or engagement result. “Best clip” is an AI score of 90/100 or higher.</p><section style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,260px),1fr))",gap:18}}>{clips.map(clip=><article key={clip.id} style={{background:"#111927",border:"1px solid #29364a",borderRadius:15,overflow:"hidden"}}><div style={{aspectRatio:"16/9",background:"#202b3d",position:"relative"}}>{clip.thumbnail_url?<img src={clip.thumbnail_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{height:"100%",display:"grid",placeItems:"center",color:"#a6f36b",fontWeight:900,letterSpacing:".12em"}}>VICEHUB CLIP</div>}<span style={{position:"absolute",right:10,bottom:10,padding:"4px 7px",borderRadius:6,background:"#080b12dd",fontSize:11}}>{Math.floor(clip.duration_seconds/60)}:{String(clip.duration_seconds%60).padStart(2,"0")}</span></div><div style={{padding:16}}><div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:9}}>{[clip.category,clip.language,...(clip.target_countries||[]),...(clip.editorial_tags||[])].filter(Boolean).map(x=><span key={x} style={pill}>{x}</span>)}</div><h2 style={{fontSize:17,margin:"0 0 8px"}}>{clip.title}</h2><p style={{fontSize:12,color:"#9ca8bb",lineHeight:1.6,minHeight:38}}>{clip.description}</p><div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"12px 0"}}>{(clip.tags||[]).slice(0,5).map(x=><span key={x} style={{fontSize:10,color:"#8796ab"}}>#{x}</span>)}</div>{clip.viral_potential_score!==null&&<small style={{color:"#a6f36b"}}>AI viral potential: {clip.viral_potential_score}/100</small>}<div style={{display:"flex",gap:8,marginTop:14}}><button onClick={()=>preview(clip)} style={buttonSecondary}>Preview</button><button onClick={()=>download(clip)} disabled={downloading===clip.id} style={buttonPrimary}>{downloading===clip.id?"Preparing…":"Download"}</button></div></div></article>)}</section>
+ {!busy&&!clips.length&&<p style={{textAlign:"center",padding:50,color:"#9ca8bb"}}>No published clips match these filters yet.</p>}{hasMore&&<div style={{textAlign:"center",marginTop:28}}><button onClick={loadMore} disabled={busy} style={buttonSecondary}>{busy?"Loading…":"Load more clips"}</button></div>}
+ {selected&&<div role="dialog" aria-modal="true" style={{position:"fixed",inset:0,zIndex:1000,background:"#02050beF",display:"grid",placeItems:"center",padding:18}}><div style={{width:"min(100%,900px)",background:"#111927",border:"1px solid #34445b",borderRadius:16,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:12}}><strong>{selected.title}</strong><button onClick={()=>setSelected(null)} style={buttonSecondary}>Close</button></div><video controls autoPlay playsInline src={"/api/internal-video-preview/"+encodeURIComponent(selected.id)} style={{width:"100%",maxHeight:"70vh",background:"#000",borderRadius:10}}/><p style={{fontSize:12,color:"#9ca8bb"}}>Preview access requires a signed-in account. Downloads remain subject to your subscription allowance. New = published within 7 days; Best clip = AI potential score at least 90/100. Trending requires real post-publication performance data.</p></div></div>}
+ </main></SiteFrame>;
 }
+const field={width:"100%",boxSizing:"border-box",padding:12,borderRadius:8,border:"1px solid #35445b",background:"#0a111c",color:"#fff"};
+const pill={display:"inline-block",padding:"4px 7px",borderRadius:99,background:"#202b3d",color:"#bdc9da",fontSize:10};
+const buttonPrimary={flex:1,padding:"10px 12px",border:0,borderRadius:8,background:"#a6f36b",color:"#10150c",fontWeight:900,cursor:"pointer"};
+const buttonSecondary={padding:"10px 12px",border:"1px solid #394960",borderRadius:8,background:"#1a2637",color:"#e4ebf5",cursor:"pointer"};

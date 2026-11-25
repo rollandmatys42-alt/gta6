@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import ipaddress
 import json
 import logging
 import os
@@ -66,6 +67,26 @@ def build_clip_command(source: Path, output: Path, start_seconds: float, end_sec
         "-movflags", "+faststart", str(output),
     ]
 
+
+
+def build_preview_command(source: Path, output: Path, start_seconds: float, duration_seconds: float) -> list[str]:
+    duration = max(1.0, min(20.0, float(duration_seconds)))
+    start = max(0.0, float(start_seconds))
+    watermark = (
+        "scale='min(640,iw)':-2,"
+        "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+        "text='VICEHUB PREVIEW':fontcolor=white:fontsize=20:"
+        "box=1:boxcolor=black@0.60:boxborderw=10:x=20:y=h-th-20"
+    )
+    return [
+        "ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error",
+        "-ss", f"{start:.3f}", "-i", str(source), "-t", f"{duration:.3f}",
+        "-map", "0:v:0", "-map", "0:a?",
+        "-vf", watermark,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "31",
+        "-c:a", "aac", "-b:a", "96k", "-threads", "2",
+        "-movflags", "+faststart", str(output),
+    ]
 
 def cleanup_stale_workdirs(root: Path, max_age_seconds: int = 3600) -> int:
     root.mkdir(parents=True, exist_ok=True)
@@ -239,6 +260,49 @@ class VideoWorker:
                         raise RuntimeError("Temporary disk reserve reached while downloading the source video.")
                     output.write(chunk)
 
+    async def download_external_source(self, source_url: str, target: Path) -> None:
+        parsed = urlparse(source_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+            raise RuntimeError("The external source URL is invalid.")
+        host = parsed.hostname.lower().rstrip(".")
+        if host in {"localhost", "metadata.google.internal"} or host.endswith(".local"):
+            raise RuntimeError("Private or local network source URLs are not accepted.")
+        try:
+            addresses = {item[4][0] for item in socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)}
+            if not addresses or any(not ipaddress.ip_address(value).is_global for value in addresses):
+                raise RuntimeError("The source hostname resolves to a private or non-public address.")
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError("The source hostname could not be resolved safely.") from exc
+
+        output_template = str(target.with_name("external-source.%(ext)s"))
+        command = [
+            "python", "-m", "yt_dlp", "--no-playlist", "--no-warnings",
+            "--no-progress", "--format", "bestvideo*+bestaudio/best",
+            "--merge-output-format", "mp4", "--output", output_template,
+            "--max-filesize", "8G", source_url,
+        ]
+        try:
+            await asyncio.to_thread(
+                subprocess.run, command, capture_output=True, text=True,
+                timeout=10800, check=True,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Source extraction exceeded the three-hour processing limit.") from exc
+        candidates = [
+            path for path in target.parent.glob("external-source.*")
+            if path.is_file() and not path.name.endswith((".part", ".ytdl"))
+        ]
+        if not candidates:
+            raise RuntimeError("The platform connector did not produce a video file.")
+        selected = max(candidates, key=lambda path: path.stat().st_size)
+        if selected.stat().st_size <= 0:
+            raise RuntimeError("The platform connector produced an empty video file.")
+        if shutil.disk_usage(self.temp_root).free < self.disk_reserve:
+            raise RuntimeError("Temporary disk reserve reached after source extraction.")
+        selected.replace(target)
+
     async def upload_clip_to_drive(self, job_id: str, clip_path: Path, file_name: str) -> dict:
         if not self.client:
             raise RuntimeError("Worker HTTP client is not running.")
@@ -333,7 +397,10 @@ class VideoWorker:
                 source_path = Path(work_dir) / ("source" + suffix)
                 self.current_progress = 1
                 await self.progress(job_id, 5, "Downloading source video to temporary worker storage")
-                await self.download_source(source_url, source_path, worker_auth=bool(job.get("sourceRequiresWorkerAuth")))
+                if job.get("sourceDownloadMode") == "extractor":
+                    await self.download_external_source(source_url, source_path)
+                else:
+                    await self.download_source(source_url, source_path, worker_auth=bool(job.get("sourceRequiresWorkerAuth")))
 
                 await self.progress(job_id, 20, "Reading media streams with FFprobe")
                 metadata = await asyncio.to_thread(probe_media, source_path)
@@ -380,14 +447,31 @@ class VideoWorker:
                     safe_name = re.sub(r"[^a-zA-Z0-9._ -]+", "_", requested_name).strip(" ._")[:150] or "VICEHUB-clip"
                     if not safe_name.lower().endswith(".mp4"):
                         safe_name += ".mp4"
-                    await self.progress(job_id, 80, "Uploading the finished MP4 to the selected Google Drive folder")
+
+                    preview_path = Path(work_dir) / "vicehub-preview.mp4"
+                    preview_duration = min(20.0, end - start)
+                    preview_command = build_preview_command(source_path, preview_path, start, preview_duration)
+                    await self.progress(job_id, 65, "Rendering a short watermarked preview")
+                    await asyncio.to_thread(
+                        subprocess.run, preview_command, capture_output=True, text=True,
+                        timeout=600, check=True,
+                    )
+                    if not preview_path.is_file() or preview_path.stat().st_size <= 0:
+                        raise RuntimeError("FFmpeg produced an empty watermarked preview.")
+                    preview_name = safe_name[:-4] + "-preview.mp4"
+                    preview_drive_file = await self.upload_clip_to_drive(job_id, preview_path, preview_name)
+
+                    await self.progress(job_id, 93, "Uploading the finished MP4 to the selected Google Drive folder")
                     drive_file = await self.upload_clip_to_drive(job_id, output_path, safe_name)
                     result.update({
-                        "stage": "Clip uploaded to Google Drive",
-                        "resultSummary": f"FFmpeg clip exported from {start:.2f}s to {end:.2f}s and verified in Google Drive.",
+                        "stage": "Clip and preview uploaded to Google Drive",
+                        "resultSummary": f"FFmpeg clip exported from {start:.2f}s to {end:.2f}s; a 20-second watermarked preview and the full clip were verified in Google Drive.",
                         "outputDriveFileId": str(drive_file["id"]),
                         "outputFileSizeBytes": int(drive_file["verifiedSizeBytes"]),
                         "outputMd5Checksum": drive_file["verifiedMd5Checksum"],
+                        "previewDriveFileId": str(preview_drive_file["id"]),
+                        "previewFileSizeBytes": int(preview_drive_file["verifiedSizeBytes"]),
+                        "previewMd5Checksum": preview_drive_file["verifiedMd5Checksum"],
                         "outputDurationSeconds": clip_metadata["durationSeconds"],
                         "outputWidth": clip_metadata["width"],
                         "outputHeight": clip_metadata["height"],

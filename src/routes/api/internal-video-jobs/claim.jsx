@@ -39,9 +39,14 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
 
         let sourceUrl;
         let sourceRequiresWorkerAuth = false;
+        let sourceDownloadMode = "stored";
+        const isExternalSource = asset.storage_provider === "external_source" && !!asset.source_url;
         const isDriveAsset = asset.storage_provider === "google_drive" || !!asset.google_drive_file_id;
         try {
-          if (isDriveAsset) {
+          if (isExternalSource) {
+            sourceUrl = asset.source_url;
+            sourceDownloadMode = "extractor";
+          } else if (isDriveAsset) {
             if (!asset.google_drive_file_id) throw new Error("Google Drive source ID is missing.");
             sourceUrl = new URL("/api/internal-video-job-source?jobId=" + encodeURIComponent(job.id), request.url).toString();
             sourceRequiresWorkerAuth = true;
@@ -87,6 +92,7 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
             outputTitle: job.output_title,
             outputDriveParentId: job.output_drive_parent_id || asset.google_drive_parent_id || null,
             sourceRequiresWorkerAuth,
+            sourceDownloadMode,
             asset: {
               id: asset.id,
               title: asset.title,
@@ -96,6 +102,7 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
               language: asset.language,
               storageProvider: isDriveAsset ? "google_drive" : "s3",
               googleDriveFileId: asset.google_drive_file_id || null,
+              sourcePlatform: asset.source_platform || null,
             },
             sourceUrl,
           },

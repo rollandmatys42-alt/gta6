@@ -1,0 +1,26 @@
+name: VICEHUB clip library checks
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  route-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Parse VICEHUB admin, client library and Drive routes
+        run: >-
+          npx --yes esbuild
+          src/routes/admin.jsx
+          src/routes/legacy-home.jsx
+          src/components/SiteFrame.jsx
+          src/routes/admin.import.jsx
+          src/routes/admin.video-library.jsx
+          src/routes/library.jsx
+          'src/routes/api/internal-video-preview/$assetId.jsx'
+          'src/routes/api/internal-video-download/$assetId.jsx'
+          src/lib/internal-video-fns.js
+          src/routeTree.gen.ts
+          --bundle --external:* --outdir=/tmp/vicehub-clip-check --log-level=warning

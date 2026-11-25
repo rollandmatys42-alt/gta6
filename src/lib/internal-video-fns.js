@@ -282,3 +282,144 @@ export const archiveInternalVideoAsset = createServerFn({ method: "POST" })
     }
     return db.InternalVideoAsset.update(asset.id, { status: "archived" });
   });
+
+export const reviewInternalVideoAsset = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    assetId: z.string().min(1).max(128),
+    reviewStatus: z.enum(["needs_review", "approved", "rejected"]).optional(),
+    publicVideoStatus: z.enum(["draft", "published"]).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const db = context.getBase44().asServiceRole.entities;
+    const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.asset_type !== "clip" || asset.status !== "ready") {
+      throw Object.assign(new Error("Only completed clip assets can be reviewed or published."), { status: 409, code: "CLIP_NOT_READY" });
+    }
+    const reviewStatus = data.reviewStatus || asset.review_status || "needs_review";
+    const publicVideoStatus = data.publicVideoStatus || asset.public_video_status || "draft";
+    if (publicVideoStatus === "published" && (!["approved"].includes(reviewStatus) || !["authorised", "not_applicable"].includes(asset.rights_status))) {
+      throw Object.assign(new Error("Approve the clip and confirm its rights before publishing it to the client library."), { status: 409, code: "CLIP_NOT_APPROVED" });
+    }
+    return db.InternalVideoAsset.update(asset.id, {
+      review_status: reviewStatus,
+      public_video_status: publicVideoStatus,
+      ...(publicVideoStatus === "published" ? { public_published_at: new Date().toISOString() } : {}),
+    });
+  });
+
+const INTERNAL_CLIP_DOWNLOAD_TTL = 120;
+
+export const listPublicInternalClips = createServerFn({ method: "GET" })
+  .validator(z.object({
+    search: z.string().trim().max(100).optional(),
+    category: z.string().trim().max(80).optional(),
+    language: z.string().trim().max(12).optional(),
+    country: z.string().trim().length(2).optional(),
+    limit: z.number().int().min(1).max(48).default(24),
+    offset: z.number().int().min(0).max(100000).default(0),
+  }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const filter = {
+      asset_type: "clip", status: "ready", review_status: "approved",
+      public_video_status: "published", rights_status: { $in: ["authorised", "not_applicable"] },
+    };
+    if (data.category) filter.category = data.category;
+    if (data.language) filter.language = data.language;
+    if (data.country) filter.target_countries = data.country.toUpperCase();
+    const rows = await db.InternalVideoAsset.filter(filter, "-public_published_at", 5000, 0);
+    const term = String(data.search || "").toLowerCase();
+    const filtered = term ? rows.filter(asset =>
+      [asset.title, asset.description, asset.topic, asset.category, asset.language, ...(asset.tags || [])]
+        .join(" ").toLowerCase().includes(term)
+    ) : rows;
+    const page = filtered.slice(data.offset, data.offset + data.limit);
+    return {
+      assets: page.map(asset => ({
+        id: asset.id, title: asset.title, description: asset.description || "",
+        category: asset.category || "Other", topic: asset.topic || "",
+        language: asset.detected_language || asset.language || "und",
+        target_countries: Array.isArray(asset.target_countries) ? asset.target_countries : [],
+        tags: Array.isArray(asset.tags) ? asset.tags : [],
+        editorial_tags: (() => {
+          const score = Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null;
+          const published = new Date(asset.public_published_at || asset.created_date || 0).getTime();
+          const tags = [];
+          if (Number.isFinite(published) && published > 0 && Date.now() - published <= 7 * 86400000) tags.push("New");
+          if (score !== null && score >= 80) tags.push("High viral potential");
+          if (score !== null && score >= 90) tags.push("Best clip · AI score ≥90");
+          return tags;
+        })(),
+        duration_seconds: Number(asset.duration_seconds || 0),
+        thumbnail_url: asset.thumbnail_url || "",
+        viral_potential_score: Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null,
+        public_published_at: asset.public_published_at || asset.created_date || null,
+      })),
+      nextOffset: data.offset + page.length,
+      hasMore: data.offset + page.length < filtered.length,
+    };
+  });
+
+export const requestInternalClipDownload = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ assetId: z.string().min(1).max(128) }))
+  .handler(async ({ data, context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const user = context.user;
+    const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.asset_type !== "clip" || asset.status !== "ready" ||
+        asset.review_status !== "approved" || asset.public_video_status !== "published" ||
+        !["authorised", "not_applicable"].includes(asset.rights_status) || !asset.google_drive_file_id) {
+      throw Object.assign(new Error("This clip is not available for download."), { status: 404, code: "CLIP_NOT_AVAILABLE" });
+    }
+    const subscriptions = await db.UserSubscription.filter({ user_id: user.id }, "-created_date", 1, 0);
+    const subscription = subscriptions[0];
+    const tier = subscription?.tier_code || "free";
+    const active = subscription?.status === "active" ||
+      (subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date());
+    if (!active || tier === "free") {
+      throw Object.assign(new Error("An active paid subscription is required to download clips from the VICEHUB library."), { status: 403, code: "PAID_SUBSCRIPTION_REQUIRED" });
+    }
+    const plans = await db.SubscriptionPlan.filter(
+      { tier_code: tier, currency: subscription?.currency || "GBP", status: "active" }, "-created_date", 1, 0,
+    );
+    const plan = plans[0];
+    if (!plan) throw Object.assign(new Error("Your subscription plan is not configured."), { status: 403, code: "PLAN_NOT_CONFIGURED" });
+    const limit = Number(plan.monthly_download_limit || 0);
+    if (!Number.isInteger(limit) || limit < 1) {
+      throw Object.assign(new Error("Your plan does not include clip downloads."), { status: 403, code: "DOWNLOADS_NOT_INCLUDED" });
+    }
+    if (!plan.clean_downloads) {
+      throw Object.assign(new Error("Clean clip downloads are not included in your current plan."), { status: 403, code: "CLEAN_DOWNLOADS_NOT_INCLUDED" });
+    }
+    const now = new Date();
+    const monthKey = now.toISOString().slice(0, 7);
+    let quotas = await db.DownloadQuota.filter({ user_id: user.id, month_key: monthKey }, "-created_date", 2, 0);
+    let quota = quotas[0];
+    if (!quota) quota = await db.DownloadQuota.create({ user_id: user.id, month_key: monthKey, downloads_used: 0, downloads_limit: limit, tier_code: tier });
+    const reservation = await db.DownloadQuota.updateMany(
+      { id: quota.id, downloads_used: { $lt: limit } },
+      { $inc: { downloads_used: 1 }, $set: { downloads_limit: limit, tier_code: tier, last_download_at: now.toISOString() } },
+    );
+    if (!reservation?.updated) throw Object.assign(new Error("You have reached your monthly clip download allowance."), { status: 429, code: "MONTHLY_DOWNLOAD_LIMIT_REACHED", limit });
+    try {
+      const event = await db.DownloadEvent.create({
+        user_id: user.id, video_id: asset.id, month_key: monthKey,
+        tier_code: tier, watermark_applied: false, status: "signed",
+        delivery_expires_at: new Date(now.getTime() + INTERNAL_CLIP_DOWNLOAD_TTL * 1000).toISOString(),
+      });
+      return {
+        downloadUrl: "/api/internal-video-download/" + encodeURIComponent(asset.id),
+        expiresInSeconds: INTERNAL_CLIP_DOWNLOAD_TTL,
+        downloadEventId: event.id,
+        downloadsLimit: limit,
+        downloadsUsed: Number(quota.downloads_used || 0) + 1,
+        downloadsRemaining: Math.max(0, limit - Number(quota.downloads_used || 0) - 1),
+      };
+    } catch (error) {
+      await db.DownloadQuota.updateMany({ id: quota.id }, { $inc: { downloads_used: -1 } }).catch(() => null);
+      throw error;
+    }
+  });
