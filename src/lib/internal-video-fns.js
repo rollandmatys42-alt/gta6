@@ -29,6 +29,65 @@ export const listInternalVideoAssets = createServerFn({ method: "GET" })
     return { assets, nextOffset: data.offset + assets.length, hasMore: assets.length === data.limit };
   });
 
+export const listInternalVideoJobs = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({ limit: z.number().int().min(1).max(50).default(20) }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    return context.getBase44().asServiceRole.entities.InternalVideoJob.list("-created_date", data.limit, 0);
+  });
+
+export const enqueueInternalVideoJob = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    assetId: z.string().min(1).max(128),
+    jobType: z.enum(["analyse", "transcribe"]),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const db = context.getBase44().asServiceRole.entities;
+    const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.status === "archived") {
+      throw Object.assign(new Error("The source asset is unavailable."), { status: 404, code: "SOURCE_ASSET_NOT_FOUND" });
+    }
+    if (!["authorised", "not_applicable"].includes(asset.rights_status)) {
+      throw Object.assign(new Error("Processing is blocked until usage rights are verified and recorded for this asset."), { status: 409, code: "VIDEO_RIGHTS_NOT_CLEARED" });
+    }
+    const active = await db.InternalVideoJob.filter({ asset_id: asset.id, job_type: data.jobType }, "-created_date", 10, 0);
+    if (active.some(job => ["queued", "processing"].includes(job.status))) {
+      throw Object.assign(new Error("A matching processing job is already queued or running for this asset."), { status: 409, code: "VIDEO_JOB_ALREADY_ACTIVE" });
+    }
+    const job = await db.InternalVideoJob.create({
+      asset_id: asset.id,
+      job_type: data.jobType,
+      status: "queued",
+      progress_percent: 0,
+      stage: "Waiting for an available VICEHUB worker",
+      attempts: 0,
+      idempotency_key: crypto.randomUUID(),
+      created_by: context.user.id,
+    });
+    return { job, workerConfigured: false, message: "Job saved to the queue. It will start when the authenticated VICEHUB worker is connected." };
+  });
+
+export const cancelInternalVideoJob = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ jobId: z.string().min(1).max(128) }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const db = context.getBase44().asServiceRole.entities;
+    const job = await db.InternalVideoJob.get(data.jobId).catch(() => null);
+    if (!job) throw Object.assign(new Error("Processing job not found."), { status: 404, code: "VIDEO_JOB_NOT_FOUND" });
+    if (job.status !== "queued") {
+      throw Object.assign(new Error("Only queued jobs can be cancelled from the library. A running worker must finish or report failure."), { status: 409, code: "VIDEO_JOB_NOT_CANCELLABLE" });
+    }
+    return db.InternalVideoJob.update(job.id, {
+      status: "cancelled",
+      stage: "Cancelled by administrator",
+      completed_at: new Date().toISOString(),
+    });
+  });
+
 export const createInternalVideoUploadUrl = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({
@@ -121,5 +180,9 @@ export const archiveInternalVideoAsset = createServerFn({ method: "POST" })
     const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
     if (!asset) throw Object.assign(new Error("Internal video asset not found."), { status: 404, code: "ASSET_NOT_FOUND" });
     if (asset.status === "archived") return asset;
+    const activeJobs = await db.InternalVideoJob.filter({ asset_id: asset.id }, "-created_date", 50, 0);
+    if (activeJobs.some(job => ["queued", "processing"].includes(job.status))) {
+      throw Object.assign(new Error("Cancel or finish the active processing jobs before archiving this asset."), { status: 409, code: "ASSET_HAS_ACTIVE_JOBS" });
+    }
     return db.InternalVideoAsset.update(asset.id, { status: "archived" });
   });

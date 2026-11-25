@@ -1,0 +1,28 @@
+{
+  "name": "InternalVideoJob",
+  "type": "object",
+  "properties": {
+    "asset_id": { "type": "string", "maxLength": 128 },
+    "job_type": { "type": "string", "enum": ["analyse", "transcribe"] },
+    "status": { "type": "string", "enum": ["queued", "processing", "succeeded", "failed", "cancelled"], "default": "queued" },
+    "progress_percent": { "type": "integer", "minimum": 0, "maximum": 100, "default": 0 },
+    "stage": { "type": "string", "maxLength": 120 },
+    "attempts": { "type": "integer", "minimum": 0, "default": 0 },
+    "worker_id": { "type": "string", "maxLength": 128 },
+    "lease_expires_at": { "type": "string", "format": "date-time" },
+    "idempotency_key": { "type": "string", "maxLength": 160 },
+    "result_summary": { "type": "string", "maxLength": 5000 },
+    "error_code": { "type": "string", "maxLength": 100 },
+    "error_message": { "type": "string", "maxLength": 1000 },
+    "created_by": { "type": "string", "maxLength": 128 },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["asset_id", "job_type", "status", "progress_percent", "created_by"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
