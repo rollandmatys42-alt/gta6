@@ -19,8 +19,7 @@ const workspaceLinks = [
   ["/dashboard", "⌂", "overview"],
   ["/library", "▤", "library"],
   ["/messages", "✉", "messages"],
-  ["/social", "↗", "social"],
-  ["/notifications", "✦", "dispatch"],
+  ["/notifications", "💵", "dispatch"],
   ["/subscription", "◈", "subscription"],
 ];
 const libraryLabels = { en: "Clip library", fr: "Bibliothèque de clips", es: "Biblioteca de clips", pt: "Biblioteca de clips", it: "Libreria di clip", de: "Clip-Bibliothek" };
@@ -77,7 +76,7 @@ function DispatchIndicator({isAuthenticated}) {
       setPushMessage("Background push alerts enabled on this device.");
     }catch(error){setPushMessage(error?.message||"Push alerts could not be enabled.");}
   };
-  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-dispatch" aria-label={unread?unread+" unread dispatches":"VICEHUB dispatches"} title="VICEHUB dispatches"><span className="vh-notification-mark" aria-hidden="true"><svg viewBox="0 0 40 40" role="img"><path d="M20 2.5 35.5 11v18L20 37.5 4.5 29V11L20 2.5Z"/><path d="m20 7 11 6v14l-11 6-11-6V13l11-6Z"/><text x="20" y="24.5" textAnchor="middle">VI</text><path d="m30 5 1.8-3 1.8 3 3 1.8-3 1.8-1.8 3-1.8-3-3-1.8L30 5Z"/></svg></span>{unread>0&&<b className="vh-notification-count">{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable dispatch alerts" title="Enable dispatch alerts">✦</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
+  return <span className="vh-notification-control"><Link to="/notifications" className="vh-notification-dispatch" aria-label={unread?unread+" unread dispatches":"VICEHUB dispatches"} title="VICEHUB dispatches"><span className="vh-notification-mark" aria-hidden="true"><svg viewBox="0 0 40 40" role="img"><rect x="3" y="8" width="34" height="24" rx="3" fill="#173d32" stroke="#a5f0c5" strokeWidth="2"/><rect x="7" y="12" width="26" height="16" rx="2" fill="none" stroke="#a5f0c5" strokeWidth="1"/><circle cx="20" cy="20" r="6" fill="none" stroke="#a5f0c5" strokeWidth="1.5"/><text x="20" y="24" textAnchor="middle" fontSize="11" fontWeight="900" fill="#e2ffec">$</text><path d="M5 15h3M32 25h3" stroke="#a5f0c5" strokeWidth="1.5" strokeLinecap="round"/></svg></span>{unread>0&&<b className="vh-notification-count">{unread>99?"99+":unread}</b>}</Link>{permission==="default"||(pushAvailable&&permission==="granted")?<button type="button" className="vh-notification-enable" onClick={enable} aria-label="Enable dispatch alerts" title="Enable dispatch alerts">✦</button>:null}{pushMessage&&<span className="vh-pwa-install-message" role="status">{pushMessage}</span>}</span>;
 }
 
 function PwaInstallButton() {
@@ -153,8 +152,8 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / SHORT-FORM CL
       <footer className="fh-footer">
         <div className="fh-footer-grid">
           <div><div className="fh-brand-text">VICE<b>HUB</b></div><p>Curated short-form video clips across topics, languages and markets. Preview and download according to your membership.</p></div>
-          <div><h4>Explore</h4><Link to="/library">Video library</Link><Link to="/social">Social planner</Link><Link to="/creators">Creators</Link></div>
-          <div><h4>Account</h4><Link to="/dashboard">My account</Link><Link to="/subscription">Membership</Link><Link to="/social">Social planner</Link></div>
+          <div><h4>Explore</h4><Link to="/library">Video library</Link><Link to="/creators">Creators</Link></div>
+          <div><h4>Account</h4><Link to="/dashboard">My account</Link><Link to="/subscription">Membership</Link></div>
           <div><h4>Legal</h4><Link to="/terms">{translate(locale, "footer.terms")}</Link><Link to="/privacy">{translate(locale, "footer.privacy")}</Link><Link to="/copyright">{translate(locale, "footer.copyright")}</Link><Link to="/cookies">Cookies</Link><Link to="/refunds">Refunds</Link><Link to="/contact">Contact</Link></div>
         </div>
         <div className="fh-footer-bottom"><span>{translate(locale, "footer.independent")}</span><small>{translate(locale, "footer.disclaimer")}</small></div>
