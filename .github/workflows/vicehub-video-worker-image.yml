@@ -1,0 +1,21 @@
+name: VICEHUB video worker image
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "workers/video-engine/**"
+      - ".github/workflows/vicehub-video-worker-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container-build:
+    name: Build worker container (no publish)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build --pull -t vicehub-video-worker:ci -f workers/video-engine/Dockerfile workers/video-engine
