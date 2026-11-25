@@ -139,7 +139,8 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / SHORT-FORM CL
           <button type="button" className="fh-burger" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}><i /><i /><i /></button>
           <nav className={"fh-nav" + (open ? " open" : "")} aria-label="Main">
             {links.map(([href, key]) => <Link key={href} to={href} className="fh-nav-link" activeProps={{ className: "fh-nav-link active" }} activeOptions={{ exact: href === "/" }} onClick={close}>{label(key)}</Link>)}
-            <Link to="/subscription" className="fh-nav-link" onClick={close}>Membership</Link>
+            <Link to="/subscription" className="fh-nav-link" onClick={close}>Pricing</Link>
+            <Link to="/library" className="fh-nav-link" onClick={close}>New Video</Link>
             <div className="fh-nav-actions"><DispatchIndicator isAuthenticated={isAuthenticated}/><PwaInstallButton/>
               <select className="fh-lang" aria-label="Language" value={locale} onChange={e => setSiteLocale(e.target.value)}><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="pt">PT</option><option value="it">IT</option><option value="de">DE</option></select>
               {isAuthenticated
