@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
-import { getMyAccount, refreshMySubscription, listPublishedVideosPage, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyReferralDashboard, applyReferralWalletCredit, getFreeSamplePack } from "@/lib/server-fns";
+import { getMyAccount, refreshMySubscription, listPublishedVideosPage, getNewsFeed, createStripePortalSession, getMyNotifications, markNotificationRead, getMyAffiliateDashboard, startAffiliatePayoutOnboarding, requestAffiliatePayout, getFreeSamplePack } from "@/lib/server-fns";
 import { downloadCleanVideo } from "@/lib/video-download";
 import { useLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
@@ -34,6 +34,8 @@ function DashboardPage() {
   const [samplePack, setSamplePack] = useState(null);
   const [referralBusy, setReferralBusy] = useState(false);
   const [referralNotice, setReferralNotice] = useState("");
+  const [payoutCurrency, setPayoutCurrency] = useState("GBP");
+  const [payoutCountry, setPayoutCountry] = useState("GB");
 
   const refresh = async () => {
     setLoading(true);
@@ -63,7 +65,7 @@ function DashboardPage() {
   };
 
   useEffect(() => { refresh(); }, [locale]);
-  useEffect(() => { getMyReferralDashboard().then(setReferral).catch(err => setReferralNotice(err?.message || "Referral dashboard is unavailable.")); }, []);
+  useEffect(() => { getMyAffiliateDashboard().then(setReferral).catch(err => setReferralNotice(err?.message || "Affiliate dashboard is unavailable.")); }, []);
 
   const firstName = "CREATOR";
   const used = Number(account?.downloadsUsed || 0);
@@ -124,17 +126,27 @@ function DashboardPage() {
         <div className="member-free-sample-head"><div><span className="member-section-kicker">VICEHUB / FIRST DROP</span><h2>YOUR 3 FREE <em>VIDEO TRIAL.</em></h2><p>Every new member receives the same three selected videos. Each can be downloaded once, with the VICEHUB watermark. The pack is fixed for every account and does not refresh monthly.</p></div><span className="member-free-sample-count">{samplePack?.downloadsRemaining ?? 3}<small>/ 3 LEFT</small></span></div>
         {samplePack?.packReady ? <div className="member-free-sample-grid">{samplePack.videos.map(video=><article className="member-free-sample-item" key={video.id}><div className="member-free-sample-image"><img src={videoThumbnail(video)} alt={video.title ? `${video.title} thumbnail` : "GTA VI video thumbnail"} loading="lazy" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src="https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=1920";}}/></div><div><small>{video.category} · {(video.language||"en").toUpperCase()}</small><b>{video.title}</b><p>{video.description}</p><button type="button" disabled={busyVideo===video.id||(samplePack.downloadedVideoIds||[]).includes(video.id)} onClick={()=>download(video)}>{busyVideo===video.id?"PREPARING…":(samplePack.downloadedVideoIds||[]).includes(video.id)?"ALREADY DOWNLOADED":"DOWNLOAD FREE VIDEO ↓"}</button></div></article>)}</div> : <div className="member-free-sample-empty">The free sample pack will appear here as soon as the three rights-cleared videos have been selected and published. The pack is identical for every new member.</div>}
       </section>
-      <section className="member-referral-card">
-        <div className="member-referral-head"><div><span className="member-section-kicker">VICEHUB / CREATOR REWARDS</span><h2>INVITE CREATORS. <em>EARN CREDIT.</em></h2><p>Give a new member 5% off their first payment. Earn 20% of that first paid subscription as VICEHUB credit after a 30-day validation period.</p></div><span className="member-referral-mark">20%</span></div>
-        {referral ? <div className="member-referral-grid">
-          <div className="member-referral-link"><small>YOUR PERSONAL REFERRAL LINK</small><code>{typeof window !== "undefined" ? window.location.origin : "https://gta6-creator-hub-c26cc578.base44.app"}/?ref={referral.code}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(window.location.origin+"/?ref="+referral.code);setReferralNotice("Referral link copied.");}catch{setReferralNotice("Copy failed. Select and copy the link manually.");}}}>COPY LINK ↗</button><p>Affiliate disclosure: you may receive VICEHUB membership credit if someone subscribes through this link. <Link to="/referral-terms">Programme terms ↗</Link></p></div>
-          <div className="member-referral-stat"><small>PAID REFERRALS</small><b>{referral.referralCount}</b></div>
-          <div className="member-referral-stat"><small>AVAILABLE CREDIT</small><b>{new Intl.NumberFormat("en-GB",{style:"currency",currency:referral.currency||"GBP"}).format((referral.availableCents||0)/100)}</b></div>
-          <div className="member-referral-stat"><small>TOTAL EARNED</small><b>{new Intl.NumberFormat("en-GB",{style:"currency",currency:referral.currency||"GBP"}).format((referral.earnedCents||0)/100)}</b></div>
-        </div> : <p className="member-referral-loading">Preparing your personal referral link…</p>}
-        {referral?.balances && Object.entries(referral.balances).filter(([code,b]) => code !== referral.currency && b.availableCents > 0).length > 0 && <p className="member-referral-currency-note">Other currency wallets: {Object.entries(referral.balances).filter(([code,b]) => code !== referral.currency && b.availableCents > 0).map(([code,b]) => `${code} ${(b.availableCents/100).toFixed(2)}`).join(" · ")}. These credits must be applied to a membership billed in the same currency.</p>}
-        <div className="member-referral-actions"><button type="button" disabled={referralBusy || !referral?.isSubscribed || (referral?.availableCents||0)<=0} onClick={async()=>{setReferralBusy(true);setReferralNotice("");try{const result=await applyReferralWalletCredit();setReferralNotice(result?.message||"Credit applied to your next invoice.");const updated=await getMyReferralDashboard();setReferral(updated);}catch(err){setReferralNotice(err?.message||"Credit could not be applied.");}finally{setReferralBusy(false);}}}>{referralBusy?"APPLYING CREDIT…":"APPLY CREDIT TO NEXT INVOICE ↗"}</button><span>Credits stay in your wallet, carry over and can cover up to 100% of a future monthly invoice. No cash withdrawals.</span></div>
+      <section className="member-referral-card member-affiliate-card">
+        <div className="member-referral-head"><div><span className="member-section-kicker">VICEHUB / AFFILIATE REWARDS</span><h2>INVITE CREATORS. <em>EARN CASH.</em></h2><p>Give a new member 5% off their first payment. Earn 20% of that first eligible payment after a 30-day validation period. No commission on renewals.</p></div><span className="member-referral-mark">20%</span></div>
+        {referral ? <>
+          <div className="member-referral-grid">
+            <div className="member-referral-link"><small>YOUR PERSONAL REFERRAL LINK</small><code>{typeof window !== "undefined" ? window.location.origin : "https://gta6-creator-hub-c26cc578.base44.app"}/?ref={referral.code}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(window.location.origin+"/?ref="+referral.code);setReferralNotice("Referral link copied.");}catch{setReferralNotice("Copy failed. Select and copy the link manually.");}}}>COPY LINK ↗</button><p>Affiliate disclosure: you may receive a cash commission if someone subscribes through this link. <Link to="/referral-terms">Programme terms ↗</Link></p></div>
+            <div className="member-referral-stat"><small>PAID REFERRALS</small><b>{referral.referralCount}</b></div>
+          </div>
+          <div className="member-affiliate-balances">{["GBP","EUR","USD"].map(cur=>{const b=referral.balances?.[cur]||{};return <article key={cur}><b>{cur}</b><div><small>Pending validation</small><strong>{new Intl.NumberFormat("en-GB",{style:"currency",currency:cur}).format((b.pendingCents||0)/100)}</strong></div><div><small>Available to withdraw</small><strong>{new Intl.NumberFormat("en-GB",{style:"currency",currency:cur}).format((b.availableCents||0)/100)}</strong></div><div><small>Reserved for payout</small><strong>{new Intl.NumberFormat("en-GB",{style:"currency",currency:cur}).format((b.reservedCents||0)/100)}</strong></div><div><small>Paid out</small><strong>{new Intl.NumberFormat("en-GB",{style:"currency",currency:cur}).format((b.paidCents||0)/100)}</strong></div></article>})}</div>
+          <div className="member-affiliate-payout">
+            <div><span className="member-section-kicker">CASH PAYOUTS / STRIPE CONNECT</span><h3>YOUR PAYOUT ACCOUNT</h3><p>{referral.connect?.payoutsEnabled ? "Your Stripe payout account is enabled." : "Connect a bank account securely through Stripe. VICEHUB does not store your bank details."}</p><small>Connection status: {String(referral.connect?.status||"not_started").replaceAll("_"," ")}</small></div>
+            <div className="member-affiliate-controls">
+              {!referral.connect?.payoutsEnabled && <><label>Country of your bank account<select value={payoutCountry} onChange={e=>setPayoutCountry(e.target.value)}><option value="GB">United Kingdom</option><option value="FR">France</option><option value="IE">Ireland</option><option value="DE">Germany</option><option value="ES">Spain</option><option value="IT">Italy</option><option value="NL">Netherlands</option><option value="BE">Belgium</option><option value="LU">Luxembourg</option><option value="US">United States</option><option value="CA">Canada</option></select></label><button type="button" disabled={referralBusy} onClick={async()=>{setReferralBusy(true);setReferralNotice("");try{const x=await startAffiliatePayoutOnboarding({data:{country:payoutCountry}});window.location.assign(x.url);}catch(e){setReferralNotice(e?.message||"Stripe onboarding could not be started.");setReferralBusy(false);}}}>{referralBusy?"OPENING STRIPE…":"CONNECT PAYOUT ACCOUNT ↗"}</button></>}
+              <label>Payout currency<select value={payoutCurrency} onChange={e=>setPayoutCurrency(e.target.value)}><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label>
+              <button type="button" disabled={referralBusy||!referral.connect?.payoutsEnabled||(referral.balances?.[payoutCurrency]?.availableCents||0)<(referral.minimumPayoutCents?.[payoutCurrency]||2500)} onClick={async()=>{setReferralBusy(true);setReferralNotice("");try{await requestAffiliatePayout({data:{currency:payoutCurrency}});setReferral(await getMyAffiliateDashboard());setReferralNotice("Payout request submitted. It is now awaiting VICEHUB review.");}catch(e){setReferralNotice(e?.message||"Payout request could not be submitted.");}finally{setReferralBusy(false);}}}>REQUEST PAYOUT — {payoutCurrency}</button>
+              <small>Minimum payout: {new Intl.NumberFormat("en-GB",{style:"currency",currency:payoutCurrency}).format((referral.minimumPayoutCents?.[payoutCurrency]||2500)/100)}. Requests are reviewed by VICEHUB.</small>
+            </div>
+          </div>
+          <div className="member-affiliate-history"><h3>PAYOUT HISTORY</h3>{(referral.requests||[]).length ? referral.requests.map(p=><article key={p.id}><span>{new Date(p.created_date).toLocaleDateString("en-GB")}</span><b>{new Intl.NumberFormat("en-GB",{style:"currency",currency:p.currency}).format(p.amount_cents/100)}</b><small>{p.status.replaceAll("_"," ")}</small></article>) : <p>No payout requests yet.</p>}</div>
+        </> : <p className="member-referral-loading">Preparing your affiliate account…</p>}
         {referralNotice && <p className="member-referral-notice" role="status">{referralNotice}</p>}
+        <p className="member-affiliate-legal-note">Commissions are calculated on the first eligible subscription payment excluding separately stated tax, held for 30 days and paid only after approval. Stripe identity checks and payout timing apply. Tax reporting remains your responsibility.</p>
       </section>
       <section className="member-social-connect">
         <div className="member-social-head"><div><span className="member-section-kicker">VICEHUB / ACCOUNT LINKS</span><h2>CONNECT YOUR <em>CHANNELS.</em></h2><p>Securely authorise your own social accounts. VICEHUB never asks for your passwords.</p></div><Link to="/social">OPEN SOCIAL CONTROL ROOM ↗</Link></div>
