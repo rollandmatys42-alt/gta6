@@ -17,6 +17,7 @@ jobs:
           src/routes/legacy-home.jsx
           src/components/SiteFrame.jsx
           src/routes/admin.import.jsx
+          src/routes/admin.storage.jsx
           src/routes/_authed/admin/video-library.jsx
           src/routes/library.jsx
           'src/routes/api/internal-video-preview/$assetId.jsx'
