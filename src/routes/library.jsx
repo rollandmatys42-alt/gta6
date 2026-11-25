@@ -39,6 +39,8 @@ function VideoLibraryPage() {
   const t = words[locale] || words.en;
   const [category, setCategory] = useState("All");
   const [language, setLanguage] = useState("All");
+  const [duration, setDuration] = useState("All");
+  const [sort, setSort] = useState("newest");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const requestSequence = useRef(0);
@@ -72,6 +74,8 @@ function VideoLibraryPage() {
           category: category === "All" ? undefined : category,
           language: language === "All" ? undefined : language,
           search: debouncedQuery || undefined,
+          duration: duration === "All" ? undefined : duration,
+          sort,
           offset: nextOffset,
           limit: 24,
         },
@@ -88,14 +92,14 @@ function VideoLibraryPage() {
         setLoadingMore(false);
       }
     }
-  }, [category, language, debouncedQuery, offset]);
+  }, [category, language, duration, sort, debouncedQuery, offset]);
 
   useEffect(() => {
     setVideos([]);
     setOffset(0);
     setHasMore(false);
     fetchPage({ reset: true });
-  }, [category, language, debouncedQuery]);
+  }, [category, language, duration, sort, debouncedQuery]);
 
   const filtered = videos;
 
@@ -166,6 +170,10 @@ function VideoLibraryPage() {
         <div className="vh-lib2-filter-panel">
           <label className="vh-lib2-search"><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search}/></label>
           <label className="vh-lib2-language"><span>{t.language}</span><select value={language} onChange={event => setLanguage(event.target.value)}>{languages.map(value => <option key={value} value={value}>{languageLabel(value)}</option>)}</select></label>
+          <div className="vh-lib2-extra-filters">
+            <label className="vh-lib2-language"><span>VIDEO LENGTH</span><select value={duration} onChange={event => setDuration(event.target.value)}><option value="All">Any duration</option><option value="under_1">Under 1 minute</option><option value="1_5">1–5 minutes</option><option value="5_15">5–15 minutes</option><option value="over_15">Over 15 minutes</option></select></label>
+            <label className="vh-lib2-language"><span>SORT BY</span><select value={sort} onChange={event => setSort(event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="shortest">Shortest first</option><option value="longest">Longest first</option></select></label>
+          </div>
         </div>
         <div className="vh-lib2-categories" aria-label={t.category}>{categories.map(value => <button key={value} type="button" className={category === value ? "active" : ""} onClick={() => setCategory(value)}>{categoryLabel(value)}</button>)}</div>
         {error && <div className="vh-lib2-alert" role="alert">{error}</div>}{downloadMessage && <div className="vh-lib2-alert" role="status">{downloadMessage}</div>}

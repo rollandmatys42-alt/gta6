@@ -1759,6 +1759,8 @@ export const listPublishedVideosPage = createServerFn({ method: "GET" })
     category: z.enum(["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"]).optional(),
     language: z.enum(["en", "fr", "es", "pt", "it", "de"]).optional(),
     search: z.string().trim().max(100).optional(),
+    duration: z.enum(["under_1", "1_5", "5_15", "over_15"]).optional(),
+    sort: z.enum(["newest", "oldest", "shortest", "longest"]).default("newest"),
     offset: z.number().int().min(0).max(100000).default(0),
     limit: z.number().int().min(1).max(48).default(24),
   }))
@@ -1767,6 +1769,10 @@ export const listPublishedVideosPage = createServerFn({ method: "GET" })
     const filter = { status: "published", license_status: "verified" };
     if (data.category) filter.category = data.category;
     if (data.language) filter.language = data.language;
+    if (data.duration === "under_1") filter.duration_seconds = { $lt: 60 };
+    if (data.duration === "1_5") filter.duration_seconds = { $gte: 60, $lt: 300 };
+    if (data.duration === "5_15") filter.duration_seconds = { $gte: 300, $lt: 900 };
+    if (data.duration === "over_15") filter.duration_seconds = { $gte: 900 };
     if (data.search) {
       // Escape regular-expression metacharacters so search input remains literal.
       const term = data.search.split("").map((char) => "\\^$.*+?()[]{}|".includes(char) ? "\\" + char : char).join("");
@@ -1779,7 +1785,7 @@ export const listPublishedVideosPage = createServerFn({ method: "GET" })
     }
     const rows = await base44.asServiceRole.entities.Video.filter(
       filter,
-      "-published_at",
+      ({ newest: "-published_at", oldest: "published_at", shortest: "duration_seconds", longest: "-duration_seconds" })[data.sort || "newest"],
       data.limit + 1,
       data.offset,
       ["id", "title", "description", "category", "language", "is_featured", "tags", "duration_seconds", "thumbnail_url", "creator_name", "published_at"],
