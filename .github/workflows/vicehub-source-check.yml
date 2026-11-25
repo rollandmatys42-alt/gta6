@@ -31,3 +31,14 @@ jobs:
         run: deno install
       - name: Type-check Deno automation
         run: deno check base44/functions/social-publisher/index.ts base44/functions/gta-news-sync/index.ts base44/functions/vicehub-send-push/index.ts
+
+  video-worker-syntax:
+    name: Python video worker syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile worker source
+        run: python -m compileall -q workers/video-engine
