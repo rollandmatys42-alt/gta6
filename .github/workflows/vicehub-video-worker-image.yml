@@ -6,6 +6,11 @@ on:
     paths:
       - "workers/video-engine/**"
       - ".github/workflows/vicehub-video-worker-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "workers/video-engine/**"
+      - ".github/workflows/vicehub-video-worker-image.yml"
   workflow_dispatch:
 
 permissions:
