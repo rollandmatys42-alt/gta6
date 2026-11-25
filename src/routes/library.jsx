@@ -116,9 +116,9 @@ function ClientClipLibrary(){
       </section>
 
       <nav className="vh-library-subnav" aria-label="Library sections">
-        <a className="active" href="#clip-catalogue">ALL CLIPS</a>
-        <a href="#clip-catalogue">DISCOVER</a>
-        <a href="#clip-catalogue">TOP RATED</a>
+        <a className={sort==="newest"?"active":""} href="#clip-catalogue" onClick={()=>setSort("newest")}>LATEST CLIPS</a>
+        <a href="#featured-clip">FEATURED</a>
+        <button type="button" className={sort==="score"?"active":""} onClick={()=>setSort("score")}>TOP RATED</button>
         <span>VICEHUB ORIGINAL COLLECTION</span>
       </nav>
 
@@ -146,7 +146,7 @@ function ClientClipLibrary(){
 
       {error&&<div role="alert" className="vh-library-error">{error}{!isAuthenticated&&<Link to="/sign-in"> SIGN IN ↗</Link>}</div>}
 
-      {featured&&<section className="vh-library-featured">
+      {featured&&<section className="vh-library-featured" id="featured-clip">
         <div className="vh-library-featured-image">
           {featured.thumbnail_url?<img src={featured.thumbnail_url} alt={featured.title}/>:<div className="vh-library-no-art">VICEHUB / FEATURED</div>}
           <span className="vh-library-featured-label">EDITOR'S PICK / LATEST DROP</span>
