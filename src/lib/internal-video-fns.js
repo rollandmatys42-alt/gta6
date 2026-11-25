@@ -134,8 +134,8 @@ export const updateInternalVideoRights = createServerFn({ method: "POST" })
     }
     const db = context.getBase44().asServiceRole.entities;
     const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
-    if (!asset || asset.storage_provider !== "google_drive" || !asset.google_drive_file_id) {
-      throw Object.assign(new Error("Google Drive source not found."), { status: 404, code: "DRIVE_ASSET_NOT_FOUND" });
+    if (!asset || !(asset.google_drive_file_id || asset.storage_url || asset.source_url)) {
+      throw Object.assign(new Error("Video storage source not found."), { status: 404, code: "VIDEO_ASSET_NOT_FOUND" });
     }
     return db.InternalVideoAsset.update(asset.id, {
       rights_status: data.rightsStatus,
@@ -625,7 +625,14 @@ export const importLinkedStorageVideo = createServerFn({ method: "POST" })
     const source = await db.VideoStorageSource.get(data.sourceId).catch(() => null);
     if (!source || !source.enabled) throw Object.assign(new Error("Storage source is unavailable."), { status: 404 });
     const existing = await db.InternalVideoAsset.filter({ storage_url: data.videoUrl }, "-created_date", 1, 0);
-    if (existing.length) return { asset: existing[0], alreadyImported: true };
+    if (existing.length) {
+      const current = existing[0];
+      const updated = await db.InternalVideoAsset.update(current.id, {
+        rights_status: data.rightsStatus,
+        ...(data.rightsEvidenceUrl ? { rights_evidence_url: data.rightsEvidenceUrl } : {}),
+      });
+      return { asset: updated, alreadyImported: true, rightsUpdated: true };
+    }
     const previewUrl = data.previewUrl || data.videoUrl;
     const asset = await db.InternalVideoAsset.create({
       title: data.title,
@@ -663,39 +670,48 @@ export const syncGoogleDriveStorageSource = createServerFn({ method: "POST" })
     if (!source || !source.enabled || source.provider !== "google_drive" || !source.folder_id) {
       throw Object.assign(new Error("This source is not a configured Google Drive folder."), { status: 400 });
     }
-    const result = await fetchGoogleDriveVideoFiles(context.getBase44(), { parentId: source.folder_id });
+    let pageToken = undefined;
     let imported = 0;
     let skipped = 0;
-    for (const file of result.files || []) {
-      const existing = await db.InternalVideoAsset.filter({ google_drive_file_id: file.id }, "-created_date", 1, 0);
-      if (existing.length) { skipped += 1; continue; }
-      const id = encodeURIComponent(file.id);
-      await db.InternalVideoAsset.create({
-        title: String(file.name || "Untitled video").slice(0, 180),
-        description: "Imported from " + source.name,
-        asset_type: "clip",
-        status: "ready",
-        category: "Other",
-        language: "und",
-        tags: [],
-        target_countries: [source.market_country],
-        rights_status: "pending",
-        storage_provider: "google_drive",
-        storage_source_id: source.id,
-        storage_url: "https://drive.google.com/uc?export=download&id=" + id,
-        preview_url: "https://drive.google.com/file/d/" + id + "/preview",
-        download_url: "https://drive.google.com/uc?export=download&id=" + id,
-        google_drive_file_id: file.id,
-        ...(Array.isArray(file.parents) && file.parents[0] ? { google_drive_parent_id: file.parents[0] } : {}),
-        ...(file.webViewLink ? { google_drive_web_view_link: file.webViewLink } : {}),
-        original_filename: String(file.name || "video").slice(0, 180),
-        mime_type: file.mimeType || "video/mp4",
-        file_size_bytes: Number(file.size || 0),
-        review_status: "needs_review",
-        public_video_status: "draft",
-        created_by: context.user.id,
-      });
-      imported += 1;
-    }
-    return { imported, skipped, total: (result.files || []).length, hasMore: !!result.nextPageToken, nextPageToken: result.nextPageToken || null };
+    let total = 0;
+    let pages = 0;
+    do {
+      const result = await fetchGoogleDriveVideoFiles(context.getBase44(), { parentId: source.folder_id, ...(pageToken ? { pageToken } : {}) });
+      const files = result.files || [];
+      total += files.length;
+      for (const file of files) {
+        const existing = await db.InternalVideoAsset.filter({ google_drive_file_id: file.id }, "-created_date", 1, 0);
+        if (existing.length) { skipped += 1; continue; }
+        const id = encodeURIComponent(file.id);
+        await db.InternalVideoAsset.create({
+          title: String(file.name || "Untitled video").slice(0, 180),
+          description: "Imported from " + source.name,
+          asset_type: "clip",
+          status: "ready",
+          category: "Other",
+          language: "und",
+          tags: [],
+          target_countries: [source.market_country],
+          rights_status: "pending",
+          storage_provider: "google_drive",
+          storage_source_id: source.id,
+          storage_url: "https://drive.google.com/uc?export=download&id=" + id,
+          preview_url: "https://drive.google.com/file/d/" + id + "/preview",
+          download_url: "https://drive.google.com/uc?export=download&id=" + id,
+          google_drive_file_id: file.id,
+          ...(Array.isArray(file.parents) && file.parents[0] ? { google_drive_parent_id: file.parents[0] } : {}),
+          ...(file.webViewLink ? { google_drive_web_view_link: file.webViewLink } : {}),
+          original_filename: String(file.name || "video").slice(0, 180),
+          mime_type: file.mimeType || "video/mp4",
+          file_size_bytes: Number(file.size || 0),
+          review_status: "needs_review",
+          public_video_status: "draft",
+          created_by: context.user.id,
+        });
+        imported += 1;
+      }
+      pageToken = result.nextPageToken || undefined;
+      pages += 1;
+    } while (pageToken && pages < 20);
+    return { imported, skipped, total, hasMore: !!pageToken };
   });
