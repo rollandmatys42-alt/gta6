@@ -3,7 +3,6 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth-middleware";
 import {
   createGoogleDriveResumableUpload,
-  getGoogleDriveAccessToken,
   getGoogleDriveFileMetadata,
   listGoogleDriveFolders as fetchGoogleDriveFolders,
   listGoogleDriveVideoFiles as fetchGoogleDriveVideoFiles,
@@ -119,6 +118,29 @@ export const importGoogleDriveVideo = createServerFn({ method: "POST" })
       created_by: context.user.id,
     });
     return { asset, alreadyImported: false };
+  });
+
+export const updateInternalVideoRights = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    assetId: z.string().min(1).max(128),
+    rightsStatus: z.enum(rightsStatuses),
+    rightsEvidenceUrl: z.string().url().max(1000).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    if (data.rightsStatus === "authorised" && !data.rightsEvidenceUrl) {
+      throw Object.assign(new Error("Written rights evidence is required before marking this video authorised."), { status: 400, code: "RIGHTS_EVIDENCE_REQUIRED" });
+    }
+    const db = context.getBase44().asServiceRole.entities;
+    const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.storage_provider !== "google_drive" || !asset.google_drive_file_id) {
+      throw Object.assign(new Error("Google Drive source not found."), { status: 404, code: "DRIVE_ASSET_NOT_FOUND" });
+    }
+    return db.InternalVideoAsset.update(asset.id, {
+      rights_status: data.rightsStatus,
+      ...(data.rightsEvidenceUrl ? { rights_evidence_url: data.rightsEvidenceUrl } : {}),
+    });
   });
 
 export const enqueueInternalVideoJob = createServerFn({ method: "POST" })
