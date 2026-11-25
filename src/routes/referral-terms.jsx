@@ -19,7 +19,7 @@ function ReferralTermsPage() {
         <li>The referrer earns a cash commission equal to 20% of the first successful subscription payment, calculated after any discount and excluding separately stated tax. The commission is calculated once only; no commission is paid on renewals or later purchases.</li>
         <li>Only one reward is earned for each eligible new customer. The reward is not recurring and is not paid on renewals.</li>
       </ul>
-      <h2>2. Validation and use of credit</h2>
+      <h2>2. Validation and cash payouts</h2>
       <ul>
         <li>Commissions remain pending for 30 days after payment confirmation. During this period VICEHUB may review the transaction for refunds, disputes, reversals or suspected abuse.</li>
         <li>After validation, the commission becomes available for a cash payout in the same currency, subject to the minimum payout threshold, successful Stripe Connect onboarding, verification and administrative approval.</li>
@@ -33,7 +33,7 @@ function ReferralTermsPage() {
         <li>Referrers must clearly disclose that they may receive a cash commission when sharing their referral link. Do not imply that earnings are guaranteed.</li>
       </ul>
       <h2>4. Refunds, disputes and abuse</h2>
-      <p>Referral credit is conditional on the referred payment remaining valid. VICEHUB may withhold, cancel, reverse or recover pending or available commissions where a payment is refunded, reversed, disputed or associated with suspected abuse. If a commission has already been paid, VICEHUB may offset the amount against future commissions or pursue recovery where legally permitted. Accounts involved in abuse may be suspended from the programme.</p>
+      <p>The commission is conditional on the referred payment remaining valid. VICEHUB may withhold, cancel, reverse or recover pending or available commissions where a payment is refunded, reversed, disputed or associated with suspected abuse. If a commission has already been paid, VICEHUB may offset the amount against future commissions or pursue recovery where legally permitted. Accounts involved in abuse may be suspended from the programme.</p>
       <h2>5. No earnings guarantee</h2>
       <p>There is no guaranteed income. Results depend on genuine referrals who independently choose to purchase a membership. The programme is one-level only; no commission is paid on referrals made by your referrals.</p>
       <h2>6. Changes and contact</h2>
