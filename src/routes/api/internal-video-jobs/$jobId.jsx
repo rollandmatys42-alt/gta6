@@ -137,6 +137,22 @@ export const Route = createFileRoute("/api/internal-video-jobs/$jobId")({
           ) {
             return Response.json({ error: "Google Drive clip integrity verification failed (MIME type, size or MD5 checksum mismatch)." }, { status: 422 });
           }
+          const previewDriveFileId = String(body.previewDriveFileId || "");
+          if (!previewDriveFileId) return Response.json({ error: "A completed clip must include its watermarked preview file ID." }, { status: 400 });
+          let verifiedPreviewFile;
+          try {
+            verifiedPreviewFile = await getGoogleDriveFileMetadata(context.getBase44(), previewDriveFileId);
+          } catch {
+            return Response.json({ error: "The watermarked preview could not be verified in Google Drive." }, { status: 502 });
+          }
+          const previewSize = Number(body.previewFileSizeBytes);
+          const previewMd5 = String(body.previewMd5Checksum || "").toLowerCase();
+          if (verifiedPreviewFile.mimeType !== "video/mp4" || !Number.isSafeInteger(previewSize) ||
+              previewSize <= 0 || Number(verifiedPreviewFile.size || 0) !== previewSize ||
+              !/^[a-f0-9]{32}$/.test(previewMd5) ||
+              String(verifiedPreviewFile.md5Checksum || "").toLowerCase() !== previewMd5) {
+            return Response.json({ error: "Google Drive preview integrity verification failed." }, { status: 422 });
+          }
           const existing = await db.InternalVideoAsset.filter({ google_drive_file_id: driveFileId }, "-created_date", 1, 0);
           createdClip = existing[0] || await db.InternalVideoAsset.create({
             title: String(verifiedDriveFile.name || job.output_title || "VICEHUB clip").slice(0, 180),
@@ -154,6 +170,7 @@ export const Route = createFileRoute("/api/internal-video-jobs/$jobId")({
             ...(sourceAsset.rights_evidence_url ? { rights_evidence_url: sourceAsset.rights_evidence_url } : {}),
             storage_provider: "google_drive",
             google_drive_file_id: verifiedDriveFile.id,
+            preview_drive_file_id: previewDriveFileId,
             ...(Array.isArray(verifiedDriveFile.parents) && verifiedDriveFile.parents[0] ? { google_drive_parent_id: verifiedDriveFile.parents[0] } : {}),
             ...(verifiedDriveFile.webViewLink ? { google_drive_web_view_link: verifiedDriveFile.webViewLink } : {}),
             original_filename: String(verifiedDriveFile.name || job.output_title || "VICEHUB-clip.mp4").slice(0, 180),

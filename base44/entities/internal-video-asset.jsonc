@@ -30,6 +30,7 @@
     "storage_key": { "type": "string", "maxLength": 600 },
     "storage_connection_id": { "type": "string", "maxLength": 128 },
     "google_drive_file_id": { "type": "string", "maxLength": 512 },
+    "preview_drive_file_id": { "type": "string", "maxLength": 512 },
     "google_drive_parent_id": { "type": "string", "maxLength": 512 },
     "google_drive_web_view_link": { "type": "string", "format": "uri", "maxLength": 1000 },
     "original_filename": { "type": "string", "maxLength": 180 },
