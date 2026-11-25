@@ -30,7 +30,7 @@ export const getAdminOperationsData = createServerFn({ method: "GET" }).middlewa
     entities.UserNotification.list("-created_date", 250, 0),
   ]);
   return {
-    settings, tickets, privacyRequests, auditLogs, staffRoles,
+    settings, tickets, privacyRequests, auditLogs, staffRoles, notifications,
     seo: {
       pages: pages.map(p => ({ id:p.id,title:p.title,slug:p.slug,locale:p.locale,status:p.status,meta_title:p.meta_title||"",meta_description:p.meta_description||"" })),
       articles: articles.map(a => ({ id:a.id,title:a.title,slug:a.slug,locale:a.locale,status:a.status,meta_title:a.meta_title||"",meta_description:a.meta_description||"" })),
