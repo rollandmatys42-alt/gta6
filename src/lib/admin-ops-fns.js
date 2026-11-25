@@ -19,7 +19,7 @@ async function audit(context, action, targetType, targetId, summary, metadata = 
 export const getAdminOperationsData = createServerFn({ method: "GET" }).middleware([requireUser]).handler(async ({ context }) => {
   requireAdmin(context);
   const entities = db(context);
-  const [settings, tickets, privacyRequests, auditLogs, staffRoles, pages, articles] = await Promise.all([
+  const [settings, tickets, privacyRequests, auditLogs, staffRoles, pages, articles, notifications] = await Promise.all([
     entities.SiteSetting.list("-updated_date", 200, 0),
     entities.SupportTicket.list("-created_date", 200, 0),
     entities.PrivacyRequest.list("-created_date", 200, 0),
@@ -27,9 +27,10 @@ export const getAdminOperationsData = createServerFn({ method: "GET" }).middlewa
     entities.StaffRole.list("-created_date", 100, 0),
     entities.SitePage.list("-updated_date", 200, 0),
     entities.NewsArticle.list("-updated_date", 200, 0),
+    entities.UserNotification.list("-created_date", 250, 0),
   ]);
   return {
-    settings, tickets, privacyRequests, auditLogs, staffRoles,
+    settings, tickets, privacyRequests, auditLogs, staffRoles, notifications,
     seo: {
       pages: pages.map(p => ({ id:p.id,title:p.title,slug:p.slug,locale:p.locale,status:p.status,meta_title:p.meta_title||"",meta_description:p.meta_description||"" })),
       articles: articles.map(a => ({ id:a.id,title:a.title,slug:a.slug,locale:a.locale,status:a.status,meta_title:a.meta_title||"",meta_description:a.meta_description||"" })),
