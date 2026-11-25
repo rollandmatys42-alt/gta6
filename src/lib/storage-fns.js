@@ -178,6 +178,10 @@ export async function proxyStorageAsset({entities,connectionId,objectKey,request
   const upstreamHeaders=new Headers();
   for(const name of ["range","if-range"]) { const value=request.headers.get(name); if(value)upstreamHeaders.set(name,value); }
   const upstream=await fetch(url,{method:"GET",headers:upstreamHeaders,redirect:"follow"});
+  if(!upstream.ok&&upstream.status!==206){
+    const status=upstream.status===404?404:upstream.status===416?416:502;
+    throw Object.assign(new Error("Private storage could not provide this video (HTTP "+upstream.status+")."),{status});
+  }
   const responseHeaders=new Headers();
   for(const name of ["content-type","content-length","content-range","accept-ranges","etag","last-modified"]) {
     const value=upstream.headers.get(name); if(value)responseHeaders.set(name,value);

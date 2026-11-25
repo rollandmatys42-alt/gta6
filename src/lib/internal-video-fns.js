@@ -421,7 +421,7 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
       })(),
       duration_seconds: Number(asset.duration_seconds || 0),
       thumbnail_url: asset.thumbnail_url || "",
-      preview_url: asset.preview_url || ((asset.preview_drive_file_id || asset.google_drive_file_id) ? "https://drive.google.com/file/d/" + encodeURIComponent(asset.preview_drive_file_id || asset.google_drive_file_id) + "/preview" : asset.storage_url || asset.source_url || ""),
+      preview_url: "/api/internal-video-preview/" + encodeURIComponent(asset.id),
       viral_potential_score: Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null,
       public_published_at: asset.public_published_at || asset.created_date || null,
       download_count_7d: counts7d.get(asset.id) || 0,
@@ -429,7 +429,10 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
       is_featured: !!asset.is_featured,
       is_favourite: !!asset.is_favourite,
     });
-    const all = rows.map(toPublic);
+    const all = rows.filter(asset =>
+      (asset.storage_provider === "google_drive" && (asset.preview_drive_file_id || asset.google_drive_file_id)) ||
+      (asset.storage_key && asset.storage_connection_id)
+    ).map(toPublic);
     const filteredByCategory = data.category ? all.filter(x => x.category === data.category) : all;
     const filteredByLanguage = data.language ? filteredByCategory.filter(x => x.language === data.language) : filteredByCategory;
     const filteredByCountry = data.country ? filteredByLanguage.filter(x => x.target_countries.includes(data.country.toUpperCase())) : filteredByLanguage;
@@ -491,7 +494,7 @@ export const requestInternalClipDownload = createServerFn({ method: "POST" })
     if (!asset || asset.asset_type !== "clip" || asset.status !== "ready" ||
         asset.review_status !== "approved" || asset.public_video_status !== "published" ||
         !["authorised", "not_applicable"].includes(asset.rights_status) ||
-        !(asset.download_url || asset.storage_url || asset.source_url || asset.google_drive_file_id)) {
+        !((asset.storage_provider === "google_drive" && asset.google_drive_file_id) || (asset.storage_key && asset.storage_connection_id))) {
       throw Object.assign(new Error("This clip is not available for download."), { status: 404, code: "CLIP_NOT_AVAILABLE" });
     }
     const subscriptions = await db.UserSubscription.filter({ user_id: user.id }, "-created_date", 1, 0);
@@ -527,13 +530,11 @@ export const requestInternalClipDownload = createServerFn({ method: "POST" })
     try {
       const event = await db.DownloadEvent.create({
         user_id: user.id, video_id: asset.id, month_key: monthKey,
-        tier_code: tier, watermark_applied: false, status: "delivered",
+        tier_code: tier, watermark_applied: false, status: "signed",
         delivery_expires_at: new Date(now.getTime() + INTERNAL_CLIP_DOWNLOAD_TTL * 1000).toISOString(),
       });
       return {
-        downloadUrl: asset.download_url || asset.storage_url || (asset.google_drive_file_id
-          ? "https://drive.google.com/uc?export=download&id=" + encodeURIComponent(asset.google_drive_file_id)
-          : asset.source_url),
+        downloadUrl: "/api/internal-video-download/" + encodeURIComponent(asset.id),
         expiresInSeconds: INTERNAL_CLIP_DOWNLOAD_TTL,
         downloadEventId: event.id,
         downloadsLimit: limit,
