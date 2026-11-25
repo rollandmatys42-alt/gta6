@@ -3,7 +3,7 @@
   "type": "object",
   "properties": {
     "asset_id": { "type": "string", "maxLength": 128 },
-    "job_type": { "type": "string", "enum": ["analyse", "transcribe", "cut_clip"] },
+    "job_type": { "type": "string", "enum": ["analyse", "transcribe", "cut_clip", "auto_select_clips"] },
     "status": { "type": "string", "enum": ["queued", "processing", "succeeded", "failed", "cancelled"], "default": "queued" },
     "progress_percent": { "type": "integer", "minimum": 0, "maximum": 100, "default": 0 },
     "stage": { "type": "string", "maxLength": 120 },
