@@ -106,6 +106,23 @@ async function presignR2({ method, objectKey, contentType, expiresIn = DOWNLOAD_
 
 export const testVideoStorage = createServerFn({ method: "POST" }).middleware([requireUser]).handler(async ({ context }) => {
   requireAdmin(context);
+  const entities = context.getBase44().asServiceRole.entities;
+  const connections = await listStorageConnections(entities);
+  const enabledConnections = connections.filter(connection => connection.enabled);
+  if (enabledConnections.length) {
+    const started = Date.now();
+    const results = await Promise.all(enabledConnections.map(async connection => {
+      try {
+        const result = await verifyStorageConnection({ entities, connectionId: connection.id, userId: context.user.id });
+        return { id: connection.id, name: connection.name, ok: true, verifiedAt: result.verifiedAt };
+      } catch (error) {
+        return { id: connection.id, name: connection.name, ok: false, error: "Connection test failed. Check provider permissions and endpoint." };
+      }
+    }));
+    const verified = results.filter(result => result.ok);
+    if (!verified.length) throw Object.assign(new Error("No connected storage account passed its write, read-back and delete test. Recheck the account credentials and permissions."), { status: 503, code: "NO_STORAGE_ACCOUNT_READY" });
+    return { ok: true, testObjectRemoved: true, storageMode: "multi", latencyMs: Date.now() - started, verifiedConnections: verified, failedConnections: results.filter(result => !result.ok) };
+  }
   const objectKey = "system/health-check-" + Date.now() + ".txt";
   const marker = "VICEHUB-R2-PRIVATE-HEALTH-CHECK";
   const started = Date.now();
