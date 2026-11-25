@@ -1,0 +1,76 @@
+{
+  "name": "PrivacyRequest",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "request_type": {
+      "type": "string",
+      "enum": [
+        "access",
+        "rectification",
+        "erasure",
+        "restriction",
+        "portability",
+        "objection",
+        "other"
+      ]
+    },
+    "details": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "received",
+        "identity_check",
+        "in_progress",
+        "completed",
+        "rejected"
+      ],
+      "default": "received"
+    },
+    "identity_verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "internal_note": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "email",
+    "request_type",
+    "status",
+    "identity_verified"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  }
+}

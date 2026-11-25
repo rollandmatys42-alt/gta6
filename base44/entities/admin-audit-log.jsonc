@@ -1,0 +1,52 @@
+{
+  "name": "AdminAuditLog",
+  "type": "object",
+  "properties": {
+    "actor_user_id": {
+      "type": "string"
+    },
+    "actor_email": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "target_type": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "target_id": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "metadata_json": {
+      "type": "string",
+      "maxLength": 5000
+    }
+  },
+  "required": [
+    "actor_user_id",
+    "action",
+    "target_type",
+    "summary"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}
