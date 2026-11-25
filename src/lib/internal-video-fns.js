@@ -3,9 +3,10 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth-middleware";
 import {
   createGoogleDriveResumableUpload,
-  getGoogleDriveAccessToken,
   getGoogleDriveFileMetadata,
+  listGoogleDriveFolders as fetchGoogleDriveFolders,
   listGoogleDriveVideoFiles as fetchGoogleDriveVideoFiles,
+  ensureGoogleDriveLibraryFolders as createGoogleDriveLibraryFolders,
 } from "@/lib/google-drive-api";
 import { issueStorageUploadUrl, listStorageConnections, recordStorageUsage } from "@/lib/storage-fns";
 
@@ -43,11 +44,28 @@ export const listInternalVideoJobs = createServerFn({ method: "GET" })
     return context.getBase44().asServiceRole.entities.InternalVideoJob.list("-created_date", data.limit, 0);
   });
 
+export const listGoogleDriveFolders = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({ parentId: z.string().min(1).max(512).default("root") }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    return fetchGoogleDriveFolders(context.getBase44(), data);
+  });
+
+export const ensureGoogleDriveLibraryFolders = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({}))
+  .handler(async ({ context }) => {
+    requireAdmin(context);
+    return { folders: await createGoogleDriveLibraryFolders(context.getBase44()) };
+  });
+
 export const listGoogleDriveVideoFiles = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .validator(z.object({
     query: z.string().trim().max(100).default(""),
     pageToken: z.string().max(2000).optional(),
+    parentId: z.string().max(512).optional(),
   }))
   .handler(async ({ data, context }) => {
     requireAdmin(context);
@@ -102,6 +120,29 @@ export const importGoogleDriveVideo = createServerFn({ method: "POST" })
     return { asset, alreadyImported: false };
   });
 
+export const updateInternalVideoRights = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    assetId: z.string().min(1).max(128),
+    rightsStatus: z.enum(rightsStatuses),
+    rightsEvidenceUrl: z.string().url().max(1000).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    if (data.rightsStatus === "authorised" && !data.rightsEvidenceUrl) {
+      throw Object.assign(new Error("Written rights evidence is required before marking this video authorised."), { status: 400, code: "RIGHTS_EVIDENCE_REQUIRED" });
+    }
+    const db = context.getBase44().asServiceRole.entities;
+    const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.storage_provider !== "google_drive" || !asset.google_drive_file_id) {
+      throw Object.assign(new Error("Google Drive source not found."), { status: 404, code: "DRIVE_ASSET_NOT_FOUND" });
+    }
+    return db.InternalVideoAsset.update(asset.id, {
+      rights_status: data.rightsStatus,
+      ...(data.rightsEvidenceUrl ? { rights_evidence_url: data.rightsEvidenceUrl } : {}),
+    });
+  });
+
 export const enqueueInternalVideoJob = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({
@@ -131,12 +172,12 @@ export const enqueueInternalVideoJob = createServerFn({ method: "POST" })
       if (!Number(asset.duration_seconds) || end > Number(asset.duration_seconds) + 0.05) {
         throw Object.assign(new Error("Analyse this source video first so VICEHUB knows its duration, then choose a clip range within the source."), { status: 409, code: "SOURCE_DURATION_REQUIRED" });
       }
-      await getGoogleDriveAccessToken(context.getBase44());
+      const folders = await createGoogleDriveLibraryFolders(context.getBase44());
       cutDetails = {
         start_seconds: start,
         end_seconds: end,
         output_title: data.outputTitle || (asset.title + " - clip"),
-        ...(asset.google_drive_parent_id ? { output_drive_parent_id: asset.google_drive_parent_id } : {}),
+        output_drive_parent_id: folders.clips.id,
       };
     }
     const active = await db.InternalVideoJob.filter({ asset_id: asset.id, job_type: data.jobType }, "-created_date", 10, 0);
