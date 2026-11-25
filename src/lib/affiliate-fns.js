@@ -150,6 +150,7 @@ export const processAffiliatePayout = createServerFn({ method: "POST" }).middlew
     const db = dbFor(context), payout = await db.AffiliatePayoutRequest.get(data.payoutId);
     if (!payout || !["requested", "failed"].includes(payout.status)) throw Object.assign(new Error("This payout is no longer awaiting an administrative decision."), { status: 409 });
     if (data.action === "reject") {
+      if (payout.stripe_transfer_id) throw Object.assign(new Error("A Stripe transfer already exists for this request. It cannot be rejected; reconcile the transfer instead."), { status: 409 });
       for (const allocation of payout.allocations || []) {
         const credit = await db.ReferralCredit.get(allocation.credit_id);
         if (credit?.status === "reserved") await db.ReferralCredit.update(credit.id, { status: "available", available_cents: Number(credit.reserved_cents || allocation.amount_cents), reserved_cents: 0 });
@@ -166,12 +167,19 @@ export const processAffiliatePayout = createServerFn({ method: "POST" }).middlew
       form.set("amount", String(payout.amount_cents)); form.set("currency", String(payout.currency).toLowerCase());
       form.set("destination", payout.connected_account_id); form.set("description", "VICEHUB affiliate commission payout");
       form.set("metadata[affiliate_payout_request_id]", payout.id); form.set("metadata[affiliate_user_id]", payout.user_id);
-      const transfer = await stripe("transfers", "POST", form, payout.idempotency_key);
       for (const allocation of payout.allocations || []) {
         const credit = await db.ReferralCredit.get(allocation.credit_id);
         if (!credit) throw new Error("A commission linked to this payout no longer exists.");
         if (credit.status === "paid" && Number(credit.paid_cents || 0) >= Number(allocation.amount_cents)) continue;
-        if (credit.status !== "reserved" || Number(credit.reserved_cents || 0) < Number(allocation.amount_cents)) throw new Error("A reserved commission was changed or reversed. Reject this payout request and reconcile its allocations before retrying.");
+        if (credit.status !== "reserved" || Number(credit.reserved_cents || 0) < Number(allocation.amount_cents)) throw new Error("A reserved commission was changed or reversed. No transfer was sent; reject this payout request and reconcile its allocations.");
+      }
+      const transfer = payout.stripe_transfer_id
+        ? await stripe("transfers/" + encodeURIComponent(payout.stripe_transfer_id))
+        : await stripe("transfers", "POST", form, payout.idempotency_key);
+      await db.AffiliatePayoutRequest.update(payout.id, { status: "processing", stripe_transfer_id: transfer.id, admin_note: data.adminNote || payout.admin_note || "" });
+      for (const allocation of payout.allocations || []) {
+        const credit = await db.ReferralCredit.get(allocation.credit_id);
+        if (credit.status === "paid" && Number(credit.paid_cents || 0) >= Number(allocation.amount_cents)) continue;
         await db.ReferralCredit.update(credit.id, { status: "paid", reserved_cents: 0, available_cents: 0, paid_cents: Number(credit.paid_cents || 0) + Number(allocation.amount_cents) });
       }
       await db.AffiliatePayoutRequest.update(payout.id, { status: "sent", stripe_transfer_id: transfer.id, processed_by: context.user.id, processed_at: new Date().toISOString(), admin_note: data.adminNote || "" });
