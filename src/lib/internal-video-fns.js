@@ -541,3 +541,104 @@ export const requestInternalClipDownload = createServerFn({ method: "POST" })
       throw error;
     }
   });
+
+
+export const listVideoStorageSources = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({}))
+  .handler(async ({ context }) => {
+    requireAdmin(context);
+    return context.getBase44().asServiceRole.entities.VideoStorageSource.list("-created_date", 100, 0);
+  });
+
+export const createVideoStorageSource = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    name: z.string().trim().min(2).max(120),
+    provider: z.enum(["google_drive", "mega", "onedrive", "dropbox", "direct_url"]),
+    marketCountry: z.string().trim().regex(/^[A-Za-z]{2}$/),
+    folderUrl: z.string().trim().url().max(1500).optional(),
+    folderId: z.string().trim().max(512).optional(),
+    notes: z.string().trim().max(1000).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    if (data.provider === "google_drive" && !data.folderId && !data.folderUrl) {
+      throw Object.assign(new Error("Add a Google Drive folder or folder link."), { status: 400 });
+    }
+    if (data.provider !== "google_drive" && !data.folderUrl) {
+      throw Object.assign(new Error("Add the shared folder or storage link."), { status: 400 });
+    }
+    return context.getBase44().asServiceRole.entities.VideoStorageSource.create({
+      name: data.name,
+      provider: data.provider,
+      market_country: data.marketCountry.toUpperCase(),
+      ...(data.folderUrl ? { folder_url: data.folderUrl } : {}),
+      ...(data.folderId ? { folder_id: data.folderId } : {}),
+      notes: data.notes || "",
+      enabled: true,
+      created_by: context.user.id,
+    });
+  });
+
+export const deleteVideoStorageSource = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ sourceId: z.string().min(1).max(128) }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const db = context.getBase44().asServiceRole.entities;
+    const source = await db.VideoStorageSource.get(data.sourceId).catch(() => null);
+    if (!source) throw Object.assign(new Error("Storage source not found."), { status: 404 });
+    await db.VideoStorageSource.delete(source.id);
+    return { success: true };
+  });
+
+export const importLinkedStorageVideo = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    sourceId: z.string().min(1).max(128),
+    title: z.string().trim().min(2).max(180),
+    videoUrl: z.string().trim().url().max(1500),
+    previewUrl: z.string().trim().url().max(1500).optional(),
+    downloadUrl: z.string().trim().url().max(1500).optional(),
+    category: z.string().trim().max(80).optional(),
+    language: z.string().trim().max(12).default("en"),
+    rightsStatus: z.enum(rightsStatuses).default("pending"),
+    rightsEvidenceUrl: z.string().url().max(1000).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    if (data.rightsStatus === "authorised" && !data.rightsEvidenceUrl) {
+      throw Object.assign(new Error("Written rights evidence is required before marking this video authorised."), { status: 400, code: "RIGHTS_EVIDENCE_REQUIRED" });
+    }
+    const db = context.getBase44().asServiceRole.entities;
+    const source = await db.VideoStorageSource.get(data.sourceId).catch(() => null);
+    if (!source || !source.enabled) throw Object.assign(new Error("Storage source is unavailable."), { status: 404 });
+    const existing = await db.InternalVideoAsset.filter({ storage_url: data.videoUrl }, "-created_date", 1, 0);
+    if (existing.length) return { asset: existing[0], alreadyImported: true };
+    const previewUrl = data.previewUrl || data.videoUrl;
+    const asset = await db.InternalVideoAsset.create({
+      title: data.title,
+      description: "Imported from " + source.name,
+      asset_type: "clip",
+      status: "ready",
+      category: data.category || "Other",
+      language: data.language,
+      tags: [],
+      target_countries: [source.market_country],
+      rights_status: data.rightsStatus,
+      ...(data.rightsEvidenceUrl ? { rights_evidence_url: data.rightsEvidenceUrl } : {}),
+      storage_provider: source.provider,
+      storage_source_id: source.id,
+      storage_url: data.videoUrl,
+      preview_url: previewUrl,
+      download_url: data.downloadUrl || data.videoUrl,
+      source_url: data.videoUrl,
+      original_filename: data.title,
+      mime_type: "video/mp4",
+      review_status: "needs_review",
+      public_video_status: "draft",
+      created_by: context.user.id,
+    });
+    return { asset, alreadyImported: false };
+  });
