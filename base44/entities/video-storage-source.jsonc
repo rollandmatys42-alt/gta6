@@ -1,0 +1,21 @@
+{
+  "name": "VideoStorageSource",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+    "provider": { "type": "string", "enum": ["google_drive", "mega", "onedrive", "dropbox", "direct_url"] },
+    "market_country": { "type": "string", "minLength": 2, "maxLength": 2 },
+    "folder_url": { "type": "string", "format": "uri", "maxLength": 1500 },
+    "folder_id": { "type": "string", "maxLength": 512 },
+    "notes": { "type": "string", "maxLength": 1000 },
+    "enabled": { "type": "boolean", "default": true },
+    "created_by": { "type": "string", "maxLength": 128 }
+  },
+  "required": ["name", "provider", "market_country", "created_by"],
+  "rls": {
+    "read": { "user_condition": { "role": "admin" } },
+    "create": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
