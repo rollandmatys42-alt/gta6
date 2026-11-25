@@ -32,11 +32,12 @@ async function readVideoMetadata(file) {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.preload = "metadata";
-  video.src = url;
   try {
     await new Promise((resolve, reject) => {
       video.onloadedmetadata = resolve;
       video.onerror = () => reject(new Error("The source video metadata could not be read."));
+      video.src = url;
+      video.load();
     });
     return {
       durationSeconds: Math.max(0, Math.round(video.duration || 0)),
