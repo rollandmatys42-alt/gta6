@@ -409,7 +409,7 @@ export const saveStorageConnection = createServerFn({ method: "POST" }).middlewa
     region: z.string().trim().min(1).max(40).default("auto"),
     accessKey: z.string().trim().min(4).max(300),
     secretKey: z.string().min(8).max(500),
-    capacityGb: z.number().positive().max(1000000),
+    capacityGb: z.number().positive().max(1000000).optional(),
   }))
   .handler(async ({ data, context }) => {
     requireAdmin(context);
