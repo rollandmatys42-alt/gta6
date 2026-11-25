@@ -50,8 +50,19 @@ export const Route = createFileRoute("/api/internal-video-jobs/$jobId")({
           } catch {
             return Response.json({ error: "The uploaded clip could not be verified in Google Drive. The job remains active for retry." }, { status: 502 });
           }
-          if (verifiedDriveFile.mimeType !== "video/mp4" || Number(verifiedDriveFile.size || 0) <= 0) {
-            return Response.json({ error: "Google Drive did not confirm a valid, non-empty MP4 clip." }, { status: 422 });
+          const expectedSize = Number(body.outputFileSizeBytes);
+          const expectedMd5 = String(body.outputMd5Checksum || "").toLowerCase();
+          const actualMd5 = String(verifiedDriveFile.md5Checksum || "").toLowerCase();
+          if (
+            verifiedDriveFile.mimeType !== "video/mp4" ||
+            !Number.isSafeInteger(expectedSize) ||
+            expectedSize <= 0 ||
+            Number(verifiedDriveFile.size || 0) !== expectedSize ||
+            !/^[a-f0-9]{32}$/.test(expectedMd5) ||
+            !actualMd5 ||
+            actualMd5 !== expectedMd5
+          ) {
+            return Response.json({ error: "Google Drive clip integrity verification failed (MIME type, size or MD5 checksum mismatch)." }, { status: 422 });
           }
           const existing = await db.InternalVideoAsset.filter({ google_drive_file_id: driveFileId }, "-created_date", 1, 0);
           createdClip = existing[0] || await db.InternalVideoAsset.create({
