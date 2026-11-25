@@ -169,7 +169,9 @@ export const processAffiliatePayout = createServerFn({ method: "POST" }).middlew
       const transfer = await stripe("transfers", "POST", form, payout.idempotency_key);
       for (const allocation of payout.allocations || []) {
         const credit = await db.ReferralCredit.get(allocation.credit_id);
-        if (!credit || credit.status !== "reserved" || Number(credit.reserved_cents || 0) < Number(allocation.amount_cents)) throw new Error("A reserved commission was changed or reversed. Reject this payout request and reconcile its allocations before retrying.");
+        if (!credit) throw new Error("A commission linked to this payout no longer exists.");
+        if (credit.status === "paid" && Number(credit.paid_cents || 0) >= Number(allocation.amount_cents)) continue;
+        if (credit.status !== "reserved" || Number(credit.reserved_cents || 0) < Number(allocation.amount_cents)) throw new Error("A reserved commission was changed or reversed. Reject this payout request and reconcile its allocations before retrying.");
         await db.ReferralCredit.update(credit.id, { status: "paid", reserved_cents: 0, available_cents: 0, paid_cents: Number(credit.paid_cents || 0) + Number(allocation.amount_cents) });
       }
       await db.AffiliatePayoutRequest.update(payout.id, { status: "sent", stripe_transfer_id: transfer.id, processed_by: context.user.id, processed_at: new Date().toISOString(), admin_note: data.adminNote || "" });
