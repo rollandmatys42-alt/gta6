@@ -4,6 +4,7 @@ import SiteFrame from "@/components/SiteFrame";
 import { AuthGateError, requireSignedIn } from "@/components/auth/AuthGate";
 import { getAdminOperationsData, saveAdminSiteSetting, updateAdminSupportTicket, updateAdminPrivacyRequest } from "@/lib/admin-ops-fns";
 import "@/styles/vicehub-admin-2026.css";
+import "@/styles/vicehub-admin-operations.css";
 
 export const Route=createFileRoute("/_authed/admin/operations")({ssr:false,beforeLoad:requireSignedIn,errorComponent:AuthGateError,head:()=>({meta:[{title:"Operations Control — VICEHUB"},{name:"robots",content:"noindex,nofollow"}]}),component:AdminOperations});
 const modules=[["overview","Command"],["settings","Site settings"],["support","Support inbox"],["privacy","Privacy / GDPR"],["seo","SEO audit"],["staff","Staff access"],["audit","Activity log"]];
