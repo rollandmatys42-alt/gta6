@@ -454,6 +454,32 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
     };
   });
 
+export const getInternalClipDownloadAccess = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({}))
+  .handler(async ({ context }) => {
+    const db = context.getBase44().asServiceRole.entities;
+    const subscriptions = await db.UserSubscription.filter({ user_id: context.user.id }, "-created_date", 1, 0);
+    const subscription = subscriptions[0];
+    const tier = subscription?.tier_code || "free";
+    const active = subscription?.status === "active" ||
+      (subscription?.status === "past_due" && subscription?.grace_period_ends_at && new Date(subscription.grace_period_ends_at) > new Date());
+    if (!active || tier === "free") return { canDownload: false, reason: "paid_subscription_required" };
+    const plans = await db.SubscriptionPlan.filter(
+      { tier_code: tier, currency: subscription?.currency || "GBP", status: "active" }, "-created_date", 1, 0,
+    );
+    const plan = plans[0];
+    if (!plan) return { canDownload: false, reason: "plan_not_configured" };
+    const limit = Number(plan.monthly_download_limit || 0);
+    if (!Number.isInteger(limit) || limit < 1) return { canDownload: false, reason: "downloads_not_included" };
+    if (!plan.clean_downloads) return { canDownload: false, reason: "clean_downloads_not_included" };
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const quotas = await db.DownloadQuota.filter({ user_id: context.user.id, month_key: monthKey }, "-created_date", 1, 0);
+    const used = Number(quotas[0]?.downloads_used || 0);
+    const remaining = Math.max(0, limit - used);
+    return { canDownload: remaining > 0, reason: remaining > 0 ? null : "limit_reached", tier, downloadsLimit: limit, downloadsUsed: used, downloadsRemaining: remaining };
+  });
+
 export const requestInternalClipDownload = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({ assetId: z.string().min(1).max(128) }))
