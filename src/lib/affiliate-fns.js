@@ -63,7 +63,7 @@ export const getMyAffiliateDashboard = createServerFn({ method: "GET" }).middlew
   if (profile.stripe_connect_account_id) {
     try {
       const account = await stripe("accounts/" + encodeURIComponent(profile.stripe_connect_account_id));
-      connect = { ...connect, status: account.payouts_enabled ? "active" : account.details_submitted ? "under_review" : "onboarding", payoutsEnabled: !!account.payouts_enabled, requirementsDue: account.requirements?.currently_due || [] };
+      connect = { ...connect, status: account.payouts_enabled ? "active" : account.details_submitted ? "under_review" : "onboarding", payoutsEnabled: !!account.payouts_enabled, defaultCurrency: String(account.default_currency || "").toUpperCase(), requirementsDue: account.requirements?.currently_due || [] };
       await db.ReferralProfile.update(profile.id, { stripe_connect_status: connect.status, payouts_enabled: connect.payoutsEnabled });
     } catch {}
   }
