@@ -46,7 +46,7 @@ export const Route = createFileRoute("/api/internal-video-jobs/$jobId")({
         if (body.resultSummary) patch.result_summary = String(body.resultSummary).slice(0, 5000);
         if (status === "succeeded" || status === "failed") {
           patch.completed_at = new Date().toISOString();
-          patch.lease_expires_at = "";
+
         }
         const updated = await db.InternalVideoJob.update(job.id, patch);
         if (status === "succeeded" || status === "failed") {
