@@ -97,6 +97,7 @@ export const requestAffiliatePayout = createServerFn({ method: "POST" }).middlew
     if (!profile.stripe_connect_account_id) throw Object.assign(new Error("Complete Stripe payout onboarding first."), { status: 409 });
     const account = await stripe("accounts/" + encodeURIComponent(profile.stripe_connect_account_id));
     if (!account.payouts_enabled || account.capabilities?.transfers !== "active") throw Object.assign(new Error("Stripe has not enabled payouts for this account yet. Complete any outstanding verification steps."), { status: 409 });
+    if (String(account.default_currency || "").toUpperCase() !== data.currency) throw Object.assign(new Error("This Stripe payout account settles in " + String(account.default_currency || "an unsupported currency").toUpperCase() + ". Request a payout in that currency."), { status: 409 });
     const open = await db.AffiliatePayoutRequest.filter({ user_id: context.user.id, currency: data.currency, status: { $in: ["requested", "processing", "failed"] } }, "-created_date", 1, 0);
     if (open.length) throw Object.assign(new Error("A payout request for this currency is already awaiting processing."), { status: 409 });
     const credits = await db.ReferralCredit.filter({ referrer_user_id: context.user.id, currency: data.currency, status: "available" }, "created_date", 2000, 0);
@@ -154,6 +155,7 @@ export const processAffiliatePayout = createServerFn({ method: "POST" }).middlew
         if (credit?.status === "reserved") await db.ReferralCredit.update(credit.id, { status: "available", available_cents: Number(credit.reserved_cents || allocation.amount_cents), reserved_cents: 0 });
       }
       await db.AffiliatePayoutRequest.update(payout.id, { status: "rejected", admin_note: data.adminNote || "", processed_by: context.user.id, processed_at: new Date().toISOString() });
+      await db.AdminAuditLog.create({ actor_user_id: context.user.id, actor_email: context.user.email || "", action: "affiliate_payout_rejected", target_type: "AffiliatePayoutRequest", target_id: payout.id, summary: "Rejected affiliate payout " + payout.amount_cents + " " + payout.currency, metadata_json: JSON.stringify({ user_id: payout.user_id, amount_cents: payout.amount_cents, currency: payout.currency, note: data.adminNote || "" }) }).catch(() => null);
       return { success: true, status: "rejected" };
     }
     await db.AffiliatePayoutRequest.update(payout.id, { status: "processing", admin_note: data.adminNote || payout.admin_note || "" });
@@ -167,9 +169,11 @@ export const processAffiliatePayout = createServerFn({ method: "POST" }).middlew
       const transfer = await stripe("transfers", "POST", form, payout.idempotency_key);
       for (const allocation of payout.allocations || []) {
         const credit = await db.ReferralCredit.get(allocation.credit_id);
-        if (credit?.status === "reserved") await db.ReferralCredit.update(credit.id, { status: "paid", reserved_cents: 0, available_cents: 0, paid_cents: Number(credit.paid_cents || 0) + Number(allocation.amount_cents) });
+        if (!credit || credit.status !== "reserved" || Number(credit.reserved_cents || 0) < Number(allocation.amount_cents)) throw new Error("A reserved commission was changed or reversed. Reject this payout request and reconcile its allocations before retrying.");
+        await db.ReferralCredit.update(credit.id, { status: "paid", reserved_cents: 0, available_cents: 0, paid_cents: Number(credit.paid_cents || 0) + Number(allocation.amount_cents) });
       }
       await db.AffiliatePayoutRequest.update(payout.id, { status: "sent", stripe_transfer_id: transfer.id, processed_by: context.user.id, processed_at: new Date().toISOString(), admin_note: data.adminNote || "" });
+      await db.AdminAuditLog.create({ actor_user_id: context.user.id, actor_email: context.user.email || "", action: "affiliate_payout_sent", target_type: "AffiliatePayoutRequest", target_id: payout.id, summary: "Sent affiliate transfer " + payout.amount_cents + " " + payout.currency, metadata_json: JSON.stringify({ user_id: payout.user_id, amount_cents: payout.amount_cents, currency: payout.currency, stripe_transfer_id: transfer.id }) }).catch(() => null);
       return { success: true, status: "sent", transferId: transfer.id };
     } catch (error) {
       await db.AffiliatePayoutRequest.update(payout.id, { status: "failed", admin_note: String(error?.message || error).slice(0, 1000), processed_by: context.user.id, processed_at: new Date().toISOString() });
