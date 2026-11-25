@@ -11,7 +11,7 @@ export const Route=createFileRoute("/api/internal-video-download/$assetId")({
   if(!event)return Response.json({error:"Download authorisation expired or unavailable."},{status:403,headers:{"cache-control":"no-store"}});
   const consumed=await db.DownloadEvent.updateMany({id:event.id,status:"signed"},{$set:{status:"delivered"}});
   if(!consumed?.updated)return Response.json({error:"Download authorisation has already been used."},{status:403,headers:{"cache-control":"no-store"}});
-  try{return await streamGoogleDriveMedia(context.getBase44(),asset.google_drive_file_id,request);}
+  try{const response=await streamGoogleDriveMedia(context.getBase44(),asset.google_drive_file_id,request);const headers=new Headers(response.headers);const safeName=String(asset.title||"VICEHUB-clip").replace(/[^A-Za-z0-9._-]+/g,"_").slice(0,140)||"VICEHUB-clip";headers.set("content-disposition","attachment; filename=\""+safeName+".mp4\"");return new Response(response.body,{status:response.status,headers});}
   catch(error){await db.DownloadEvent.update(event.id,{status:"failed"}).catch(()=>null);return Response.json({error:error?.message||"Clip download failed."},{status:error?.status||502,headers:{"cache-control":"no-store"}});}
  }}}
 });
