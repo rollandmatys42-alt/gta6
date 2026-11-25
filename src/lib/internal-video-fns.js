@@ -343,6 +343,15 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
         language: asset.detected_language || asset.language || "und",
         target_countries: Array.isArray(asset.target_countries) ? asset.target_countries : [],
         tags: Array.isArray(asset.tags) ? asset.tags : [],
+        editorial_tags: (() => {
+          const score = Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null;
+          const published = new Date(asset.public_published_at || asset.created_date || 0).getTime();
+          const tags = [];
+          if (Number.isFinite(published) && published > 0 && Date.now() - published <= 7 * 86400000) tags.push("New");
+          if (score !== null && score >= 80) tags.push("High viral potential");
+          if (score !== null && score >= 90) tags.push("Best clip · AI score ≥90");
+          return tags;
+        })(),
         duration_seconds: Number(asset.duration_seconds || 0),
         thumbnail_url: asset.thumbnail_url || "",
         viral_potential_score: Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null,

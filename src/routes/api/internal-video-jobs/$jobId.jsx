@@ -38,7 +38,7 @@ Retourne uniquement un objet JSON valide avec cette structure :
  "viralScoreFactors":{"hook":0,"emotion":0,"clarity":0,"shareability":0,"pacing":0},
  "clips":[{"startSeconds":0,"endSeconds":45,"title":"titre spécifique du clip","description":"description fidèle du passage","tags":["tag1"],"viralPotentialScore":0,"hook":"accroche du passage"}]
 }
-Scores sur 100. Pays = marchés cibles probables, pas pays d'origine. La langue doit être celle entendue. Ne confonds jamais langue et marché. Ne crée pas de score de performance réelle : seuls les scores prédictifs sont autorisés.
+Scores sur 100. Pays = marchés cibles probables, pas pays d'origine. Utilise les codes ISO 3166-1 alpha-2 : GB pour le Royaume-Uni, US pour les États-Unis, CA, FR, BE, LU, etc. La langue doit être celle entendue. Ne confonds jamais langue et marché. Ne crée pas de score de performance réelle : seuls les scores prédictifs sont autorisés.
 Titre initial de la source : ${sourceAsset.title || "Source vidéo"}.
 Durée : ${durationSeconds} secondes.
 Transcription :
@@ -60,6 +60,7 @@ ${String(transcript || "").slice(0, 60000)}`;
     viralPotentialScore: Math.max(0, Math.min(100, Math.round(Number(clip.viralPotentialScore) || 0))),
     hook: String(clip.hook || "").slice(0, 300),
   })).filter(x => Number.isFinite(x.startSeconds) && Number.isFinite(x.endSeconds) && x.startSeconds >= 0 && x.endSeconds > x.startSeconds && x.endSeconds <= durationSeconds && x.endSeconds - x.startSeconds <= 180);
+  if (!clips.length) throw new Error("OmniRoute did not return any valid clip timecodes.");
   return {
     title: String(plan.title || sourceAsset.title || "Source vidéo").slice(0, 180),
     description: String(plan.description || "").slice(0, 5000),
