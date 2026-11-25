@@ -11,6 +11,7 @@ import { Route as AuthedAdminAffiliatesRouteImport } from "./routes/_authed/admi
 import { Route as AboutRouteImport } from "./routes/about";
 import { Route as AdminRouteImport } from "./routes/admin";
 import { Route as AdminImportRouteImport } from "./routes/admin.import";
+import { Route as AdminVideoLibraryRouteImport } from "./routes/admin.video-library";
 import { Route as LegacyAdminRouteImport } from "./routes/admin.legacy";
 import { Route as CommunityRouteImport } from "./routes/community";
 import { Route as ContactRouteImport } from "./routes/contact";
@@ -43,6 +44,7 @@ const AuthedAdminAffiliatesRoute = AuthedAdminAffiliatesRouteImport.update({ id:
 const AboutRoute = AboutRouteImport.update({ id: "/about", path: "/about", getParentRoute: () => rootRouteImport });
 const AdminRoute = AdminRouteImport.update({ id: "/admin", path: "/admin", getParentRoute: () => rootRouteImport });
 const AdminImportRoute = AdminImportRouteImport.update({ id: "/admin/import", path: "/admin/import", getParentRoute: () => rootRouteImport });
+const AdminVideoLibraryRoute = AdminVideoLibraryRouteImport.update({ id: "/admin/video-library", path: "/admin/video-library", getParentRoute: () => rootRouteImport });
 const LegacyAdminRoute = LegacyAdminRouteImport.update({ id: "/admin/legacy", path: "/admin/legacy", getParentRoute: () => rootRouteImport });
 const CommunityRoute = CommunityRouteImport.update({ id: "/community", path: "/community", getParentRoute: () => rootRouteImport });
 const ContactRoute = ContactRouteImport.update({ id: "/contact", path: "/contact", getParentRoute: () => rootRouteImport });
@@ -79,6 +81,7 @@ const rootRouteChildren = {
   AboutRoute,
   AdminRoute,
   AdminImportRoute,
+  AdminVideoLibraryRoute,
   LegacyAdminRoute,
   CommunityRoute,
   ContactRoute,
