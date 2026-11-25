@@ -1,0 +1,27 @@
+name: VICEHUB scheduled automation checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'base44/functions/**'
+      - 'package.json'
+  push:
+    branches: [main]
+    paths:
+      - 'base44/functions/**'
+      - 'package.json'
+
+jobs:
+  scheduled-worker:
+    name: Scheduled social worker type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Install npm dependencies for Deno checks
+        run: deno install
+      - name: Type-check Deno automation
+        run: deno check base44/functions/social-publisher/index.ts base44/functions/gta-news-sync/index.ts base44/functions/vicehub-send-push/index.ts
