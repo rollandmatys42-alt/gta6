@@ -116,7 +116,7 @@ function ClientClipLibrary(){
  return <SiteFrame eyebrow="VICEHUB / THE VIDEO LIBRARY">
   <main className="vh-library">
    <section className={"vh-landing-hero "+(lead?.thumbnail_url?"has-image":"")}>
-    {lead?.thumbnail_url&&<img src={lead.thumbnail_url} alt="" className="vh-landing-backdrop"/>}
+    <img src={lead?.thumbnail_url||EDITORIAL_IMAGES[0]} alt="" aria-hidden="true" className="vh-landing-backdrop"/>
     <div className="vh-landing-shade"/>
     <div className="vh-landing-content">
      <span className="vh-eyebrow"><i/> THE VICEHUB VIDEO LIBRARY</span>
@@ -129,6 +129,12 @@ function ClientClipLibrary(){
     <div className="vh-landing-bottom"><span>DISCOVER</span><i/><span>{total.toLocaleString()} PUBLISHED CLIPS</span></div>
    </section>
 
+
+   <section className="vh-leonida-gallery" aria-label="Explore GTA VI locations">
+    <a className="vh-leonida-tile vh-leonida-city" href="#discover"><img src={EDITORIAL_IMAGES[0]} alt="Official GTA VI Vice City artwork"/><span>01 / THE CITY</span><b>VICE CITY</b><i>EXPLORE CLIPS ↘</i></a>
+    <a className="vh-leonida-tile vh-leonida-coast" href="#discover"><img src={EDITORIAL_IMAGES[1]} alt="Official GTA VI Leonida Keys artwork"/><span>02 / THE COAST</span><b>LEONIDA KEYS</b><i>EXPLORE CLIPS ↘</i></a>
+    <a className="vh-leonida-tile vh-leonida-streets" href="#discover"><img src={EDITORIAL_IMAGES[2]} alt="Official GTA VI Port Gellhorn artwork"/><span>03 / THE STREETS</span><b>PORT GELLHORN</b><i>EXPLORE CLIPS ↘</i></a>
+   </section>
    <section className="vh-library-stats" aria-label="Library overview">
     <div><b>{total.toLocaleString()}</b><span>PUBLISHED CLIPS</span></div>
     <div><b>{collections.featured.length.toString().padStart(2,"0")}</b><span>EDITOR'S PICKS</span></div>
