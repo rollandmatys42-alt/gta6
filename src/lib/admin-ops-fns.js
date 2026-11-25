@@ -19,14 +19,14 @@ async function audit(context, action, targetType, targetId, summary, metadata = 
 export const getAdminOperationsData = createServerFn({ method: "GET" }).middleware([requireUser]).handler(async ({ context }) => {
   requireAdmin(context);
   const entities = db(context);
-  const [settings, tickets, privacyRequests, auditLogs, staffRoles, pages, articles] = await Promise.all([
+  const [settings, tickets, privacyRequests, auditLogs, staffRoles, pages, articles, notifications] = await Promise.all([
     entities.SiteSetting.list("-updated_date", 200, 0),
     entities.SupportTicket.list("-created_date", 200, 0),
     entities.PrivacyRequest.list("-created_date", 200, 0),
     entities.AdminAuditLog.list("-created_date", 250, 0),
     entities.StaffRole.list("-created_date", 100, 0),
     entities.SitePage.list("-updated_date", 200, 0),
-    entities.NewsArticle.list("-updated_date", 200, 0),
+    entities.NewsArticle.list("-updated_date", 200, 0),\n    entities.UserNotification.list("-created_date", 250, 0),
   ]);
   return {
     settings, tickets, privacyRequests, auditLogs, staffRoles,
