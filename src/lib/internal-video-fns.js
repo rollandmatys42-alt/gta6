@@ -329,7 +329,7 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
     if (data.category) filter.category = data.category;
     if (data.language) filter.language = data.language;
     if (data.country) filter.target_countries = data.country.toUpperCase();
-    const rows = await db.InternalVideoAsset.filter(filter, "-public_published_at", 500, 0);
+    const rows = await db.InternalVideoAsset.filter(filter, "-public_published_at", 5000, 0);
     const term = String(data.search || "").toLowerCase();
     const filtered = term ? rows.filter(asset =>
       [asset.title, asset.description, asset.topic, asset.category, asset.language, ...(asset.tags || [])]
