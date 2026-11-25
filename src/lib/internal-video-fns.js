@@ -569,12 +569,18 @@ export const createVideoStorageSource = createServerFn({ method: "POST" })
     if (data.provider !== "google_drive" && !data.folderUrl) {
       throw Object.assign(new Error("Add the shared folder or storage link."), { status: 400 });
     }
+    const parsedFolderId = data.folderId || (data.provider === "google_drive" && data.folderUrl
+      ? data.folderUrl.match(/\\/folders\\/([A-Za-z0-9_-]+)/)?.[1]
+      : undefined);
+    if (data.provider === "google_drive" && !parsedFolderId) {
+      throw Object.assign(new Error("The Google Drive folder link is not valid. Copy the folder URL from Drive."), { status: 400 });
+    }
     return context.getBase44().asServiceRole.entities.VideoStorageSource.create({
       name: data.name,
       provider: data.provider,
       market_country: data.marketCountry.toUpperCase(),
       ...(data.folderUrl ? { folder_url: data.folderUrl } : {}),
-      ...(data.folderId ? { folder_id: data.folderId } : {}),
+      ...(parsedFolderId ? { folder_id: parsedFolderId } : {}),
       notes: data.notes || "",
       enabled: true,
       created_by: context.user.id,
