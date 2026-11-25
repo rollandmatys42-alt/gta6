@@ -15,7 +15,7 @@ import { getMyNotifications, getPushNotificationConfig, savePushSubscription } f
 import "@/styles/vicehub-2026-redesign.css";
 import "@/styles/vicehub-header-nav.css";
 
-const links = [["/", "nav.home"], ["/news", "nav.news"], ["/creators", "nav.creators"], ["/library", "nav.library"]];
+const links = [["/", "nav.home"], ["/news", "nav.news"], ["/creators", "nav.creators"], ["/community", "COMMUNITY"], ["/marketplace", "MARKETPLACE"], ["/library", "nav.library"], ["/shop", "nav.shop"]];
 const workspaceLinks = [
   ["/dashboard", "⌂", "overview"],
   ["/library", "▤", "library"],
