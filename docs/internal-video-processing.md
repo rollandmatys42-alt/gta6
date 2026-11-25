@@ -53,3 +53,19 @@ The VICEHUB worker will use only audited, self-hostable core components. Exclude
 - Add retry/backoff and stale-lease recovery before enabling unattended production processing.
 - Add multipart S3 uploads and signed output uploads before enabling clip rendering.
 - Keep concurrency and resource limits based on measured CPU/GPU/RAM capacity, not arbitrary product quotas.
+
+## Worker implementation
+
+The initial worker source now lives in `workers/video-engine/`:
+
+- FastAPI health endpoint and one sequential queue poller.
+- FFprobe metadata extraction.
+- Local faster-whisper transcription (CPU/int8 by default).
+- Streaming download of the signed private source to temporary disk; the file is deleted when the job finishes.
+- Heartbeat callbacks extend the 15-minute job lease during long transcriptions.
+- The worker never sends the source audio to an external transcription API and never writes the signed source URL or worker token to logs or job error records.
+- The Docker image runs as a non-root user and includes FFmpeg/FFprobe.
+
+The worker has source code and CI syntax validation only. It has not been built into a registry image, deployed to a container runtime or connected to a real storage account. No worker token has been created or configured in Base44. Jobs therefore remain queued.
+
+Before first production use, run an actual MP4 and MOV through both `analyse` and `transcribe`, verify the transcript and media metadata, test expired signed URLs, worker restart/lease recovery and temporary-disk exhaustion, and confirm model-cache persistence. The worker must remain single-replica until the queue claim is made atomic.
