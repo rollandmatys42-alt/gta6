@@ -153,7 +153,7 @@ export default function SiteFrame({ children, eyebrow = "VICEHUB / SHORT-FORM CL
         <div className="fh-footer-grid">
           <div><div className="fh-brand-text">VICE<b>HUB</b></div><p>Curated short-form video clips across topics, languages and markets. Preview and download according to your membership.</p></div>
           <div><h4>Explore</h4><Link to="/library">Video library</Link><Link to="/creators">Creators</Link></div>
-          <div><h4>Account</h4><Link to="/dashboard">My account</Link><Link to="/subscription">Membership</Link><Link to="/social">Social planner</Link></div>
+          <div><h4>Account</h4><Link to="/dashboard">My account</Link><Link to="/subscription">Membership</Link></div>
           <div><h4>Legal</h4><Link to="/terms">{translate(locale, "footer.terms")}</Link><Link to="/privacy">{translate(locale, "footer.privacy")}</Link><Link to="/copyright">{translate(locale, "footer.copyright")}</Link><Link to="/cookies">Cookies</Link><Link to="/refunds">Refunds</Link><Link to="/contact">Contact</Link></div>
         </div>
         <div className="fh-footer-bottom"><span>{translate(locale, "footer.independent")}</span><small>{translate(locale, "footer.disclaimer")}</small></div>
