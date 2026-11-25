@@ -8,6 +8,7 @@ import {
 } from "@/lib/server-fns";
 import { useAuth } from "@/lib/AuthContext";
 import "@/styles/vicehub-2026-redesign.css";
+import "@/styles/social-library.css";
 
 export const Route = createFileRoute("/social")({
   ssr: false,
@@ -19,9 +20,9 @@ export const Route = createFileRoute("/social")({
 });
 
 const platforms = [
-  { key: "TikTok", label: "TikTok", mark: "♪", description: "Connect the TikTok account you use for your GTA VI videos.", className: "tiktok" },
-  { key: "Instagram", label: "Instagram", mark: "◎", description: "Connect your Instagram account to your VICEHUB profile.", className: "instagram" },
-  { key: "YouTube", label: "YouTube", mark: "▶", description: "Connect your YouTube channel for your creator profile.", className: "youtube" },
+  { key: "TikTok", label: "TikTok", mark: "♪", description: "Connect the TikTok account you use for your GTA VI videos.", className: "tiktok", art: "https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=1920" },
+  { key: "Instagram", label: "Instagram", mark: "◎", description: "Connect your Instagram account to your VICEHUB profile.", className: "instagram", art: "https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=1920" },
+  { key: "YouTube", label: "YouTube", mark: "▶", description: "Connect your YouTube channel for your creator profile.", className: "youtube", art: "https://www.rockstargames.com/VI/_next/static/media/Vice_City_27.0d2e~w_r93hmh.jpg?akim=1&imdensity=1&imwidth=1920" },
 ];
 
 function SocialAccountsPage() {
@@ -118,14 +119,14 @@ function SocialAccountsPage() {
 
   return (
     <SiteFrame eyebrow="VICEHUB / SOCIAL ACCOUNTS" workspace={isAuthenticated} activeKey="social">
-      <main className="social-shell vh-social-connect-only">
+      <main className="social-shell vh-social-connect-only vh-social-library-page">
         <header className="social-hero vh-image-hero">
           <img className="vh-page-art-image" src="https://www.rockstargames.com/VI/_next/static/media/Jason_Lucia_Rooftop_landscape.0c6p5do~-8~7..jpg?akim=1&imdensity=1&imwidth=1920" alt="Jason and Lucia in Leonida — GTA VI artwork" />
           <div className="vh-page-art-shade" />
           <div className="vh-social-hero-copy">
-            <span className="social-kicker">VICEHUB / YOUR CREATOR PROFILE</span>
-            <h1>CONNECT YOUR<br /><em>SOCIAL ACCOUNTS.</em></h1>
-            <p>Link the accounts you already use to publish your GTA VI content. Connect TikTok, Instagram and YouTube — nothing else is required at this stage.</p>
+            <span className="social-kicker">VICEHUB / CREATOR CHANNELS</span>
+            <h1>YOUR SOCIAL<br /><em>CHANNELS.</em></h1>
+            <p>Manage the TikTok, Instagram and YouTube accounts linked to your VICEHUB creator profile. Each connection is authorised directly by its platform.</p>
           </div>
           <div className="social-hero-stamp"><b>03</b><span>PLATFORMS</span><small>YOUR ACCOUNTS / YOUR CONTROL</small></div>
         </header>
@@ -154,6 +155,7 @@ function SocialAccountsPage() {
                   const ready = availability[platform.key] === true;
                   return (
                     <article className={"vh-social-platform-card " + platform.className} key={platform.key}>
+                      <div className="vh-social-platform-art"><img src={platform.art} alt="" loading="lazy" /><span>{platform.label}</span></div>
                       <div className="vh-social-platform-brand">
                         <span className="vh-social-platform-mark" aria-hidden="true">{platform.mark}</span>
                         <span className="vh-social-platform-state">{linked.length ? "CONNECTED" : "NOT CONNECTED"}</span>
