@@ -15,7 +15,7 @@ export const Route=createFileRoute("/library")({
  component:ClientClipLibrary
 });
 
-function ClientClipLibrary(){
+const EDITORIAL_IMAGES=["https://www.rockstargames.com/VI/_next/static/media/Vice_City_01.135x56yoeu.6t.jpg?akim=1&imdensity=1&imwidth=3840","https://www.rockstargames.com/VI/_next/static/media/Leonida_Keys_01.0zgz7tveur6y8.jpg?akim=1&imdensity=1&imwidth=3840","https://www.rockstargames.com/VI/_next/static/media/Port_Gellhorn_01.0fmisvza-5-cq.jpg?akim=1&imdensity=1&imwidth=3840"];\n\nfunction ClientClipLibrary(){
  const{isAuthenticated}=useAuth();
  const[clips,setClips]=useState([]);
  const[collections,setCollections]=useState({featured:[],favourites:[],mostDownloaded:[],videoOfWeek:null});
@@ -90,7 +90,7 @@ function ClientClipLibrary(){
  const duration=s=>{const n=Math.max(0,Number(s)||0);return Math.floor(n/60)+":"+String(n%60).padStart(2,"0");};
  const VideoCard=({clip,index=0,rank})=><article className="vh-card" key={clip.id}>
   <button type="button" className="vh-card-art" onClick={()=>preview(clip)} aria-label={"Preview "+clip.title}>
-   {clip.thumbnail_url?<img src={clip.thumbnail_url} alt={clip.title} loading={index>3?"lazy":"eager"}/>:<span className="vh-card-placeholder">VICEHUB<br/>VIDEO</span>}
+   {clip.thumbnail_url?<img src={clip.thumbnail_url} alt={clip.title} loading={index>3?"lazy":"eager"}/>:<><img className="vh-card-fallback-image" src={EDITORIAL_IMAGES[index%EDITORIAL_IMAGES.length]} alt="Illustrative Vice City artwork" loading="lazy"/><span className="vh-card-illustrative">ILLUSTRATIVE VISUAL</span></>}
    {rank&&<span className="vh-card-rank">#{rank}</span>}
    <span className="vh-card-duration">{duration(clip.duration_seconds)}</span>
    <span className="vh-card-play">▶</span>
@@ -137,7 +137,7 @@ function ClientClipLibrary(){
    {error&&<div role="alert" className="vh-library-error">{error}{!isAuthenticated&&<Link to="/sign-in"> SIGN IN ↗</Link>}</div>}
 
    {lead&&<section className="vh-spotlight">
-    <div className="vh-spotlight-art">{lead.thumbnail_url?<img src={lead.thumbnail_url} alt={lead.title}/>:<div className="vh-card-placeholder">VICEHUB<br/>SPOTLIGHT</div>}<span>01 / EDITOR'S SPOTLIGHT</span><button type="button" onClick={()=>preview(lead)}>▶</button></div>
+    <div className="vh-spotlight-art">{lead.thumbnail_url?<img src={lead.thumbnail_url} alt={lead.title}/>:<img src={EDITORIAL_IMAGES[1]} alt="Illustrative Leonida artwork"/>}<span>01 / EDITOR'S SPOTLIGHT</span><button type="button" onClick={()=>preview(lead)}>▶</button></div>
     <div className="vh-spotlight-copy"><span className="vh-eyebrow"><i/> HAND-PICKED BY VICEHUB</span><h2>{lead.title}</h2><p>{lead.description||"A featured selection from the VICEHUB editorial team."}</p><div className="vh-spotlight-tags">{[lead.category,lead.language,...(lead.target_countries||[])].filter(Boolean).map((x,i)=><span key={x+i}>{x}</span>)}</div><div className="vh-spotlight-actions"><button type="button" onClick={()=>preview(lead)}>▶ WATCH PREVIEW</button><button type="button" onClick={()=>download(lead)} disabled={downloading===lead.id}>{downloading===lead.id?"PREPARING…":"↓ DOWNLOAD CLIP"}</button></div></div>
    </section>}
 
@@ -146,7 +146,7 @@ function ClientClipLibrary(){
 
    <section className="vh-week-feature">
     <div className="vh-week-label"><span>THE WEEKLY SPOTLIGHT</span><b>VIDEO<br/>OF THE<br/><em>WEEK.</em></b><small>TOP DOWNLOADED · LAST 7 DAYS</small></div>
-    {week?<div className="vh-week-content"><button type="button" className="vh-week-art" onClick={()=>preview(week)}>{week.thumbnail_url?<img src={week.thumbnail_url} alt={week.title}/>:<span className="vh-card-placeholder">VIDEO<br/>OF THE WEEK</span>}<i>▶</i></button><div className="vh-week-copy"><span>THE COMMUNITY'S MOST DOWNLOADED THIS WEEK</span><h2>{week.title}</h2><p>{week.description||"The clip with the highest number of confirmed downloads in the last seven days."}</p><strong>{week.download_count_7d} <small>CONFIRMED DOWNLOADS</small></strong><button type="button" onClick={()=>download(week)} disabled={downloading===week.id}>{downloading===week.id?"PREPARING…":"↓ DOWNLOAD THIS CLIP"}</button></div></div>:<div className="vh-week-empty"><b>THE NEXT WEEKLY WINNER IS WAITING.</b><p>The video of the week is selected automatically from confirmed downloads over the last seven days. It will appear here when a clip has download activity.</p></div>}
+    {week?<div className="vh-week-content"><button type="button" className="vh-week-art" onClick={()=>preview(week)}>{week.thumbnail_url?<img src={week.thumbnail_url} alt={week.title}/>:<img src={EDITORIAL_IMAGES[2]} alt="Illustrative Port Gellhorn artwork"/>}<i>▶</i></button><div className="vh-week-copy"><span>THE COMMUNITY'S MOST DOWNLOADED THIS WEEK</span><h2>{week.title}</h2><p>{week.description||"The clip with the highest number of confirmed downloads in the last seven days."}</p><strong>{week.download_count_7d} <small>CONFIRMED DOWNLOADS</small></strong><button type="button" onClick={()=>download(week)} disabled={downloading===week.id}>{downloading===week.id?"PREPARING…":"↓ DOWNLOAD THIS CLIP"}</button></div></div>:<div className="vh-week-empty"><b>THE NEXT WEEKLY WINNER IS WAITING.</b><p>The video of the week is selected automatically from confirmed downloads over the last seven days. It will appear here when a clip has download activity.</p></div>}
    </section>
 
    <Section eyebrow="COMMUNITY ACTIVITY / LAST 30 DAYS / 03" title="MOST DOWNLOADED" description="Ranked by completed, confirmed downloads — not views or AI predictions." items={collections.mostDownloaded} empty="The ranking will update automatically after the first confirmed downloads." ranked id="most-downloaded"/>
@@ -164,7 +164,7 @@ function ClientClipLibrary(){
     {hasMore&&<div className="vh-load-more"><button type="button" onClick={loadMore} disabled={busy}>{busy?"LOADING…":"LOAD MORE CLIPS ↓"}</button></div>}
    </section>
 
-   <footer className="vh-library-footer"><span>VICEHUB / LEONIDA VIDEO ARCHIVE</span><p>Download rankings use completed download events recorded by VICEHUB. Weekly and monthly lists update as new downloads are completed. AI viral potential is an estimate, not a verified engagement result. All clips remain subject to their usage rights and membership limits.</p></footer>
+   <footer className="vh-library-footer"><span>VICEHUB / LEONIDA VIDEO ARCHIVE</span><p>Download rankings use completed download events recorded by VICEHUB. Weekly and monthly lists update as new downloads are completed. AI viral potential is an estimate, not a verified engagement result. All clips remain subject to their usage rights and membership limits. Decorative artwork: <a href="https://www.rockstargames.com/VI/media/screenshots" target="_blank" rel="noreferrer">official Rockstar Games media gallery</a>.</p></footer>
 
    {selected&&<div className="vh-preview-modal" role="dialog" aria-modal="true" aria-label={selected.title} onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null);}}><div className="vh-preview-panel"><div className="vh-preview-head"><div><span>VICEHUB / SECURE PREVIEW</span><b>{selected.title}</b></div><button type="button" onClick={()=>setSelected(null)} aria-label="Close preview">×</button></div><video controls autoPlay playsInline src={"/api/internal-video-preview/"+encodeURIComponent(selected.id)}/><div className="vh-preview-foot"><span>Preview access requires a signed-in account.</span><span>Downloads depend on your active membership allowance.</span></div></div></div>}
   </main>
