@@ -42,29 +42,66 @@ export async function getGoogleDriveFileMetadata(base44, fileId) {
   return response.json();
 }
 
-export async function listGoogleDriveVideoFiles(base44, { query = "", pageToken = "" } = {}) {
+export async function listGoogleDriveVideoFiles(base44, { query = "", pageToken = "", parentId = "" } = {}) {
   const token = await getGoogleDriveAccessToken(base44);
   const q = ["trashed = false", "mimeType contains 'video/'"];
+  if (parentId) {
+    if (!/^[A-Za-z0-9_-]{1,512}$/.test(parentId)) throw Object.assign(new Error("Invalid Google Drive folder ID."), { status: 400 });
+    q.push("'" + parentId + "' in parents");
+  }
   const term = String(query || "").trim().slice(0, 100);
   if (term) {
     const escaped = term.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
     q.push("name contains '" + escaped + "'");
   }
   const params = new URLSearchParams({
-    q: q.join(" and "),
-    pageSize: "50",
-    orderBy: "modifiedTime desc",
+    q: q.join(" and "), pageSize: "50", orderBy: "modifiedTime desc",
     fields: "nextPageToken,files(id,name,mimeType,size,modifiedTime,parents,webViewLink,capabilities(canDownload))",
-    supportsAllDrives: "true",
-    includeItemsFromAllDrives: "true",
+    supportsAllDrives: "true", includeItemsFromAllDrives: "true",
   });
   if (pageToken) params.set("pageToken", pageToken);
   const response = await driveRequest(token, DRIVE_API + "/files?" + params.toString());
   const payload = await response.json();
-  return {
-    files: Array.isArray(payload.files) ? payload.files : [],
-    nextPageToken: payload.nextPageToken || null,
-  };
+  return { files: Array.isArray(payload.files) ? payload.files : [], nextPageToken: payload.nextPageToken || null };
+}
+
+export async function listGoogleDriveFolders(base44, { parentId = "root" } = {}) {
+  const token = await getGoogleDriveAccessToken(base44);
+  if (!/^[A-Za-z0-9_-]{1,512}$/.test(parentId)) throw Object.assign(new Error("Invalid Google Drive folder ID."), { status: 400 });
+  const q = ["trashed = false", "mimeType = 'application/vnd.google-apps.folder'", "'" + parentId + "' in parents"];
+  const params = new URLSearchParams({
+    q: q.join(" and "), pageSize: "100", orderBy: "name",
+    fields: "files(id,name,mimeType,modifiedTime,parents,webViewLink)",
+    supportsAllDrives: "true", includeItemsFromAllDrives: "true",
+  });
+  const response = await driveRequest(token, DRIVE_API + "/files?" + params.toString());
+  const payload = await response.json();
+  return { folders: Array.isArray(payload.files) ? payload.files : [] };
+}
+
+async function findOrCreateDriveFolder(accessToken, name, parentId) {
+  const escaped = String(name).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const q = ["trashed = false", "mimeType = 'application/vnd.google-apps.folder'", "name = '" + escaped + "'", "'" + parentId + "' in parents"].join(" and ");
+  const params = new URLSearchParams({ q, pageSize: "10", fields: "files(id,name,mimeType,parents)", supportsAllDrives: "true", includeItemsFromAllDrives: "true" });
+  const found = await (await driveRequest(accessToken, DRIVE_API + "/files?" + params.toString())).json();
+  if (found.files?.length) return found.files[0];
+  const created = await driveRequest(accessToken, DRIVE_API + "/files?supportsAllDrives=true&fields=id,name,mimeType,parents", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
+  });
+  return created.json();
+}
+
+export async function ensureGoogleDriveLibraryFolders(base44) {
+  const token = await getGoogleDriveAccessToken(base44);
+  const root = await findOrCreateDriveFolder(token, "VICEHUB", "root");
+  const [originals, clips, approved, published] = await Promise.all([
+    findOrCreateDriveFolder(token, "01 - ORIGINALS", root.id),
+    findOrCreateDriveFolder(token, "02 - CLIPS", root.id),
+    findOrCreateDriveFolder(token, "03 - APPROVED", root.id),
+    findOrCreateDriveFolder(token, "04 - PUBLISHED", root.id),
+  ]);
+  return { root, originals, clips, approved, published };
 }
 
 export async function streamGoogleDriveMedia(base44, fileId, request) {
