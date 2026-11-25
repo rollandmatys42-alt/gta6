@@ -51,52 +51,6 @@ async function readVideoMetadata(file) {
   }
 }
 
-async function createVideoThumbnail(file) {
-  const sourceUrl = URL.createObjectURL(file);
-  const video = document.createElement("video");
-  video.preload = "auto";
-  video.muted = true;
-  video.playsInline = true;
-  try {
-    await new Promise((resolve, reject) => {
-      video.onloadedmetadata = resolve;
-      video.onerror = () => reject(new Error("A thumbnail could not be extracted from this video."));
-      video.src = sourceUrl;
-      video.load();
-    });
-    if (video.duration > 0) {
-      const target = Math.min(1, video.duration * 0.1);
-      await new Promise((resolve, reject) => {
-        video.onseeked = resolve;
-        video.onerror = () => reject(new Error("The video thumbnail frame could not be decoded."));
-        video.currentTime = target;
-      });
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = 480;
-    canvas.height = 270;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("The thumbnail renderer could not be initialised.");
-    const sourceRatio = video.videoWidth / video.videoHeight;
-    const targetRatio = 16 / 9;
-    let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
-    if (sourceRatio > targetRatio) {
-      sw = Math.round(video.videoHeight * targetRatio);
-      sx = Math.round((video.videoWidth - sw) / 2);
-    } else {
-      sh = Math.round(video.videoWidth / targetRatio);
-      sy = Math.round((video.videoHeight - sh) / 2);
-    }
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.58);
-  } finally {
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    URL.revokeObjectURL(sourceUrl);
-  }
-}
-
 async function createWatermarkedRendition(file, onProgress) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
     throw new Error("This browser cannot create a watermarked MP4. Use current Chrome or Edge on desktop.");
@@ -383,11 +337,9 @@ function InternalVideoLibraryPage() {
       if (!response.ok) throw new Error("The private source video could not be retrieved (HTTP " + response.status + ").");
       const blob = await response.blob();
       const originalFile = new File([blob], publishAsset.original_filename || (publishAsset.title + ".mp4"), { type: publishAsset.mime_type || blob.type || "video/mp4" });
-      setPublishProgress("2/5 — Extracting a real thumbnail from the source video…");
-      const thumbnailDataUrl = await createVideoThumbnail(originalFile);
-      setPublishProgress("3/5 — Creating the permanent VICEHUB watermark in your browser…");
-      const watermarkedFile = await createWatermarkedRendition(originalFile, value => setPublishProgress("3/5 — Watermarking source video: " + value + "%"));
-      setPublishProgress("4/5 — Uploading the protected rendition to private storage…");
+      setPublishProgress("2/4 — Creating the permanent VICEHUB watermark in your browser…");
+      const watermarkedFile = await createWatermarkedRendition(originalFile, value => setPublishProgress("2/4 — Watermarking source video: " + value + "%"));
+      setPublishProgress("3/4 — Uploading the protected rendition to private storage…");
       const signed = await createVideoUploadUrl({ data: {
         fileName: watermarkedFile.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 170),
         contentType: "video/mp4",
@@ -396,14 +348,13 @@ function InternalVideoLibraryPage() {
       } });
       const uploaded = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": "video/mp4" }, body: watermarkedFile });
       if (!uploaded.ok) throw new Error("Private storage rejected the protected rendition (HTTP " + uploaded.status + ").");
-      setPublishProgress("5/5 — Publishing the video to the client catalogue…");
+      setPublishProgress("4/4 — Publishing the video to the client catalogue…");
       const result = await publishInternalAssetToCatalogue({ data: {
         assetId: publishAsset.id,
         category: publishCategory,
         language: publishLanguage,
         isFeatured: publishFeatured,
         creatorName: publishCreatorName.trim() || "VICEHUB",
-        thumbnailDataUrl,
         watermarkedStorageKey: signed.objectKey,
         watermarkedStorageConnectionId: signed.storageConnectionId,
         watermarkedBytes: watermarkedFile.size,
