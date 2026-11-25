@@ -311,6 +311,28 @@ export const reviewInternalVideoAsset = createServerFn({ method: "POST" })
 
 const INTERNAL_CLIP_DOWNLOAD_TTL = 120;
 
+export const setInternalClipEditorial = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    assetId: z.string().min(1).max(128),
+    isFeatured: z.boolean().optional(),
+    isFavourite: z.boolean().optional(),
+  }).refine(data => data.isFeatured !== undefined || data.isFavourite !== undefined))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const db = context.getBase44().asServiceRole.entities;
+    const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
+    if (!asset || asset.asset_type !== "clip" || asset.status !== "ready" ||
+        asset.review_status !== "approved" || asset.public_video_status !== "published" ||
+        !["authorised", "not_applicable"].includes(asset.rights_status)) {
+      throw Object.assign(new Error("Only approved, rights-cleared and published clips can be placed in editorial collections."), { status: 409, code: "CLIP_NOT_PUBLISHABLE" });
+    }
+    const patch = {};
+    if (data.isFeatured !== undefined) patch.is_featured = data.isFeatured;
+    if (data.isFavourite !== undefined) patch.is_favourite = data.isFavourite;
+    return db.InternalVideoAsset.update(asset.id, patch);
+  });
+
 export const listPublicInternalClips = createServerFn({ method: "GET" })
   .validator(z.object({
     search: z.string().trim().max(100).optional(),
@@ -326,39 +348,68 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
       asset_type: "clip", status: "ready", review_status: "approved",
       public_video_status: "published", rights_status: { $in: ["authorised", "not_applicable"] },
     };
-    if (data.category) filter.category = data.category;
-    if (data.language) filter.language = data.language;
-    if (data.country) filter.target_countries = data.country.toUpperCase();
-    const rows = await db.InternalVideoAsset.filter(filter, "-public_published_at", 5000, 0);
+    const [rows, downloadEvents] = await Promise.all([
+      db.InternalVideoAsset.filter(filter, "-public_published_at", 5000, 0),
+      db.DownloadEvent.filter({ status: "delivered" }, "-created_date", 5000, 0),
+    ]);
+    const now = Date.now();
+    const sevenDaysAgo = now - 7 * 86400000;
+    const thirtyDaysAgo = now - 30 * 86400000;
+    const counts7d = new Map();
+    const counts30d = new Map();
+    for (const event of downloadEvents) {
+      const when = new Date(event.created_date || 0).getTime();
+      if (!Number.isFinite(when) || !event.video_id) continue;
+      if (when >= sevenDaysAgo) counts7d.set(event.video_id, (counts7d.get(event.video_id) || 0) + 1);
+      if (when >= thirtyDaysAgo) counts30d.set(event.video_id, (counts30d.get(event.video_id) || 0) + 1);
+    }
+    const toPublic = asset => ({
+      id: asset.id, title: asset.title, description: asset.description || "",
+      category: asset.category || "Other", topic: asset.topic || "",
+      language: asset.detected_language || asset.language || "und",
+      target_countries: Array.isArray(asset.target_countries) ? asset.target_countries : [],
+      tags: Array.isArray(asset.tags) ? asset.tags : [],
+      editorial_tags: (() => {
+        const score = Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null;
+        const published = new Date(asset.public_published_at || asset.created_date || 0).getTime();
+        const tags = [];
+        if (Number.isFinite(published) && published > 0 && now - published <= 7 * 86400000) tags.push("New");
+        if (score !== null && score >= 80) tags.push("High viral potential");
+        if (score !== null && score >= 90) tags.push("Best clip · AI score ≥90");
+        return tags;
+      })(),
+      duration_seconds: Number(asset.duration_seconds || 0),
+      thumbnail_url: asset.thumbnail_url || "",
+      viral_potential_score: Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null,
+      public_published_at: asset.public_published_at || asset.created_date || null,
+      download_count_7d: counts7d.get(asset.id) || 0,
+      download_count_30d: counts30d.get(asset.id) || 0,
+      is_featured: !!asset.is_featured,
+      is_favourite: !!asset.is_favourite,
+    });
+    const all = rows.map(toPublic);
+    const filteredByCategory = data.category ? all.filter(x => x.category === data.category) : all;
+    const filteredByLanguage = data.language ? filteredByCategory.filter(x => x.language === data.language) : filteredByCategory;
+    const filteredByCountry = data.country ? filteredByLanguage.filter(x => x.target_countries.includes(data.country.toUpperCase())) : filteredByLanguage;
     const term = String(data.search || "").toLowerCase();
-    const filtered = term ? rows.filter(asset =>
+    const filtered = term ? filteredByCountry.filter(asset =>
       [asset.title, asset.description, asset.topic, asset.category, asset.language, ...(asset.tags || [])]
         .join(" ").toLowerCase().includes(term)
-    ) : rows;
+    ) : filteredByCountry;
     const page = filtered.slice(data.offset, data.offset + data.limit);
+    const mostDownloaded = [...all].filter(x => x.download_count_30d > 0)
+      .sort((a,b) => b.download_count_30d-a.download_count_30d || new Date(b.public_published_at)-new Date(a.public_published_at)).slice(0,8);
+    const videoOfWeek = [...all].filter(x => x.download_count_7d > 0)
+      .sort((a,b) => b.download_count_7d-a.download_count_7d || new Date(b.public_published_at)-new Date(a.public_published_at))[0] || null;
+    const featured = all.filter(x => x.is_featured).sort((a,b) => new Date(b.public_published_at)-new Date(a.public_published_at)).slice(0,4);
+    const favourites = all.filter(x => x.is_favourite).sort((a,b) => new Date(b.public_published_at)-new Date(a.public_published_at)).slice(0,8);
     return {
-      assets: page.map(asset => ({
-        id: asset.id, title: asset.title, description: asset.description || "",
-        category: asset.category || "Other", topic: asset.topic || "",
-        language: asset.detected_language || asset.language || "und",
-        target_countries: Array.isArray(asset.target_countries) ? asset.target_countries : [],
-        tags: Array.isArray(asset.tags) ? asset.tags : [],
-        editorial_tags: (() => {
-          const score = Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null;
-          const published = new Date(asset.public_published_at || asset.created_date || 0).getTime();
-          const tags = [];
-          if (Number.isFinite(published) && published > 0 && Date.now() - published <= 7 * 86400000) tags.push("New");
-          if (score !== null && score >= 80) tags.push("High viral potential");
-          if (score !== null && score >= 90) tags.push("Best clip · AI score ≥90");
-          return tags;
-        })(),
-        duration_seconds: Number(asset.duration_seconds || 0),
-        thumbnail_url: asset.thumbnail_url || "",
-        viral_potential_score: Number.isInteger(asset.viral_potential_score) ? asset.viral_potential_score : null,
-        public_published_at: asset.public_published_at || asset.created_date || null,
-      })),
+      assets: page,
+      collections: { featured, favourites, mostDownloaded, videoOfWeek },
       nextOffset: data.offset + page.length,
       hasMore: data.offset + page.length < filtered.length,
+      totalPublished: all.length,
+      downloadMetricsWindowDays: 30,
     };
   });
 

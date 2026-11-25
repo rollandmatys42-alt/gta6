@@ -18,6 +18,8 @@
     "target_countries": { "type": "array", "items": { "type": "string", "maxLength": 2 } },
     "topic": { "type": "string", "maxLength": 300 },
     "viral_potential_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "is_featured": { "type": "boolean", "default": false },
+    "is_favourite": { "type": "boolean", "default": false },
     "viral_score_factors": { "type": "object" },
     "performance_viral_score": { "type": "integer", "minimum": 0, "maximum": 100 },
     "thumbnail_url": { "type": "string", "format": "uri", "maxLength": 1000 },
