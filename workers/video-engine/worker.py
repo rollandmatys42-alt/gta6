@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import ipaddress
 import json
 import logging
 import os
@@ -239,6 +240,49 @@ class VideoWorker:
                         raise RuntimeError("Temporary disk reserve reached while downloading the source video.")
                     output.write(chunk)
 
+    async def download_external_source(self, source_url: str, target: Path) -> None:
+        parsed = urlparse(source_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+            raise RuntimeError("The external source URL is invalid.")
+        host = parsed.hostname.lower().rstrip(".")
+        if host in {"localhost", "metadata.google.internal"} or host.endswith(".local"):
+            raise RuntimeError("Private or local network source URLs are not accepted.")
+        try:
+            addresses = {item[4][0] for item in socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)}
+            if not addresses or any(not ipaddress.ip_address(value).is_global for value in addresses):
+                raise RuntimeError("The source hostname resolves to a private or non-public address.")
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError("The source hostname could not be resolved safely.") from exc
+
+        output_template = str(target.with_name("external-source.%(ext)s"))
+        command = [
+            "python", "-m", "yt_dlp", "--no-playlist", "--no-warnings",
+            "--no-progress", "--format", "bestvideo*+bestaudio/best",
+            "--merge-output-format", "mp4", "--output", output_template,
+            "--max-filesize", "8G", source_url,
+        ]
+        try:
+            await asyncio.to_thread(
+                subprocess.run, command, capture_output=True, text=True,
+                timeout=10800, check=True,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Source extraction exceeded the three-hour processing limit.") from exc
+        candidates = [
+            path for path in target.parent.glob("external-source.*")
+            if path.is_file() and not path.name.endswith((".part", ".ytdl"))
+        ]
+        if not candidates:
+            raise RuntimeError("The platform connector did not produce a video file.")
+        selected = max(candidates, key=lambda path: path.stat().st_size)
+        if selected.stat().st_size <= 0:
+            raise RuntimeError("The platform connector produced an empty video file.")
+        if shutil.disk_usage(self.temp_root).free < self.disk_reserve:
+            raise RuntimeError("Temporary disk reserve reached after source extraction.")
+        selected.replace(target)
+
     async def upload_clip_to_drive(self, job_id: str, clip_path: Path, file_name: str) -> dict:
         if not self.client:
             raise RuntimeError("Worker HTTP client is not running.")
@@ -333,7 +377,10 @@ class VideoWorker:
                 source_path = Path(work_dir) / ("source" + suffix)
                 self.current_progress = 1
                 await self.progress(job_id, 5, "Downloading source video to temporary worker storage")
-                await self.download_source(source_url, source_path, worker_auth=bool(job.get("sourceRequiresWorkerAuth")))
+                if job.get("sourceDownloadMode") == "extractor":
+                    await self.download_external_source(source_url, source_path)
+                else:
+                    await self.download_source(source_url, source_path, worker_auth=bool(job.get("sourceRequiresWorkerAuth")))
 
                 await self.progress(job_id, 20, "Reading media streams with FFprobe")
                 metadata = await asyncio.to_thread(probe_media, source_path)
