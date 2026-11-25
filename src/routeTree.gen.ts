@@ -7,6 +7,7 @@ import { Route as AuthedDashboardRouteImport } from "./routes/_authed/dashboard"
 import { Route as AuthedSubscriptionRouteImport } from "./routes/_authed/subscription";
 import { Route as AuthedAdminVideosRouteImport } from "./routes/_authed/admin/videos";
 import { Route as AuthedAdminOperationsRouteImport } from "./routes/_authed/admin/operations";
+import { Route as AuthedAdminAffiliatesRouteImport } from "./routes/_authed/admin/affiliates";
 import { Route as AboutRouteImport } from "./routes/about";
 import { Route as AdminRouteImport } from "./routes/admin";
 import { Route as CommunityRouteImport } from "./routes/community";
@@ -36,6 +37,7 @@ const AuthedDashboardRoute = AuthedDashboardRouteImport.update({ id: "/dashboard
 const AuthedSubscriptionRoute = AuthedSubscriptionRouteImport.update({ id: "/subscription", path: "/subscription", getParentRoute: () => AuthedRoute });
 const AuthedAdminVideosRoute = AuthedAdminVideosRouteImport.update({ id: "/admin/videos", path: "/admin/videos", getParentRoute: () => AuthedRoute });
 const AuthedAdminOperationsRoute = AuthedAdminOperationsRouteImport.update({ id: "/admin/operations", path: "/admin/operations", getParentRoute: () => AuthedRoute });
+const AuthedAdminAffiliatesRoute = AuthedAdminAffiliatesRouteImport.update({ id: "/admin/affiliates", path: "/admin/affiliates", getParentRoute: () => AuthedRoute });
 const AboutRoute = AboutRouteImport.update({ id: "/about", path: "/about", getParentRoute: () => rootRouteImport });
 const AdminRoute = AdminRouteImport.update({ id: "/admin", path: "/admin", getParentRoute: () => rootRouteImport });
 const CommunityRoute = CommunityRouteImport.update({ id: "/community", path: "/community", getParentRoute: () => rootRouteImport });
@@ -64,6 +66,7 @@ const AuthedRouteWithChildren = AuthedRoute._addFileChildren({
   AuthedSubscriptionRoute,
   AuthedAdminVideosRoute,
   AuthedAdminOperationsRoute,
+  AuthedAdminAffiliatesRoute,
 });
 const rootRouteChildren = {
   IndexRoute,
