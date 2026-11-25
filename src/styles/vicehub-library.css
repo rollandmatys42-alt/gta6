@@ -139,3 +139,25 @@
 .vh-btn-primary,.vh-spotlight-actions button+button,.vh-week-copy>button,.vh-load-more button,.vh-section-empty button{background:var(--vc-grad,linear-gradient(135deg,#ff2d95,#ff9a3c));border-color:transparent;color:#fff!important}
 .vh-library-stats b,.vh-section-head>b,.vh-week-copy>strong{color:var(--vc-orange,#ff9a3c)}
 .vh-eyebrow,.vh-card-meta span:first-child,.vh-landing-bottom i{color:var(--vc-cyan,#2de2e6)}
+
+
+/* Cinematic Leonida gallery — scoped to /library only. */
+.vh-library .vh-landing-hero{border-color:rgba(255,79,154,.42);background:radial-gradient(ellipse at 82% 20%,rgba(141,99,243,.28),transparent 38%),linear-gradient(120deg,#100817,#090613 68%,#171023);box-shadow:0 24px 70px rgba(0,0,0,.28)}
+.vh-library .vh-landing-backdrop{opacity:.56;filter:saturate(1.12) contrast(1.04);transition:transform 1.2s ease,opacity .4s}
+.vh-library .vh-landing-hero:hover .vh-landing-backdrop{transform:scale(1.035);opacity:.66}
+.vh-library .vh-landing-shade{background:linear-gradient(90deg,rgba(10,6,18,.94) 0%,rgba(10,6,18,.72) 52%,rgba(10,6,18,.18) 100%),linear-gradient(0deg,rgba(10,6,18,.68),transparent 62%)}
+.vh-library .vh-leonida-gallery{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px;margin:0 0 22px}
+.vh-library .vh-leonida-tile{position:relative;display:flex;min-height:190px;flex-direction:column;justify-content:flex-end;gap:7px;overflow:hidden;padding:17px;border:1px solid rgba(255,255,255,.14);border-radius:13px;background:#160d22;isolation:isolate}
+.vh-library .vh-leonida-tile:after{content:"";position:absolute;z-index:-1;inset:0;background:linear-gradient(0deg,rgba(8,5,15,.94),rgba(8,5,15,.08) 78%)}
+.vh-library .vh-leonida-tile img{position:absolute;z-index:-2;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .55s ease,filter .55s ease}
+.vh-library .vh-leonida-tile:hover img{transform:scale(1.07);filter:saturate(1.2)}
+.vh-library .vh-leonida-tile>span{color:#70e7e5;font-size:8px;font-weight:900;letter-spacing:.17em}
+.vh-library .vh-leonida-tile>b{color:#fff;font:900 clamp(22px,3vw,34px)/.95 "Barlow Condensed",Impact,sans-serif;letter-spacing:.02em}
+.vh-library .vh-leonida-tile>i{color:#ff8fbe;font-size:8px;font-style:normal;font-weight:900;letter-spacing:.12em}
+.vh-library .vh-leonida-city{min-height:220px}
+.vh-library .vh-library-stats{background:linear-gradient(110deg,#160d24,#0e0a18);border-color:rgba(255,79,154,.22)}
+.vh-library .vh-card,.vh-library .vh-discover,.vh-library .vh-spotlight,.vh-library .vh-week-feature{border-color:rgba(255,255,255,.13)}
+.vh-library .vh-card:hover{border-color:rgba(255,79,154,.62);box-shadow:0 18px 42px rgba(255,45,149,.13)}
+.vh-library .vh-spotlight{background:radial-gradient(ellipse at 10% 0%,rgba(255,79,154,.12),transparent 48%),linear-gradient(140deg,#21132e,#0c0915)}
+@media(max-width:760px){.vh-library .vh-leonida-gallery{grid-template-columns:1fr 1fr}.vh-library .vh-leonida-city{grid-column:1/-1;min-height:185px}.vh-library .vh-leonida-tile{min-height:145px;padding:13px}.vh-library .vh-leonida-tile>b{font-size:23px}}
+@media(max-width:420px){.vh-library .vh-leonida-gallery{grid-template-columns:1fr}.vh-library .vh-leonida-city{grid-column:auto}.vh-library .vh-leonida-tile{min-height:160px}}
