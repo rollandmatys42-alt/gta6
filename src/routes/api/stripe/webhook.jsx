@@ -148,7 +148,7 @@ export const Route = createFileRoute("/api/stripe/webhook")({
           const seen = await db.StripeWebhookEvent.filter({ event_id: event.id }, "-created_date", 1, 0);
           if (seen.length) return Response.json({ received: true, duplicate: true });
           const object = event.data?.object || {};
-          if (event.type === "checkout.session.completed" && object.mode === "subscription" && object.subscription) {
+          if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type) && object.mode === "subscription" && object.subscription) {
             const subscriptionId = typeof object.subscription === "string" ? object.subscription : object.subscription.id;
             const stripeSub = await stripeGet("subscriptions/" + encodeURIComponent(subscriptionId));
             await saveStripeSubscription(db, stripeSub, {
