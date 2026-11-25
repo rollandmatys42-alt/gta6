@@ -2,12 +2,13 @@
 
 ## Scope
 
-This is an administrator-only workspace for VICEHUB staff. It is separate from the public member video catalogue and never publishes records to the public Video entity.
+This is an administrator-only workspace for VICEHUB staff. Assets are private by default. An administrator can explicitly publish an authorised asset to the public Video catalogue from its card after VICEHUB creates a protected watermarked rendition.
 
 - Store original source footage, selected clips and derivative assets.
 - Keep media objects in private storage and metadata in the InternalVideoAsset entity.
 - Preview private assets through an authenticated, admin-only streaming route.
 - Archive records without deleting the underlying object.
+- Publish authorised assets to the client catalogue without re-uploading the original master. The public Video record points to the private original object and a separately generated watermarked rendition.
 - Preserve source URL, rights status and evidence reference.
 - Do not add a commercial watermark to internal assets.
 
@@ -28,7 +29,7 @@ The first upload path accepts MP4 and MOV. Larger single-request uploads remain 
 
 ## Processing status
 
-This release implements ingestion, private storage, metadata, rights provenance, preview and archive. It does not claim that AI clip selection, transcription or FFmpeg rendering is live. Those jobs require the separate VICEHUB worker service based on the audited OpenShorts engine, with a queue and a secure callback/API into this application.
+This release implements ingestion, private storage, metadata, rights provenance, preview, archive and explicit publication of authorised assets to the client catalogue. Publication creates the watermarked MP4 in the administrator's browser and keeps the original master unchanged. It does not claim that AI clip selection, transcription or FFmpeg rendering is live. Those jobs require the separate VICEHUB worker service based on the audited OpenShorts engine, with a queue and a secure callback/API into this application.
 
 ## Security
 

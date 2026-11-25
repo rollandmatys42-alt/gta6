@@ -14,3 +14,8 @@
 - The admin upload flow generates a watermarked MP4 in the browser using Canvas and MediaRecorder, then uploads both the clean master and watermarked rendition to private R2. Use current Chrome or Edge on desktop and keep the tab open until processing finishes. This is browser-side rendering, not a server-side transcoding service; a managed server-side pipeline remains necessary for robust high-volume processing.
 - Monthly quota uses a conditional atomic increment after a quota row exists. First-time concurrent quota-row creation and full end-to-end load/race testing remain required before commercial launch.
 - Signed download URLs expire after 120 seconds; they are not persistent public URLs.
+
+
+## Client catalogue discovery
+
+The public catalogue supports server-side filtering by category, language and text/tag search, plus duration ranges (under 1 minute, 1–5, 5–15, over 15 minutes) and sorting by newest, oldest, shortest or longest. Pagination is retained. Only published videos with verified rights are returned. Preview and download delivery continue through VICEHUB routes; the storage provider URL is not exposed to the client.

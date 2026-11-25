@@ -11,7 +11,7 @@ import {
   listInternalVideoAssets,
   listInternalVideoJobs,
 } from "@/lib/internal-video-fns";
-import { getStorageConnections } from "@/lib/server-fns";
+import { getStorageConnections, createVideoUploadUrl, publishInternalAssetToCatalogue } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/_authed/admin/video-library")({
   ssr: false,
@@ -27,6 +27,114 @@ const formatBytes = value => {
   do { size /= 1024; index += 1; } while (size >= 1024 && index < units.length - 1);
   return size.toFixed(size >= 100 ? 0 : 1) + " " + units[index];
 };
+
+async function readVideoMetadata(file) {
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  try {
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve;
+      video.onerror = () => reject(new Error("The source video metadata could not be read."));
+      video.src = url;
+      video.load();
+    });
+    return {
+      durationSeconds: Math.max(0, Math.round(video.duration || 0)),
+      width: Math.max(0, Number(video.videoWidth) || 0),
+      height: Math.max(0, Number(video.videoHeight) || 0),
+    };
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function createWatermarkedRendition(file, onProgress) {
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
+    throw new Error("This browser cannot create a watermarked MP4. Use current Chrome or Edge on desktop.");
+  }
+  const video = document.createElement("video");
+  const sourceUrl = URL.createObjectURL(file);
+  let recorder = null, raf = 0, videoStream = null, canvasStream = null;
+  video.src = sourceUrl;
+  video.preload = "auto";
+  video.playsInline = true;
+  video.muted = false;
+  try {
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve;
+      video.onerror = () => reject(new Error("The source video could not be decoded."));
+      video.load();
+    });
+    if (!video.videoWidth || !video.videoHeight || !Number.isFinite(video.duration)) throw new Error("The source video has invalid dimensions or duration.");
+    const scale = Math.min(1, 1920 / video.videoWidth, 1080 / video.videoHeight);
+    const width = Math.max(2, Math.round(video.videoWidth * scale / 2) * 2);
+    const height = Math.max(2, Math.round(video.videoHeight * scale / 2) * 2);
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("Could not initialise the watermark renderer.");
+    const capture = typeof video.captureStream === "function" ? video.captureStream.bind(video)
+      : typeof video.mozCaptureStream === "function" ? video.mozCaptureStream.bind(video) : null;
+    if (!capture) throw new Error("This browser cannot capture source audio. Use Chrome or Edge on desktop.");
+    videoStream = capture();
+    canvasStream = canvas.captureStream(30);
+    const combined = new MediaStream([...canvasStream.getVideoTracks(), ...videoStream.getAudioTracks()]);
+    const mimeType = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4"].find(type => MediaRecorder.isTypeSupported(type));
+    if (!mimeType) throw new Error("MP4/H.264 recording is not supported by this browser.");
+    recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 8000000, audioBitsPerSecond: 128000 });
+    const chunks = [];
+    const result = new Promise((resolve, reject) => {
+      recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
+      recorder.onerror = () => reject(new Error("The browser stopped while creating the protected rendition."));
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "video/mp4" });
+        if (!blob.size) reject(new Error("The watermark renderer produced an empty file."));
+        else resolve(new File([blob], file.name.replace(/\.[^.]+$/, "") + "-vicehub-watermarked.mp4", { type: "video/mp4" }));
+      };
+    });
+    let lastProgress = -1;
+    const drawFrame = () => {
+      if (video.readyState >= 2) {
+        ctx.drawImage(video, 0, 0, width, height);
+        const pad = Math.max(16, Math.round(width * 0.018));
+        const fontSize = Math.max(18, Math.round(width * 0.027));
+        ctx.save(); ctx.font = "900 " + fontSize + "px Arial, sans-serif";
+        const boxWidth = ctx.measureText("VICEHUB").width + pad * 2;
+        const boxHeight = fontSize + pad * 1.25;
+        const x = width - boxWidth - pad, y = height - boxHeight - pad;
+        ctx.fillStyle = "rgba(8, 9, 16, 0.62)"; ctx.fillRect(x, y, boxWidth, boxHeight);
+        ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,.75)"; ctx.shadowBlur = 5;
+        ctx.textBaseline = "middle"; ctx.fillText("VICEHUB", x + pad, y + boxHeight / 2); ctx.restore();
+      }
+      const progress = Math.min(99, Math.round((video.currentTime / video.duration) * 100));
+      if (progress !== lastProgress) { lastProgress = progress; onProgress?.(progress); }
+      if (!video.ended && !video.error) raf = requestAnimationFrame(drawFrame);
+    };
+    const ended = new Promise(resolve => video.addEventListener("ended", resolve, { once: true }));
+    recorder.start(1000);
+    await video.play();
+    drawFrame();
+    await ended;
+    if (raf) cancelAnimationFrame(raf);
+    drawFrame();
+    await new Promise(resolve => setTimeout(resolve, 180));
+    if (recorder.state !== "inactive") recorder.stop();
+    const output = await result;
+    onProgress?.(100);
+    return output;
+  } catch (error) {
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    throw error;
+  } finally {
+    if (raf) cancelAnimationFrame(raf);
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    for (const track of [...(videoStream?.getTracks() || []), ...(canvasStream?.getTracks() || [])]) track.stop();
+    video.pause(); video.removeAttribute("src"); video.load(); URL.revokeObjectURL(sourceUrl);
+  }
+}
 
 function InternalVideoLibraryPage() {
   const { user } = Route.useRouteContext();
@@ -54,6 +162,13 @@ function InternalVideoLibraryPage() {
   const [preview, setPreview] = useState(null);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [publishAsset, setPublishAsset] = useState(null);
+  const [publishCategory, setPublishCategory] = useState("Other");
+  const [publishLanguage, setPublishLanguage] = useState("en");
+  const [publishCreatorName, setPublishCreatorName] = useState("VICEHUB");
+  const [publishFeatured, setPublishFeatured] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishProgress, setPublishProgress] = useState("");
 
   const refresh = async (reset = true) => {
     setLoading(true);
@@ -142,6 +257,8 @@ function InternalVideoLibraryPage() {
     }
     setBusy(true);
     try {
+      setMessage("Reading video metadata…");
+      const mediaMetadata = await readVideoMetadata(file);
       setMessage("1/3 — Requesting a private upload URL…");
       const signed = await createInternalVideoUploadUrl({
         data: {
@@ -175,6 +292,7 @@ function InternalVideoLibraryPage() {
           originalFilename: file.name,
           mimeType,
           fileSizeBytes: file.size,
+          ...mediaMetadata,
         },
       });
       setMessage("Original stored in the private VICEHUB library. No watermark was applied." + (saved.usageRecorded ? "" : " Storage usage counters need a refresh."));
@@ -193,6 +311,62 @@ function InternalVideoLibraryPage() {
       setMessage("");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openPublish = asset => {
+    const categories = ["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"];
+    setPublishAsset(asset);
+    setPublishCategory(categories.find(value => value.toLowerCase() === String(asset.category || "").toLowerCase()) || "Other");
+    setPublishLanguage(["en", "fr", "es", "pt", "it", "de"].includes(asset.language) ? asset.language : "en");
+    setPublishCreatorName("VICEHUB");
+    setPublishFeatured(false);
+    setPublishProgress("");
+    setError("");
+  };
+
+  const submitPublish = async event => {
+    event.preventDefault();
+    if (!publishAsset) return;
+    setPublishBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      setPublishProgress("1/4 — Retrieving the private source video…");
+      const response = await fetch("/api/internal-video-assets/" + encodeURIComponent(publishAsset.id), { credentials: "same-origin" });
+      if (!response.ok) throw new Error("The private source video could not be retrieved (HTTP " + response.status + ").");
+      const blob = await response.blob();
+      const originalFile = new File([blob], publishAsset.original_filename || (publishAsset.title + ".mp4"), { type: publishAsset.mime_type || blob.type || "video/mp4" });
+      setPublishProgress("2/4 — Creating the permanent VICEHUB watermark in your browser…");
+      const watermarkedFile = await createWatermarkedRendition(originalFile, value => setPublishProgress("2/4 — Watermarking source video: " + value + "%"));
+      setPublishProgress("3/4 — Uploading the protected rendition to private storage…");
+      const signed = await createVideoUploadUrl({ data: {
+        fileName: watermarkedFile.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 170),
+        contentType: "video/mp4",
+        assetVariant: "watermarked",
+        fileSize: watermarkedFile.size,
+      } });
+      const uploaded = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": "video/mp4" }, body: watermarkedFile });
+      if (!uploaded.ok) throw new Error("Private storage rejected the protected rendition (HTTP " + uploaded.status + ").");
+      setPublishProgress("4/4 — Publishing the video to the client catalogue…");
+      const result = await publishInternalAssetToCatalogue({ data: {
+        assetId: publishAsset.id,
+        category: publishCategory,
+        language: publishLanguage,
+        isFeatured: publishFeatured,
+        creatorName: publishCreatorName.trim() || "VICEHUB",
+        watermarkedStorageKey: signed.objectKey,
+        watermarkedStorageConnectionId: signed.storageConnectionId,
+        watermarkedBytes: watermarkedFile.size,
+      } });
+      setMessage(result.message || "Video published to the client catalogue.");
+      setPublishAsset(null);
+      await refresh(true);
+    } catch (err) {
+      setError(err?.message || "The internal asset could not be published.");
+      setPublishProgress("");
+    } finally {
+      setPublishBusy(false);
     }
   };
 
@@ -221,7 +395,7 @@ function InternalVideoLibraryPage() {
         <div className="account-header-actions"><span>Administrator</span><Link to="/admin/videos" className="outline-btn">Public catalogue ↗</Link><Link to="/dashboard" className="outline-btn">My account</Link></div>
       </header>
       <section className="account-content internal-library-content">
-        <div className="ivl-topline"><div><div className="eyebrow">VICEHUB / INTERNAL PRODUCTION</div><h1>VIDEO <em>LIBRARY.</em></h1><p className="account-intro">Private storage for original footage, generated clips and working assets. No public catalogue, subscriptions or watermarking.</p></div><div className="ivl-count"><b>{assets.length}</b><span>ASSETS LOADED</span></div></div>
+        <div className="ivl-topline"><div><div className="eyebrow">VICEHUB / INTERNAL PRODUCTION</div><h1>VIDEO <em>LIBRARY.</em></h1><p className="account-intro">Private storage for original footage, generated clips and working assets. Select an authorised asset to create its protected rendition and publish it to the client catalogue.</p></div><div className="ivl-count"><b>{assets.length}</b><span>ASSETS LOADED</span></div></div>
         <div className="ivl-notice"><b>PROCESSING ENGINE / WORKER BRIDGE</b><span>The queue and secure worker endpoints are installed. Jobs remain queued until the separate FFmpeg / Whisper worker is deployed and its private token is configured. Current enabled tasks: media analysis and transcription. Clip selection and rendering are not yet enabled.</span></div>
         {jobs.length > 0 && <section className="ivl-library-panel ivl-jobs-panel">
           <div className="ivl-section-heading"><div><span className="admin-kicker">WORKER / ASYNC TASKS</span><h2>PROCESSING QUEUE</h2><p>Jobs are private and linked to their original source asset.</p></div><button className="outline-btn" type="button" onClick={() => refresh(true)} disabled={loading}>REFRESH QUEUE ↻</button></div>
@@ -260,12 +434,23 @@ function InternalVideoLibraryPage() {
           {visibleAssets.length ? <div className="ivl-grid">{visibleAssets.map(asset => <article className="ivl-card" key={asset.id}>
             <div className="ivl-card-media"><video src={"/api/internal-video-assets/" + encodeURIComponent(asset.id)} preload="metadata" muted playsInline onClick={() => setPreview(asset)} /><span>{asset.asset_type === "source" ? "SOURCE" : asset.asset_type.toUpperCase()}</span></div>
             <div className="ivl-card-body"><div className="ivl-card-title"><h3>{asset.title}</h3><small>{asset.status.toUpperCase()}</small></div><p>{asset.description || asset.category || "No description added."}</p><div className="ivl-card-meta"><span>{formatBytes(asset.file_size_bytes)}</span><span>{asset.language?.toUpperCase() || "—"}</span><span>{asset.rights_status?.replace("_", " ").toUpperCase()}</span></div>{asset.source_url && <a href={asset.source_url} target="_blank" rel="noreferrer">SOURCE REFERENCE ↗</a>}
-              <div className="ivl-card-actions"><button type="button" className="text-btn" onClick={() => setPreview(asset)}>PREVIEW ▶</button>{["authorised", "not_applicable"].includes(asset.rights_status) && asset.status !== "archived" && <><button type="button" className="text-btn" onClick={() => queueJob(asset, "analyse")}>ANALYSE</button><button type="button" className="text-btn" onClick={() => queueJob(asset, "transcribe")}>TRANSCRIBE</button></>}{asset.status !== "archived" && <button type="button" className="text-btn" onClick={() => archive(asset)}>ARCHIVE</button>}</div>
+              {asset.public_video_status === "published" && <span className="ivl-published-label">PUBLISHED IN CLIENT LIBRARY</span>}
+              <div className="ivl-card-actions"><button type="button" className="text-btn" onClick={() => setPreview(asset)}>PREVIEW ▶</button>{asset.rights_status === "authorised" && asset.rights_evidence_url && asset.status !== "archived" && asset.public_video_status !== "published" && <button type="button" className="text-btn" onClick={() => openPublish(asset)}>PUBLISH TO CLIENT LIBRARY ↗</button>}{["authorised", "not_applicable"].includes(asset.rights_status) && asset.status !== "archived" && <><button type="button" className="text-btn" onClick={() => queueJob(asset, "analyse")}>ANALYSE</button><button type="button" className="text-btn" onClick={() => queueJob(asset, "transcribe")}>TRANSCRIBE</button></>}{asset.status !== "archived" && <button type="button" className="text-btn" onClick={() => archive(asset)}>ARCHIVE</button>}</div>
             </div>
           </article>)}</div> : <div className="ivl-empty">{loading ? "Loading internal assets…" : "No internal video assets yet. Upload a source video or a clip to start building the library."}</div>}
           {hasMore && <div className="ivl-load-more"><button className="outline-btn" type="button" onClick={() => refresh(false)} disabled={loading}>{loading ? "LOADING…" : "LOAD MORE ASSETS"}</button></div>}
         </section>
       </section>
+      {publishAsset && <div className="ivl-preview-backdrop" role="presentation" onClick={e => { if (e.target === e.currentTarget && !publishBusy) setPublishAsset(null); }}><form className="ivl-preview-modal ivl-publish-modal" onSubmit={submitPublish}>
+        <header><div><small>PUBLIC CATALOGUE / RIGHTS CLEARED</small><h2>Publish: {publishAsset.title}</h2></div><button type="button" className="text-btn" disabled={publishBusy} onClick={() => setPublishAsset(null)}>CLOSE ×</button></header>
+        <p>This keeps the original master in private storage, creates a permanent VICEHUB-watermarked MP4, and publishes the video to the client library. The rights evidence already recorded for this asset will be attached to the public video record.</p>
+        <label>Client category<select value={publishCategory} onChange={e => setPublishCategory(e.target.value)}>{["Cinematics", "Gameplay", "Characters", "Vehicles", "Locations", "Missions", "Shorts", "Edit packs", "Tutorials", "Other"].map(value => <option key={value}>{value}</option>)}</select></label>
+        <label>Language<select value={publishLanguage} onChange={e => setPublishLanguage(e.target.value)}>{[["en","English"],["fr","French"],["es","Spanish"],["pt","Portuguese"],["it","Italian"],["de","German"]].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label>Creator name<input value={publishCreatorName} maxLength={80} onChange={e => setPublishCreatorName(e.target.value)} /></label>
+        <label className="ivl-publish-check"><input type="checkbox" checked={publishFeatured} onChange={e => setPublishFeatured(e.target.checked)} /> Feature this video in the client library</label>
+        {publishProgress && <div className="ivl-message" role="status">{publishProgress}</div>}
+        <div className="ivl-form-footer"><p>Publishing is allowed only for assets marked Authorised with a rights-evidence URL. The browser tab must remain open while the watermarked copy is generated.</p><button className="primary-btn" type="submit" disabled={publishBusy}>{publishBusy ? "PUBLISHING…" : "CREATE PROTECTED COPY & PUBLISH ↗"}</button></div>
+      </form></div>}
       {preview && <div className="ivl-preview-backdrop" role="presentation" onClick={e => { if (e.target === e.currentTarget) setPreview(null); }}><section className="ivl-preview-modal" role="dialog" aria-modal="true" aria-label={preview.title}><header><div><small>PRIVATE ASSET PREVIEW</small><h2>{preview.title}</h2></div><button type="button" className="text-btn" onClick={() => setPreview(null)}>CLOSE ×</button></header><video controls playsInline preload="metadata" src={"/api/internal-video-assets/" + encodeURIComponent(preview.id)} /></section></div>}
     </main>
   );
