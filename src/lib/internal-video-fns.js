@@ -574,7 +574,7 @@ export const createVideoStorageSource = createServerFn({ method: "POST" })
       throw Object.assign(new Error("Add the shared folder or storage link."), { status: 400 });
     }
     const parsedFolderId = data.folderId || (data.provider === "google_drive" && data.folderUrl
-      ? data.folderUrl.match(/\\/folders\\/([A-Za-z0-9_-]+)/)?.[1]
+      ? data.folderUrl.match(/\/folders\/([A-Za-z0-9_-]+)/)?.[1]
       : undefined);
     if (data.provider === "google_drive" && !parsedFolderId) {
       throw Object.assign(new Error("The Google Drive folder link is not valid. Copy the folder URL from Drive."), { status: 400 });
