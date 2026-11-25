@@ -33,7 +33,7 @@ export async function getGoogleDriveFileMetadata(base44, fileId) {
     throw Object.assign(new Error("Invalid Google Drive file ID."), { status: 400 });
   }
   const token = await getGoogleDriveAccessToken(base44);
-  const fields = "id,name,mimeType,size,modifiedTime,parents,webViewLink,description,capabilities(canDownload)";
+  const fields = "id,name,mimeType,size,md5Checksum,modifiedTime,parents,webViewLink,description,capabilities(canDownload)";
   const url = DRIVE_API + "/files/" + encodeURIComponent(fileId) + "?" + new URLSearchParams({
     fields,
     supportsAllDrives: "true",
@@ -109,7 +109,7 @@ export async function createGoogleDriveResumableUpload(base44, { fileName, fileS
   if (parentFolderId && /^[A-Za-z0-9_-]{5,256}$/.test(parentFolderId)) {
     metadata.parents = [parentFolderId];
   }
-  const response = await fetch(DRIVE_UPLOAD_API + "/files?uploadType=resumable&supportsAllDrives=true&fields=id,name,mimeType,size,parents,webViewLink", {
+  const response = await fetch(DRIVE_UPLOAD_API + "/files?uploadType=resumable&supportsAllDrives=true&fields=id,name,mimeType,size,md5Checksum,parents,webViewLink", {
     method: "POST",
     headers: {
       Authorization: "Bearer " + token,

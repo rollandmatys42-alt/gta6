@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -72,15 +73,35 @@ def cleanup_stale_workdirs(root: Path, max_age_seconds: int = 3600) -> int:
     removed = 0
     for candidate in root.iterdir():
         try:
-            marker = candidate / ".vicehub-active"
-            if marker.is_file() and marker.stat().st_mtime >= cutoff:
+            if not candidate.is_dir() or not candidate.name.startswith("vicehub-"):
                 continue
-            if candidate.is_dir() and candidate.name.startswith("vicehub-") and candidate.stat().st_mtime < cutoff:
+            marker = candidate / ".vicehub-active"
+            last_activity = marker.stat().st_mtime if marker.is_file() else candidate.stat().st_mtime
+            if last_activity < cutoff:
                 shutil.rmtree(candidate, ignore_errors=True)
                 removed += 1
         except OSError:
             log.warning("Could not inspect stale temporary path %s.", candidate.name)
     return removed
+
+
+async def janitor_loop(root: Path) -> None:
+    while True:
+        try:
+            removed = cleanup_stale_workdirs(root, 3600)
+            if removed:
+                log.info("Removed %s abandoned temporary job directories.", removed)
+        except Exception:
+            log.exception("Temporary-file janitor failed.")
+        await asyncio.sleep(300)
+
+
+def md5_file(path: Path) -> str:
+    digest = hashlib.md5()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def transcribe_media(path: Path, language: str | None) -> tuple[str, str | None]:
@@ -224,6 +245,7 @@ class VideoWorker:
         size = clip_path.stat().st_size
         if size <= 0:
             raise RuntimeError("Cannot upload an empty clip.")
+        local_md5 = await asyncio.to_thread(md5_file, clip_path)
         session = await self.request_json("POST", "/api/internal-video-job-upload", json={
             "jobId": job_id,
             "fileName": file_name,
@@ -279,7 +301,10 @@ class VideoWorker:
                 raise RuntimeError("Google Drive returned an unexpected resumable-upload response.")
         if not result or not result.get("id"):
             raise RuntimeError("Google Drive did not confirm the uploaded clip file ID.")
-        return result
+        remote_md5 = str(result.get("md5Checksum") or "").lower()
+        if remote_md5 and remote_md5 != local_md5:
+            raise RuntimeError("Google Drive checksum does not match the locally rendered clip.")
+        return {**result, "verifiedMd5Checksum": local_md5, "verifiedSizeBytes": size}
 
     async def heartbeat(self, job_id: str) -> None:
         while True:
@@ -361,7 +386,8 @@ class VideoWorker:
                         "stage": "Clip uploaded to Google Drive",
                         "resultSummary": f"FFmpeg clip exported from {start:.2f}s to {end:.2f}s and verified in Google Drive.",
                         "outputDriveFileId": str(drive_file["id"]),
-                        "outputFileSizeBytes": int(drive_file.get("size") or output_path.stat().st_size),
+                        "outputFileSizeBytes": int(drive_file["verifiedSizeBytes"]),
+                        "outputMd5Checksum": drive_file["verifiedMd5Checksum"],
                         "outputDurationSeconds": clip_metadata["durationSeconds"],
                         "outputWidth": clip_metadata["width"],
                         "outputHeight": clip_metadata["height"],
@@ -384,14 +410,8 @@ class VideoWorker:
 
     async def run(self) -> None:
         backoff = self.poll_seconds
-        last_cleanup = 0.0
         while True:
             try:
-                if time.monotonic() - last_cleanup > 300:
-                    removed = cleanup_stale_workdirs(self.temp_root, 3600)
-                    if removed:
-                        log.info("Removed %s abandoned temporary job directories.", removed)
-                    last_cleanup = time.monotonic()
                 job = await self.claim()
                 backoff = self.poll_seconds
                 if not job:
@@ -427,18 +447,24 @@ worker: VideoWorker | None = None
 async def lifespan(app: FastAPI):
     global worker
     enabled = os.getenv("VICEHUB_WORKER_ENABLED", "true").lower() not in {"0", "false", "no"}
-    task = None
+    temp_root = Path(os.getenv("VIDEO_TEMP_DIR", "/tmp/vicehub-video"))
+    removed = cleanup_stale_workdirs(temp_root, 3600)
+    if removed:
+        log.info("Removed %s abandoned temporary job directories at startup.", removed)
+    janitor_task = asyncio.create_task(janitor_loop(temp_root))
+    worker_task = None
     if enabled:
         worker = VideoWorker()
         await worker.start()
-        task = asyncio.create_task(worker.run())
+        worker_task = asyncio.create_task(worker.run())
     yield
-    if task:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    for task in (worker_task, janitor_task):
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
     if worker:
         await worker.close()
     worker = None

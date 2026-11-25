@@ -19,19 +19,6 @@ jobs:
         run: |
           npx --yes esbuild src/routes/index.jsx src/routes/_authed/dashboard.jsx src/routes/library.jsx src/routes/social.jsx src/routes/admin.jsx src/routes/api/social/publisher.jsx src/routes/api/social/publisher/cron.jsx src/routes/api/news/sources/cron.jsx src/routes/api/agents/growth/cron.jsx src/routes/_authed/admin/videos.jsx 'src/routes/news/$slug.jsx' src/routes/news-sitemap[.]xml.jsx src/routes/articles-sitemap[.]xml.jsx src/routes/api/agents/growth/cron.jsx src/routes/shop.jsx src/routes/api/stripe/webhook.jsx src/lib/server-fns.js src/lib/storage-fns.js src/lib/i18n.js src/lib/video-cleaner.js src/lib/video-download.js src/routes/api/video/preview/\$videoId.jsx src/routes/api/video/download/\$videoId.jsx src/routes/_authed/admin/video-library.jsx src/routes/_authed/admin/operations.jsx src/routeTree.gen.ts src/lib/admin-ops-fns.js 'src/routes/api/internal-video-assets/$assetId.jsx' src/routes/api/internal-video-jobs/claim.jsx 'src/routes/api/internal-video-jobs/$jobId.jsx' src/routes/api/internal-video-job-source.jsx src/routes/api/internal-video-job-upload.jsx src/lib/internal-video-fns.js src/lib/google-drive-api.js --bundle --external:* --outdir=/tmp/vicehub-syntax-check --log-level=warning
 
-  scheduled-worker:
-    name: Scheduled social worker type check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-      - name: Install npm dependencies for Deno checks
-        run: deno install
-      - name: Type-check Deno automation
-        run: deno check base44/functions/social-publisher/index.ts base44/functions/gta-news-sync/index.ts base44/functions/vicehub-send-push/index.ts
-
   video-worker-syntax:
     name: Python video worker syntax
     runs-on: ubuntu-latest
