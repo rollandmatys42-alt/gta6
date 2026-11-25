@@ -357,3 +357,4 @@ function AdminVideosPage() {
     </main>
   );
 }
+import "@/styles/vicehub-admin-2026.css";
