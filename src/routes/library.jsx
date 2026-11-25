@@ -116,7 +116,7 @@ function ClientClipLibrary(){
    <div className="vh-card-meta"><span>{clip.category||"VIDEO"}</span><span>{clip.language&&clip.language!=="und"?clip.language.toUpperCase():"MULTI"}</span></div>
    <h3>{clip.title}</h3>
    <p>{clip.description||"A selected clip from the VICEHUB video library."}</p>
-   <div className="vh-card-foot"><span>{clip.download_count_30d>0?clip.download_count_30d+" DOWNLOADS / 30 DAYS":clip.viral_potential_score!=null?"✦ "+clip.viral_potential_score+"/100 VIRAL SCORE":"VICEHUB COLLECTION"}</span><button type="button" onClick={()=>download(clip)} disabled={downloadDisabled()}>{downloading===clip.id?"…":downloadLabel()}</button></div>
+   <div className="vh-card-foot"><span>{clip.download_count_30d>0?clip.download_count_30d+" DOWNLOADS / 30 DAYS":clip.viral_potential_score!=null?"✦ "+clip.viral_potential_score+"/100 VIRAL SCORE":"VICEHUB COLLECTION"}</span><div className="vh-card-actions"><button type="button" className="vh-preview-button" onClick={()=>preview(clip)} aria-label={"Preview "+clip.title}>▶ PREVIEW</button><button type="button" className="vh-download-button" onClick={()=>download(clip)} disabled={downloadDisabled()}>{downloading===clip.id?"…":downloadLabel()}</button></div></div>
   </div>
  </article>;
 
