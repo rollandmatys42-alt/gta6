@@ -35,6 +35,18 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
           });
           return Response.json({ job: null }, { headers: { "cache-control": "no-store" } });
         }
+        let sourceUrl;
+        try {
+          sourceUrl = await createStorageAssetUrl({
+            entities: db,
+            connectionId: asset.storage_connection_id,
+            objectKey: asset.storage_key,
+            expiresIn: 900,
+          });
+        } catch {
+          return Response.json({ error: "The private source URL could not be issued. The job remains queued." }, { status: 503 });
+        }
+        if (!sourceUrl) return Response.json({ error: "The private source URL is unavailable. The job remains queued." }, { status: 503 });
         const now = new Date().toISOString();
         await db.InternalVideoJob.update(job.id, {
           status: "processing",
@@ -46,12 +58,6 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
           lease_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         });
         await db.InternalVideoAsset.update(asset.id, { status: "processing" });
-        const sourceUrl = await createStorageAssetUrl({
-          entities: db,
-          connectionId: asset.storage_connection_id,
-          objectKey: asset.storage_key,
-          expiresIn: 900,
-        });
         return Response.json({
           job: {
             id: job.id,
