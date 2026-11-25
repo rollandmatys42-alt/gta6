@@ -3,27 +3,201 @@ import {createFileRoute,Link} from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import {useAuth} from "@/lib/AuthContext";
 import {listPublicInternalClips,requestInternalClipDownload} from "@/lib/internal-video-fns";
-export const Route=createFileRoute("/library")({ssr:false,head:()=>({meta:[{title:"VICEHUB — Clip Library"},{name:"description",content:"Discover, preview and download curated short-form video clips from the VICEHUB library."}]}),component:ClientClipLibrary});
+import "@/styles/vicehub-library.css";
+
+export const Route=createFileRoute("/library")({
+  ssr:false,
+  head:()=>({meta:[
+    {title:"VICEHUB — Video Library"},
+    {name:"description",content:"Explore, preview and download curated VICEHUB video clips."}
+  ]}),
+  component:ClientClipLibrary
+});
+
 function ClientClipLibrary(){
- const{isAuthenticated}=useAuth();const[clips,setClips]=useState([]);const[nextOffset,setNextOffset]=useState(0);const[hasMore,setHasMore]=useState(false);const[query,setQuery]=useState("");const[category,setCategory]=useState("all");const[language,setLanguage]=useState("all");const[country,setCountry]=useState("all");const[selected,setSelected]=useState(null);const[busy,setBusy]=useState(false);const[downloading,setDownloading]=useState("");const[error,setError]=useState("");
- const refresh=useCallback(async()=>{setBusy(true);setError("");try{const r=await listPublicInternalClips({data:{search:query.trim()||undefined,category:category==="all"?undefined:category,language:language==="all"?undefined:language,country:country==="all"?undefined:country,limit:48,offset:0}});setClips(r.assets||[]);setNextOffset(r.nextOffset||0);setHasMore(!!r.hasMore);}catch(e){setError(e?.message||"The clip library could not be loaded.");}finally{setBusy(false);}},[query,category,language,country]);
- useEffect(()=>{refresh();},[refresh]);
- const categories=useMemo(()=>["Gaming","News","Comedy","Sport","Technology","Interview","Education","Other"],[]);
- const languages=useMemo(()=>[...new Set(clips.map(x=>x.language).filter(x=>x&&x!=="und"))].sort(),[clips]);
- const countries=useMemo(()=>[...new Set(clips.flatMap(x=>x.target_countries||[]))].sort(),[clips]);
- const loadMore=async()=>{if(!hasMore||busy)return;setBusy(true);setError("");try{const r=await listPublicInternalClips({data:{search:query.trim()||undefined,category:category==="all"?undefined:category,language:language==="all"?undefined:language,country:country==="all"?undefined:country,limit:48,offset:nextOffset}});setClips(current=>[...current,...(r.assets||[])]);setNextOffset(r.nextOffset||nextOffset);setHasMore(!!r.hasMore);}catch(e){setError(e?.message||"More clips could not be loaded.");}finally{setBusy(false);}};
- const preview=clip=>{if(!isAuthenticated){setError("Sign in to preview and download clips.");return;}setError("");setSelected(clip);};
- const download=async clip=>{if(!isAuthenticated){setError("Sign in to download clips.");return;}setDownloading(clip.id);setError("");try{const r=await requestInternalClipDownload({data:{assetId:clip.id}});window.location.assign(r.downloadUrl);}catch(e){setError(e?.message||"Download could not be authorised.");}finally{setDownloading("");}};
- return <SiteFrame eyebrow="VICEHUB / CLIP LIBRARY"><main style={{padding:"20px 0 60px",color:"#f4f6fb"}}><header style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",marginBottom:42}}><div><p style={{color:"#a6f36b",fontSize:10,letterSpacing:".2em",fontWeight:900}}>THE VICEHUB CLIP LIBRARY</p><h1 style={{fontSize:"clamp(36px,6vw,64px)",lineHeight:1,margin:"12px 0"}}>Find your next <span style={{color:"#a6f36b"}}>best clip.</span></h1><p style={{maxWidth:680,color:"#9ca8bb",lineHeight:1.7}}>Discover short-form clips, preview them before downloading and filter by subject, language and target market.</p></div><Link to={isAuthenticated?"/dashboard":"/sign-in"} style={{color:"#a6f36b"}}>{isAuthenticated?"My account":"Sign in"} ↗</Link></header>
- <section style={{display:"grid",gridTemplateColumns:"minmax(200px,2fr) repeat(3,minmax(120px,1fr))",gap:10,marginBottom:24}}><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search titles, topics or tags…" style={field}/><select value={category} onChange={e=>setCategory(e.target.value)} style={field}><option value="all">All categories</option>{categories.map(x=><option key={x}>{x}</option>)}</select><select value={language} onChange={e=>setLanguage(e.target.value)} style={field}><option value="all">All languages</option>{languages.map(x=><option key={x}>{x}</option>)}</select><select value={country} onChange={e=>setCountry(e.target.value)} style={field}><option value="all">All markets</option>{countries.map(x=><option key={x}>{x}</option>)}</select></section>
- {error&&<p role="alert" style={{padding:12,borderRadius:9,background:"#3b1920",color:"#ffb4bd"}}>{error}</p>}
- <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,color:"#9ca8bb",fontSize:12}}><span>{clips.length} published clips</span><button onClick={refresh} disabled={busy} style={buttonSecondary}>{busy?"Loading…":"Refresh"}</button></div>
- <p style={{color:"#8998ac",fontSize:11,marginBottom:16}}>AI viral potential is an estimate based on the opening hook, emotion, clarity, shareability and pacing. It is not a view or engagement result. “Best clip” is an AI score of 90/100 or higher.</p><section style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,260px),1fr))",gap:18}}>{clips.map(clip=><article key={clip.id} style={{background:"#111927",border:"1px solid #29364a",borderRadius:15,overflow:"hidden"}}><div style={{aspectRatio:"16/9",background:"#202b3d",position:"relative"}}>{clip.thumbnail_url?<img src={clip.thumbnail_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{height:"100%",display:"grid",placeItems:"center",color:"#a6f36b",fontWeight:900,letterSpacing:".12em"}}>VICEHUB CLIP</div>}<span style={{position:"absolute",right:10,bottom:10,padding:"4px 7px",borderRadius:6,background:"#080b12dd",fontSize:11}}>{Math.floor(clip.duration_seconds/60)}:{String(clip.duration_seconds%60).padStart(2,"0")}</span></div><div style={{padding:16}}><div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:9}}>{[clip.category,clip.language,...(clip.target_countries||[]),...(clip.editorial_tags||[])].filter(Boolean).map(x=><span key={x} style={pill}>{x}</span>)}</div><h2 style={{fontSize:17,margin:"0 0 8px"}}>{clip.title}</h2><p style={{fontSize:12,color:"#9ca8bb",lineHeight:1.6,minHeight:38}}>{clip.description}</p><div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"12px 0"}}>{(clip.tags||[]).slice(0,5).map(x=><span key={x} style={{fontSize:10,color:"#8796ab"}}>#{x}</span>)}</div>{clip.viral_potential_score!==null&&<small style={{color:"#a6f36b"}}>AI viral potential: {clip.viral_potential_score}/100</small>}<div style={{display:"flex",gap:8,marginTop:14}}><button onClick={()=>preview(clip)} style={buttonSecondary}>Preview</button><button onClick={()=>download(clip)} disabled={downloading===clip.id} style={buttonPrimary}>{downloading===clip.id?"Preparing…":"Download"}</button></div></div></article>)}</section>
- {!busy&&!clips.length&&<p style={{textAlign:"center",padding:50,color:"#9ca8bb"}}>No published clips match these filters yet.</p>}{hasMore&&<div style={{textAlign:"center",marginTop:28}}><button onClick={loadMore} disabled={busy} style={buttonSecondary}>{busy?"Loading…":"Load more clips"}</button></div>}
- {selected&&<div role="dialog" aria-modal="true" style={{position:"fixed",inset:0,zIndex:1000,background:"#02050beF",display:"grid",placeItems:"center",padding:18}}><div style={{width:"min(100%,900px)",background:"#111927",border:"1px solid #34445b",borderRadius:16,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:12}}><strong>{selected.title}</strong><button onClick={()=>setSelected(null)} style={buttonSecondary}>Close</button></div><video controls autoPlay playsInline src={"/api/internal-video-preview/"+encodeURIComponent(selected.id)} style={{width:"100%",maxHeight:"70vh",background:"#000",borderRadius:10}}/><p style={{fontSize:12,color:"#9ca8bb"}}>Preview access requires a signed-in account. Downloads remain subject to your subscription allowance. New = published within 7 days; Best clip = AI potential score at least 90/100. Trending requires real post-publication performance data.</p></div></div>}
- </main></SiteFrame>;
+  const{isAuthenticated}=useAuth();
+  const[clips,setClips]=useState([]);
+  const[nextOffset,setNextOffset]=useState(0);
+  const[hasMore,setHasMore]=useState(false);
+  const[query,setQuery]=useState("");
+  const[category,setCategory]=useState("all");
+  const[language,setLanguage]=useState("all");
+  const[country,setCountry]=useState("all");
+  const[sort,setSort]=useState("newest");
+  const[selected,setSelected]=useState(null);
+  const[busy,setBusy]=useState(false);
+  const[downloading,setDownloading]=useState("");
+  const[error,setError]=useState("");
+
+  const requestParams=useMemo(()=>({
+    search:query.trim()||undefined,
+    category:category==="all"?undefined:category,
+    language:language==="all"?undefined:language,
+    country:country==="all"?undefined:country,
+    limit:48
+  }),[query,category,language,country]);
+
+  const refresh=useCallback(async()=>{
+    setBusy(true);setError("");
+    try{
+      const r=await listPublicInternalClips({data:{...requestParams,offset:0}});
+      setClips(r.assets||[]);
+      setNextOffset(r.nextOffset||0);
+      setHasMore(!!r.hasMore);
+    }catch(e){setError(e?.message||"The clip library could not be loaded.");}
+    finally{setBusy(false);}
+  },[requestParams]);
+
+  useEffect(()=>{refresh();},[refresh]);
+
+  const categories=useMemo(()=>["Gaming","News","Comedy","Sport","Technology","Interview","Education","Other"],[]);
+  const languages=useMemo(()=>[...new Set(clips.map(x=>x.language).filter(x=>x&&x!=="und"))].sort(),[clips]);
+  const countries=useMemo(()=>[...new Set(clips.flatMap(x=>x.target_countries||[]))].sort(),[clips]);
+
+  const sortedClips=useMemo(()=>{
+    const copy=[...clips];
+    if(sort==="score")copy.sort((a,b)=>(b.viral_potential_score??-1)-(a.viral_potential_score??-1));
+    else if(sort==="shortest")copy.sort((a,b)=>(a.duration_seconds||0)-(b.duration_seconds||0));
+    else if(sort==="longest")copy.sort((a,b)=>(b.duration_seconds||0)-(a.duration_seconds||0));
+    else copy.sort((a,b)=>new Date(b.created_date||b.created_at||0)-new Date(a.created_date||a.created_at||0));
+    return copy;
+  },[clips,sort]);
+
+  const loadMore=async()=>{
+    if(!hasMore||busy)return;
+    setBusy(true);setError("");
+    try{
+      const r=await listPublicInternalClips({data:{...requestParams,offset:nextOffset}});
+      setClips(current=>[...current,...(r.assets||[])]);
+      setNextOffset(r.nextOffset||nextOffset);
+      setHasMore(!!r.hasMore);
+    }catch(e){setError(e?.message||"More clips could not be loaded.");}
+    finally{setBusy(false);}
+  };
+
+  const preview=clip=>{
+    if(!isAuthenticated){setError("Sign in to preview and download clips.");return;}
+    setError("");setSelected(clip);
+  };
+
+  const download=async clip=>{
+    if(!isAuthenticated){setError("Sign in to download clips.");return;}
+    setDownloading(clip.id);setError("");
+    try{
+      const r=await requestInternalClipDownload({data:{assetId:clip.id}});
+      window.location.assign(r.downloadUrl);
+    }catch(e){setError(e?.message||"Download could not be authorised.");}
+    finally{setDownloading("");}
+  };
+
+  const featured=sortedClips[0];
+  const formatDuration=seconds=>{
+    const value=Math.max(0,Number(seconds)||0);
+    return Math.floor(value/60)+":"+String(value%60).padStart(2,"0");
+  };
+
+  return <SiteFrame eyebrow="VICEHUB / VIDEO LIBRARY">
+    <main className="vh-library">
+      <section className="vh-library-hero">
+        {featured?.thumbnail_url&&<img className="vh-library-hero-image" src={featured.thumbnail_url} alt="" />}
+        <div className="vh-library-hero-shade"/>
+        <div className="vh-library-hero-content">
+          <div className="vh-library-kicker"><span/> THE VICEHUB VIDEO ARCHIVE <span className="vh-library-kicker-line"/></div>
+          <p className="vh-library-overline">CURATED CLIPS. READY FOR YOUR NEXT POST.</p>
+          <h1>FIND THE<br/><em>PERFECT CLIP.</em></h1>
+          <p className="vh-library-hero-copy">Explore a growing collection of short-form video. Find the right moment, preview it, then download it for your next creation.</p>
+          <div className="vh-library-hero-actions">
+            <a href="#clip-catalogue" className="vh-library-primary">EXPLORE THE LIBRARY <span>↘</span></a>
+            <Link to={isAuthenticated?"/dashboard":"/sign-in"} className="vh-library-secondary">{isAuthenticated?"MY ACCOUNT":"SIGN IN"} ↗</Link>
+          </div>
+        </div>
+        <div className="vh-library-hero-stamp"><span>VICE</span><b>HUB</b><small>VIDEO ARCHIVE / 2026</small></div>
+        <div className="vh-library-hero-index">01 <i/> THE CLIP COLLECTION</div>
+      </section>
+
+      <nav className="vh-library-subnav" aria-label="Library sections">
+        <a className="active" href="#clip-catalogue">ALL CLIPS</a>
+        <a href="#clip-catalogue">DISCOVER</a>
+        <a href="#clip-catalogue">TOP RATED</a>
+        <span>VICEHUB ORIGINAL COLLECTION</span>
+      </nav>
+
+      <section className="vh-library-intro" id="clip-catalogue">
+        <div>
+          <p className="vh-library-section-kicker">THE COLLECTION / 001</p>
+          <h2>YOUR NEXT <em>SCENE</em> STARTS HERE.</h2>
+          <p>Search the archive, narrow your selection and preview clips before downloading.</p>
+        </div>
+        <div className="vh-library-count"><b>{clips.length}</b><span>CLIPS<br/>LOADED</span></div>
+      </section>
+
+      <section className="vh-library-toolbar" aria-label="Search and filter clips">
+        <label className="vh-library-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search titles, topics or tags…" aria-label="Search clips"/>{query&&<button type="button" onClick={()=>setQuery("")} aria-label="Clear search">×</button>}</label>
+        <label className="vh-library-filter"><span>CATEGORY</span><select value={category} onChange={e=>setCategory(e.target.value)}><option value="all">All categories</option>{categories.map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+        <label className="vh-library-filter"><span>LANGUAGE</span><select value={language} onChange={e=>setLanguage(e.target.value)}><option value="all">All languages</option>{languages.map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+        <label className="vh-library-filter"><span>MARKET</span><select value={country} onChange={e=>setCountry(e.target.value)}><option value="all">All markets</option>{countries.map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+      </section>
+
+      <div className="vh-library-results-row">
+        <div><span className="vh-library-live-dot"/><b>{sortedClips.length}</b> MATCHING CLIPS <i> / </i> {hasMore?"MORE AVAILABLE":"END OF CURRENT COLLECTION"}</div>
+        <label>SORT BY <select value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Recently added</option><option value="score">AI potential score</option><option value="shortest">Shortest first</option><option value="longest">Longest first</option></select></label>
+        <button type="button" onClick={refresh} disabled={busy} className="vh-library-refresh">{busy?"UPDATING…":"↻ REFRESH"}</button>
+      </div>
+
+      {error&&<div role="alert" className="vh-library-error">{error}{!isAuthenticated&&<Link to="/sign-in"> SIGN IN ↗</Link>}</div>}
+
+      {featured&&<section className="vh-library-featured">
+        <div className="vh-library-featured-image">
+          {featured.thumbnail_url?<img src={featured.thumbnail_url} alt={featured.title}/>:<div className="vh-library-no-art">VICEHUB / FEATURED</div>}
+          <span className="vh-library-featured-label">EDITOR'S PICK / LATEST DROP</span>
+          <span className="vh-library-featured-duration">{formatDuration(featured.duration_seconds)}</span>
+          <button type="button" onClick={()=>preview(featured)} aria-label={"Preview "+featured.title}>▶</button>
+        </div>
+        <div className="vh-library-featured-copy">
+          <p className="vh-library-section-kicker">FEATURED CLIP / 001</p>
+          <h3>{featured.title}</h3>
+          <p>{featured.description||"A selected clip from the VICEHUB video archive."}</p>
+          <div className="vh-library-feature-tags">{[featured.category,featured.language,...(featured.target_countries||[])].filter(Boolean).map((x,i)=><span key={x+i}>{x}</span>)}</div>
+          {featured.viral_potential_score!==null&&featured.viral_potential_score!==undefined&&<div className="vh-library-score"><span>AI VIRAL POTENTIAL</span><b>{featured.viral_potential_score}<small>/100</small></b></div>}
+          <div className="vh-library-feature-actions"><button type="button" onClick={()=>preview(featured)}>▶ PREVIEW CLIP</button><button type="button" onClick={()=>download(featured)} disabled={downloading===featured.id}>{downloading===featured.id?"PREPARING…":"↓ DOWNLOAD"}</button></div>
+        </div>
+      </section>}
+
+      <section className="vh-library-grid" aria-label="Video clips">
+        {sortedClips.map((clip,index)=><article className="vh-library-card" key={clip.id}>
+          <button type="button" className="vh-library-card-art" onClick={()=>preview(clip)} aria-label={"Preview "+clip.title}>
+            {clip.thumbnail_url?<img src={clip.thumbnail_url} alt={clip.title} loading={index>5?"lazy":"eager"}/>:<span className="vh-library-no-art">VICEHUB<br/>CLIP</span>}
+            <span className="vh-library-card-number">{String(index+1).padStart(2,"0")}</span>
+            <span className="vh-library-card-duration">{formatDuration(clip.duration_seconds)}</span>
+            <span className="vh-library-card-play">▶</span>
+            {clip.viral_potential_score>=90&&<span className="vh-library-best">BEST CLIP</span>}
+          </button>
+          <div className="vh-library-card-body">
+            <div className="vh-library-card-meta"><span>{clip.category||"VIDEO"}</span><span>{clip.language&&clip.language!=="und"?clip.language:"MULTI"}</span></div>
+            <h3>{clip.title}</h3>
+            <p>{clip.description||"Selected from the VICEHUB video archive."}</p>
+            <div className="vh-library-card-tags">{(clip.tags||[]).slice(0,3).map(tag=><span key={tag}>#{tag}</span>)}</div>
+            <div className="vh-library-card-footer">
+              {clip.viral_potential_score!==null&&clip.viral_potential_score!==undefined?<span className="vh-library-card-score">✦ {clip.viral_potential_score}/100</span>:<span className="vh-library-card-score">VICEHUB ARCHIVE</span>}
+              <button type="button" onClick={()=>download(clip)} disabled={downloading===clip.id}>{downloading===clip.id?"…":"↓ DOWNLOAD"}</button>
+            </div>
+          </div>
+        </article>)}
+      </section>
+
+      {!busy&&!clips.length&&<div className="vh-library-empty"><span>NO RESULTS / 000</span><h3>NOTHING IN THIS FRAME.</h3><p>No published clips match these filters. Try another category, language or market.</p><button type="button" onClick={()=>{setQuery("");setCategory("all");setLanguage("all");setCountry("all");}}>CLEAR ALL FILTERS</button></div>}
+      {busy&&!clips.length&&<div className="vh-library-loading">LOADING THE ARCHIVE<span>•••</span></div>}
+      {hasMore&&<div className="vh-library-load-more"><button type="button" onClick={loadMore} disabled={busy}>{busy?"LOADING…":"LOAD MORE CLIPS  ↓"}</button></div>}
+
+      <div className="vh-library-footnote"><span>VICEHUB / CONTENT ARCHIVE</span><p>AI viral potential is an editorial estimate based on the opening hook, emotion, clarity, shareability and pacing. It is not a view or engagement result. “Best Clip” means an AI score of 90/100 or higher. Trending is not shown without verified post-publication performance data.</p></div>
+
+      {selected&&<div className="vh-library-modal" role="dialog" aria-modal="true" aria-label={selected.title} onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null);}}>
+        <div className="vh-library-modal-panel">
+          <div className="vh-library-modal-head"><div><span>VICEHUB / SECURE PREVIEW</span><b>{selected.title}</b></div><button type="button" onClick={()=>setSelected(null)} aria-label="Close preview">×</button></div>
+          <video controls autoPlay playsInline src={"/api/internal-video-preview/"+encodeURIComponent(selected.id)}/>
+          <div className="vh-library-modal-foot"><span>Preview access requires a signed-in account.</span><span>Downloads remain subject to your subscription allowance.</span></div>
+        </div>
+      </div>}
+    </main>
+  </SiteFrame>;
 }
-const field={width:"100%",boxSizing:"border-box",padding:12,borderRadius:8,border:"1px solid #35445b",background:"#0a111c",color:"#fff"};
-const pill={display:"inline-block",padding:"4px 7px",borderRadius:99,background:"#202b3d",color:"#bdc9da",fontSize:10};
-const buttonPrimary={flex:1,padding:"10px 12px",border:0,borderRadius:8,background:"#a6f36b",color:"#10150c",fontWeight:900,cursor:"pointer"};
-const buttonSecondary={padding:"10px 12px",border:"1px solid #394960",borderRadius:8,background:"#1a2637",color:"#e4ebf5",cursor:"pointer"};
