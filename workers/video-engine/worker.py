@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -21,6 +22,7 @@ logging.basicConfig(
 log = logging.getLogger("vicehub-video-worker")
 
 MAX_TRANSCRIPT_CHARS = 200_000
+MAX_CLIP_SECONDS = 900
 MODEL = None
 
 
@@ -48,6 +50,39 @@ def probe_media(path: Path) -> dict:
     }
 
 
+def build_clip_command(source: Path, output: Path, start_seconds: float, end_seconds: float) -> list[str]:
+    start = float(start_seconds)
+    end = float(end_seconds)
+    if start < 0 or end <= start or end - start > MAX_CLIP_SECONDS:
+        raise ValueError("Invalid clip range.")
+    duration = end - start
+    return [
+        "ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error",
+        "-ss", f"{start:.3f}", "-i", str(source), "-t", f"{duration:.3f}",
+        "-map", "0:v:0", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k", "-threads", "2",
+        "-movflags", "+faststart", str(output),
+    ]
+
+
+def cleanup_stale_workdirs(root: Path, max_age_seconds: int = 3600) -> int:
+    root.mkdir(parents=True, exist_ok=True)
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    for candidate in root.iterdir():
+        try:
+            marker = candidate / ".vicehub-active"
+            if marker.is_file() and marker.stat().st_mtime >= cutoff:
+                continue
+            if candidate.is_dir() and candidate.name.startswith("vicehub-") and candidate.stat().st_mtime < cutoff:
+                shutil.rmtree(candidate, ignore_errors=True)
+                removed += 1
+        except OSError:
+            log.warning("Could not inspect stale temporary path %s.", candidate.name)
+    return removed
+
+
 def transcribe_media(path: Path, language: str | None) -> tuple[str, str | None]:
     global MODEL
     from faster_whisper import WhisperModel
@@ -57,12 +92,7 @@ def transcribe_media(path: Path, language: str | None) -> tuple[str, str | None]
         device = os.getenv("WHISPER_DEVICE", "cpu")
         compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
         model_dir = os.getenv("WHISPER_MODEL_DIR", "/models")
-        MODEL = WhisperModel(
-            model_size,
-            device=device,
-            compute_type=compute_type,
-            download_root=model_dir,
-        )
+        MODEL = WhisperModel(model_size, device=device, compute_type=compute_type, download_root=model_dir)
 
     selected_language = language if language and language not in {"und", "auto"} else None
     segments, info = MODEL.transcribe(
@@ -99,6 +129,8 @@ class VideoWorker:
         self.temp_root = Path(os.getenv("VIDEO_TEMP_DIR", "/tmp/vicehub-video"))
         self.model_dir = Path(os.getenv("WHISPER_MODEL_DIR", "/models"))
         self.client: httpx.AsyncClient | None = None
+        self.active_workdir: Path | None = None
+        self.current_progress = 1
 
     def validate(self) -> None:
         if not self.base_url.startswith("https://"):
@@ -119,8 +151,11 @@ class VideoWorker:
 
     async def start(self) -> None:
         self.validate()
+        removed = cleanup_stale_workdirs(self.temp_root, 3600)
+        if removed:
+            log.info("Removed %s abandoned temporary job directories.", removed)
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(60, connect=15), follow_redirects=False)
-        log.info("Worker started; one polling loop is active.")
+        log.info("Worker started; one sequential polling loop is active.")
 
     async def close(self) -> None:
         if self.client:
@@ -143,24 +178,35 @@ class VideoWorker:
         payload = await self.request_json("POST", "/api/internal-video-jobs/claim", json={})
         return payload.get("job")
 
-    async def callback(self, job_id: str, payload: dict) -> None:
-        await self.request_json("POST", f"/api/internal-video-jobs/{job_id}", json=payload)
+    async def callback(self, job_id: str, payload: dict) -> dict:
+        return await self.request_json("POST", f"/api/internal-video-jobs/{job_id}", json=payload)
 
     async def progress(self, job_id: str, percent: int, stage: str) -> None:
+        # Progress must be monotonic: heartbeats must never move a job backwards.
+        self.current_progress = max(self.current_progress, max(1, min(99, percent)))
         await self.callback(job_id, {
             "status": "processing",
-            "progressPercent": max(1, min(99, percent)),
+            "progressPercent": self.current_progress,
             "stage": stage,
         })
 
-    async def download_source(self, source_url: str, target: Path) -> None:
+    async def download_source(self, source_url: str, target: Path, worker_auth: bool = False) -> None:
         parsed = urlparse(source_url)
         if parsed.scheme != "https" or not parsed.hostname:
             raise RuntimeError("The worker received an invalid private source URL.")
         if not self.client:
             raise RuntimeError("Worker HTTP client is not running.")
+        headers = None
+        if worker_auth:
+            expected_host = urlparse(self.base_url).hostname
+            if parsed.hostname != expected_host:
+                raise RuntimeError("The authenticated source stream must come from the configured VICEHUB host.")
+            headers = {
+                "x-vicehub-worker-token": self.token,
+                "x-vicehub-worker-id": self.worker_id,
+            }
 
-        async with self.client.stream("GET", source_url, timeout=None) as response:
+        async with self.client.stream("GET", source_url, headers=headers, timeout=None) as response:
             response.raise_for_status()
             content_length = int(response.headers.get("content-length") or 0)
             free = shutil.disk_usage(self.temp_root).free
@@ -172,11 +218,76 @@ class VideoWorker:
                         raise RuntimeError("Temporary disk reserve reached while downloading the source video.")
                     output.write(chunk)
 
+    async def upload_clip_to_drive(self, job_id: str, clip_path: Path, file_name: str) -> dict:
+        if not self.client:
+            raise RuntimeError("Worker HTTP client is not running.")
+        size = clip_path.stat().st_size
+        if size <= 0:
+            raise RuntimeError("Cannot upload an empty clip.")
+        session = await self.request_json("POST", "/api/internal-video-job-upload", json={
+            "jobId": job_id,
+            "fileName": file_name,
+            "fileSizeBytes": size,
+            "mimeType": "video/mp4",
+        })
+        upload_url = str(session.get("uploadUrl") or "")
+        parsed = urlparse(upload_url)
+        if parsed.scheme != "https" or not parsed.hostname or not (
+            parsed.hostname == "www.googleapis.com" or parsed.hostname.endswith(".googleapis.com")
+        ) or not parsed.path.startswith("/upload/drive/v3/files"):
+            raise RuntimeError("The upload endpoint returned an invalid Google Drive session URL.")
+
+        chunk_size = 8 * 1024 * 1024  # multiple of Google's 256 KiB resumable-upload granularity
+        offset = 0
+        stalled = 0
+        result = None
+        with clip_path.open("rb") as handle:
+            while offset < size:
+                handle.seek(offset)
+                chunk = await asyncio.to_thread(handle.read, min(chunk_size, size - offset))
+                if not chunk:
+                    raise RuntimeError("The clip file ended before the declared upload size.")
+                end = offset + len(chunk) - 1
+                response = await self.client.put(
+                    upload_url,
+                    content=chunk,
+                    headers={
+                        "Content-Type": "video/mp4",
+                        "Content-Length": str(len(chunk)),
+                        "Content-Range": f"bytes {offset}-{end}/{size}",
+                    },
+                    timeout=None,
+                )
+                if response.status_code in (200, 201):
+                    result = response.json()
+                    offset = size
+                    break
+                if response.status_code == 308:
+                    accepted = response.headers.get("Range", "")
+                    match = re.search(r"bytes=0-(\d+)", accepted)
+                    next_offset = int(match.group(1)) + 1 if match else 0
+                    if next_offset <= offset:
+                        stalled += 1
+                        if stalled >= 3:
+                            raise RuntimeError("Google Drive did not acknowledge progress on the resumable clip upload.")
+                    else:
+                        stalled = 0
+                        offset = next_offset
+                    await self.progress(job_id, 80 + int((offset / size) * 12), "Uploading clip to Google Drive")
+                    continue
+                response.raise_for_status()
+                raise RuntimeError("Google Drive returned an unexpected resumable-upload response.")
+        if not result or not result.get("id"):
+            raise RuntimeError("Google Drive did not confirm the uploaded clip file ID.")
+        return result
+
     async def heartbeat(self, job_id: str) -> None:
         while True:
             await asyncio.sleep(90)
             try:
-                await self.progress(job_id, 45, "Processing locally; worker heartbeat")
+                if self.active_workdir and self.active_workdir.exists():
+                    (self.active_workdir / ".vicehub-active").touch()
+                await self.progress(job_id, 45, "Worker heartbeat — job is still processing")
             except Exception:
                 log.warning("Heartbeat could not be delivered for job %s.", job_id)
 
@@ -185,16 +296,19 @@ class VideoWorker:
         job_type = job.get("type")
         asset = job.get("asset") or {}
         source_url = job.get("sourceUrl") or ""
-        if not job_id or job_type not in {"analyse", "transcribe"}:
+        if not job_id or job_type not in {"analyse", "transcribe", "cut_clip"}:
             raise RuntimeError("The queue returned an unsupported job payload.")
 
         heartbeat_task = asyncio.create_task(self.heartbeat(job_id))
         try:
             suffix = ".mov" if str(asset.get("mimeType", "")).lower() == "video/quicktime" else ".mp4"
             with tempfile.TemporaryDirectory(prefix="vicehub-", dir=self.temp_root) as work_dir:
+                self.active_workdir = Path(work_dir)
+                (self.active_workdir / ".vicehub-active").touch()
                 source_path = Path(work_dir) / ("source" + suffix)
-                await self.progress(job_id, 5, "Downloading private source to temporary worker storage")
-                await self.download_source(source_url, source_path)
+                self.current_progress = 1
+                await self.progress(job_id, 5, "Downloading source video to temporary worker storage")
+                await self.download_source(source_url, source_path, worker_auth=bool(job.get("sourceRequiresWorkerAuth")))
 
                 await self.progress(job_id, 20, "Reading media streams with FFprobe")
                 metadata = await asyncio.to_thread(probe_media, source_path)
@@ -202,22 +316,56 @@ class VideoWorker:
                 result = {
                     "status": "succeeded",
                     "progressPercent": 100,
-                    "stage": "Media analysis complete" if job_type == "analyse" else "Transcription complete",
+                    "stage": "Media analysis complete" if job_type == "analyse" else "Processing complete",
                     **metadata,
                 }
                 if job_type == "transcribe":
                     await self.progress(job_id, 35, "Loading local faster-whisper model")
                     language = str(asset.get("language") or "und")
                     await self.progress(job_id, 40, "Transcribing audio locally")
-                    transcript, detected_language = await asyncio.to_thread(
-                        transcribe_media,
-                        source_path,
-                        language,
-                    )
+                    transcript, detected_language = await asyncio.to_thread(transcribe_media, source_path, language)
                     result["transcript"] = transcript
                     result["resultSummary"] = (
                         f"Local transcription completed; detected language: {detected_language or 'unknown'}."
                     )
+                    result["stage"] = "Transcription complete"
+                elif job_type == "cut_clip":
+                    start = float(job.get("startSeconds"))
+                    end = float(job.get("endSeconds"))
+                    if end <= start or end - start > MAX_CLIP_SECONDS:
+                        raise RuntimeError("The clip range is invalid or exceeds the worker's 15-minute limit.")
+                    output_path = Path(work_dir) / "vicehub-clip.mp4"
+                    command = build_clip_command(source_path, output_path, start, end)
+                    await self.progress(job_id, 35, "FFmpeg is rendering the selected clip")
+                    timeout_seconds = max(300, min(7200, int((end - start) * 8)))
+                    await asyncio.to_thread(
+                        subprocess.run,
+                        command,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout_seconds,
+                        check=True,
+                    )
+                    if not output_path.is_file() or output_path.stat().st_size <= 0:
+                        raise RuntimeError("FFmpeg produced an empty clip.")
+                    if shutil.disk_usage(self.temp_root).free < self.disk_reserve:
+                        raise RuntimeError("Temporary disk reserve reached after clip rendering.")
+                    clip_metadata = await asyncio.to_thread(probe_media, output_path)
+                    requested_name = str(job.get("outputTitle") or (asset.get("title") or "VICEHUB") + " - clip")
+                    safe_name = re.sub(r"[^a-zA-Z0-9._ -]+", "_", requested_name).strip(" ._")[:150] or "VICEHUB-clip"
+                    if not safe_name.lower().endswith(".mp4"):
+                        safe_name += ".mp4"
+                    await self.progress(job_id, 80, "Uploading the finished MP4 to the selected Google Drive folder")
+                    drive_file = await self.upload_clip_to_drive(job_id, output_path, safe_name)
+                    result.update({
+                        "stage": "Clip uploaded to Google Drive",
+                        "resultSummary": f"FFmpeg clip exported from {start:.2f}s to {end:.2f}s and verified in Google Drive.",
+                        "outputDriveFileId": str(drive_file["id"]),
+                        "outputFileSizeBytes": int(drive_file.get("size") or output_path.stat().st_size),
+                        "outputDurationSeconds": clip_metadata["durationSeconds"],
+                        "outputWidth": clip_metadata["width"],
+                        "outputHeight": clip_metadata["height"],
+                    })
                 else:
                     result["resultSummary"] = (
                         f"Media probe complete: {metadata['durationSeconds']} seconds, "
@@ -231,11 +379,19 @@ class VideoWorker:
                 await heartbeat_task
             except asyncio.CancelledError:
                 pass
+            self.active_workdir = None
+            self.current_progress = 1
 
     async def run(self) -> None:
         backoff = self.poll_seconds
+        last_cleanup = 0.0
         while True:
             try:
+                if time.monotonic() - last_cleanup > 300:
+                    removed = cleanup_stale_workdirs(self.temp_root, 3600)
+                    if removed:
+                        log.info("Removed %s abandoned temporary job directories.", removed)
+                    last_cleanup = time.monotonic()
                 job = await self.claim()
                 backoff = self.poll_seconds
                 if not job:
@@ -244,7 +400,7 @@ class VideoWorker:
                 job_id = str(job.get("id") or "unknown")
                 try:
                     await self.process(job)
-                except Exception as exc:
+                except Exception:
                     log.exception("Video job %s failed.", job_id)
                     try:
                         await self.callback(job_id, {
@@ -288,7 +444,7 @@ async def lifespan(app: FastAPI):
     worker = None
 
 
-app = FastAPI(title="VICEHUB Video Worker", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="VICEHUB Video Worker", version="0.2.0", lifespan=lifespan)
 
 
 @app.get("/healthz")

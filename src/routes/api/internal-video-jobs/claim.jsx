@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { secrets } from "base44:runtime";
 import { createStorageAssetUrl } from "@/lib/storage-fns";
+import { getGoogleDriveAccessToken } from "@/lib/google-drive-api";
 
 function safeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
@@ -35,18 +36,36 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
           });
           return Response.json({ job: null }, { headers: { "cache-control": "no-store" } });
         }
+
         let sourceUrl;
+        let sourceRequiresWorkerAuth = false;
+        const isDriveAsset = asset.storage_provider === "google_drive" || !!asset.google_drive_file_id;
         try {
-          sourceUrl = await createStorageAssetUrl({
-            entities: db,
-            connectionId: asset.storage_connection_id,
-            objectKey: asset.storage_key,
-            expiresIn: 900,
-          });
+          if (isDriveAsset) {
+            if (!asset.google_drive_file_id) throw new Error("Google Drive source ID is missing.");
+            sourceUrl = new URL("/api/internal-video-job-source?jobId=" + encodeURIComponent(job.id), request.url).toString();
+            sourceRequiresWorkerAuth = true;
+            await getGoogleDriveAccessToken(context.getBase44());
+          } else {
+            sourceUrl = await createStorageAssetUrl({
+              entities: db,
+              connectionId: asset.storage_connection_id,
+              objectKey: asset.storage_key,
+              expiresIn: 900,
+            });
+          }
         } catch {
-          return Response.json({ error: "The private source URL could not be issued. The job remains queued." }, { status: 503 });
+          return Response.json({ error: "The private source could not be prepared. The job remains queued." }, { status: 503 });
         }
         if (!sourceUrl) return Response.json({ error: "The private source URL is unavailable. The job remains queued." }, { status: 503 });
+
+        if (job.job_type === "cut_clip") {
+          try {
+            await getGoogleDriveAccessToken(context.getBase44());
+          } catch {
+            return Response.json({ error: "Google Drive is not connected for clip exports. The job remains queued." }, { status: 503 });
+          }
+        }
         const now = new Date().toISOString();
         await db.InternalVideoJob.update(job.id, {
           status: "processing",
@@ -63,6 +82,11 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
             id: job.id,
             type: job.job_type,
             idempotencyKey: job.idempotency_key,
+            startSeconds: job.start_seconds,
+            endSeconds: job.end_seconds,
+            outputTitle: job.output_title,
+            outputDriveParentId: job.output_drive_parent_id || asset.google_drive_parent_id || null,
+            sourceRequiresWorkerAuth,
             asset: {
               id: asset.id,
               title: asset.title,
@@ -70,6 +94,8 @@ export const Route = createFileRoute("/api/internal-video-jobs/claim")({
               mimeType: asset.mime_type,
               sizeBytes: asset.file_size_bytes,
               language: asset.language,
+              storageProvider: isDriveAsset ? "google_drive" : "s3",
+              googleDriveFileId: asset.google_drive_file_id || null,
             },
             sourceUrl,
           },

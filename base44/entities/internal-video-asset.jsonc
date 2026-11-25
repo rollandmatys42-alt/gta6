@@ -12,8 +12,12 @@
     "source_url": { "type": "string", "format": "uri", "maxLength": 1000 },
     "rights_status": { "type": "string", "enum": ["pending", "authorised", "restricted", "not_applicable"], "default": "pending" },
     "rights_evidence_url": { "type": "string", "format": "uri", "maxLength": 1000 },
+    "storage_provider": { "type": "string", "enum": ["s3", "google_drive"], "default": "s3" },
     "storage_key": { "type": "string", "maxLength": 600 },
     "storage_connection_id": { "type": "string", "maxLength": 128 },
+    "google_drive_file_id": { "type": "string", "maxLength": 512 },
+    "google_drive_parent_id": { "type": "string", "maxLength": 512 },
+    "google_drive_web_view_link": { "type": "string", "format": "uri", "maxLength": 1000 },
     "original_filename": { "type": "string", "maxLength": 180 },
     "mime_type": { "type": "string", "maxLength": 100 },
     "file_size_bytes": { "type": "integer", "minimum": 0 },
@@ -28,7 +32,7 @@
     "notes": { "type": "string", "maxLength": 5000 },
     "created_by": { "type": "string", "maxLength": 128 }
   },
-  "required": ["title", "asset_type", "status", "rights_status", "storage_key", "storage_connection_id", "created_by"],
+  "required": ["title", "asset_type", "status", "rights_status", "created_by"],
   "rls": {
     "read": { "user_condition": { "role": "admin" } },
     "create": { "user_condition": { "role": "admin" } },
