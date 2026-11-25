@@ -10,6 +10,8 @@ import {
   enqueueInternalVideoJob,
   listInternalVideoAssets,
   listInternalVideoJobs,
+  listGoogleDriveVideoFiles,
+  importGoogleDriveVideo,
 } from "@/lib/internal-video-fns";
 import { getStorageConnections, createVideoUploadUrl, publishInternalAssetToCatalogue } from "@/lib/server-fns";
 
@@ -169,6 +171,17 @@ function InternalVideoLibraryPage() {
   const [publishFeatured, setPublishFeatured] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishProgress, setPublishProgress] = useState("");
+  const [driveFiles, setDriveFiles] = useState([]);
+  const [driveQuery, setDriveQuery] = useState("");
+  const [driveNextPage, setDriveNextPage] = useState("");
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveRightsStatus, setDriveRightsStatus] = useState("pending");
+  const [driveRightsEvidenceUrl, setDriveRightsEvidenceUrl] = useState("");
+  const [cutAsset, setCutAsset] = useState(null);
+  const [cutStartSeconds, setCutStartSeconds] = useState("0");
+  const [cutEndSeconds, setCutEndSeconds] = useState("15");
+  const [cutTitle, setCutTitle] = useState("");
+  const [cutBusy, setCutBusy] = useState(false);
 
   const refresh = async (reset = true) => {
     setLoading(true);
@@ -225,6 +238,89 @@ function InternalVideoLibraryPage() {
       await refresh(true);
     } catch (err) {
       setError(err?.message || "The processing job could not be queued.");
+    }
+  };
+
+  const searchDrive = async (loadMore = false) => {
+    setDriveLoading(true);
+    setError("");
+    try {
+      const result = await listGoogleDriveVideoFiles({
+        data: {
+          query: driveQuery,
+          ...(loadMore && driveNextPage ? { pageToken: driveNextPage } : {}),
+        },
+      });
+      setDriveFiles(current => loadMore ? [...current, ...result.files] : result.files);
+      setDriveNextPage(result.nextPageToken || "");
+      setMessage("Google Drive returned " + result.files.length + " video file(s) on this page.");
+    } catch (err) {
+      setError(err?.message || "Google Drive videos could not be listed. Check the connected Drive integration.");
+    } finally {
+      setDriveLoading(false);
+    }
+  };
+
+  const importDriveFile = async driveFile => {
+    setError("");
+    setMessage("");
+    try {
+      const result = await importGoogleDriveVideo({
+        data: {
+          fileId: driveFile.id,
+          rightsStatus: driveRightsStatus,
+          ...(driveRightsEvidenceUrl.trim() ? { rightsEvidenceUrl: driveRightsEvidenceUrl.trim() } : {}),
+        },
+      });
+      setMessage(result.alreadyImported
+        ? "This Google Drive video is already in the VICEHUB library."
+        : "Google Drive video imported into the VICEHUB library. The original remains in Drive.");
+      await refresh(true);
+    } catch (err) {
+      setError(err?.message || "The Google Drive video could not be imported.");
+    }
+  };
+
+  const openCut = asset => {
+    setCutAsset(asset);
+    setCutStartSeconds("0");
+    setCutEndSeconds(String(Math.min(30, Number(asset.duration_seconds) || 15)));
+    setCutTitle(asset.title + " - clip");
+    setError("");
+    setMessage("");
+  };
+
+  const submitCut = async event => {
+    event.preventDefault();
+    if (!cutAsset) return;
+    const startSeconds = Number(cutStartSeconds);
+    const endSeconds = Number(cutEndSeconds);
+    if (!Number.isFinite(startSeconds) || !Number.isFinite(endSeconds) || startSeconds < 0 ||
+        endSeconds <= startSeconds || endSeconds > Number(cutAsset.duration_seconds || 0) ||
+        endSeconds - startSeconds > 900) {
+      setError("Choose a valid clip range within the source video. The initial worker limit is 15 minutes per clip.");
+      return;
+    }
+    setCutBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await enqueueInternalVideoJob({
+        data: {
+          assetId: cutAsset.id,
+          jobType: "cut_clip",
+          startSeconds,
+          endSeconds,
+          outputTitle: cutTitle.trim() || (cutAsset.title + " - clip"),
+        },
+      });
+      setCutAsset(null);
+      setMessage(result.message);
+      await refresh(true);
+    } catch (err) {
+      setError(err?.message || "The clip job could not be queued.");
+    } finally {
+      setCutBusy(false);
     }
   };
 
@@ -396,11 +492,27 @@ function InternalVideoLibraryPage() {
       </header>
       <section className="account-content internal-library-content">
         <div className="ivl-topline"><div><div className="eyebrow">VICEHUB / INTERNAL PRODUCTION</div><h1>VIDEO <em>LIBRARY.</em></h1><p className="account-intro">Private storage for original footage, generated clips and working assets. Select an authorised asset to create its protected rendition and publish it to the client catalogue.</p></div><div className="ivl-count"><b>{assets.length}</b><span>ASSETS LOADED</span></div></div>
-        <div className="ivl-notice"><b>PROCESSING ENGINE / WORKER BRIDGE</b><span>The queue and secure worker endpoints are installed. Jobs remain queued until the separate FFmpeg / Whisper worker is deployed and its private token is configured. Current enabled tasks: media analysis and transcription. Clip selection and rendering are not yet enabled.</span></div>
+        <div className="ivl-notice"><b>PROCESSING ENGINE / WORKER BRIDGE</b><span>Google Drive import and the FFmpeg clip-export flow are prepared in the application code. Jobs will remain queued until the VPS worker is deployed and its private token is configured. Original videos stay in Drive; the worker uses temporary disk only and exports completed clips back to Drive.</span></div>
+        <section className="ivl-library-panel">
+          <div className="ivl-section-heading"><div><span className="admin-kicker">INGEST / GOOGLE DRIVE</span><h2>IMPORT FROM GOOGLE DRIVE</h2><p>Search videos in the currently connected Google Drive account. Importing a video adds its reference and metadata to VICEHUB; it does not copy the original onto the VPS.</p></div><button className="outline-btn" type="button" onClick={() => searchDrive(false)} disabled={driveLoading}>{driveLoading ? "SEARCHING…" : "SEARCH DRIVE ↻"}</button></div>
+          <div className="ivl-filters"><input value={driveQuery} onChange={e => setDriveQuery(e.target.value)} placeholder="Search Drive video filenames…" aria-label="Search Google Drive video filenames" onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); searchDrive(false); } }} /></div>
+          <div className="ivl-form-grid">
+            <label>Rights status for imported videos<select value={driveRightsStatus} onChange={e => setDriveRightsStatus(e.target.value)}><option value="pending">Pending verification</option><option value="authorised">Authorised (evidence required)</option><option value="not_applicable">Not applicable</option><option value="restricted">Restricted</option></select></label>
+            <label>Rights evidence URL (required for Authorised)<input type="url" value={driveRightsEvidenceUrl} onChange={e => setDriveRightsEvidenceUrl(e.target.value)} placeholder="https://… written permission or licence" /></label>
+          </div>
+          {driveFiles.length > 0 && <div className="ivl-jobs-list">{driveFiles.map(driveFile => <div className="ivl-job-row" key={driveFile.id}>
+            <div><b>{driveFile.name || "Untitled video"}</b><small>{driveFile.mimeType || "Video"} · {formatBytes(driveFile.size)} · {driveFile.modifiedTime ? new Date(driveFile.modifiedTime).toLocaleDateString() : "Drive"}</small></div>
+            <div className="ivl-job-status"><span>{driveFile.capabilities?.canDownload === false ? "NOT DOWNLOADABLE" : "GOOGLE DRIVE"}</span></div>
+            <button className="text-btn" type="button" disabled={driveLoading || driveFile.capabilities?.canDownload === false} onClick={() => importDriveFile(driveFile)}>IMPORT ↗</button>
+          </div>)}</div>}
+          {!driveFiles.length && <div className="ivl-empty">{driveLoading ? "Searching connected Google Drive…" : "Search Google Drive to list video files available to the connected account."}</div>}
+          {driveNextPage && <div className="ivl-load-more"><button className="outline-btn" type="button" onClick={() => searchDrive(true)} disabled={driveLoading}>{driveLoading ? "LOADING…" : "LOAD MORE DRIVE VIDEOS"}</button></div>}
+          <p className="account-intro">The current Base44 Google Drive connector exposes one app-wide connected account. Separate Google accounts per user are not yet enabled.</p>
+        </section>
         {jobs.length > 0 && <section className="ivl-library-panel ivl-jobs-panel">
           <div className="ivl-section-heading"><div><span className="admin-kicker">WORKER / ASYNC TASKS</span><h2>PROCESSING QUEUE</h2><p>Jobs are private and linked to their original source asset.</p></div><button className="outline-btn" type="button" onClick={() => refresh(true)} disabled={loading}>REFRESH QUEUE ↻</button></div>
           <div className="ivl-jobs-list">{jobs.map(job => <div className="ivl-job-row" key={job.id}>
-            <div><b>{job.job_type === "transcribe" ? "WHISPER TRANSCRIPTION" : "MEDIA ANALYSIS"}</b><small>{job.asset_id} · {job.stage || job.status}</small></div>
+            <div><b>{job.job_type === "transcribe" ? "WHISPER TRANSCRIPTION" : job.job_type === "cut_clip" ? "FFMPEG CLIP EXPORT" : "MEDIA ANALYSIS"}</b><small>{job.asset_id} · {job.stage || job.status}</small></div>
             <div className="ivl-job-status"><span>{job.status.toUpperCase()}</span><small>{Number(job.progress_percent || 0)}%</small></div>
             {job.status === "queued" && <button className="text-btn" type="button" onClick={() => cancelJob(job)}>CANCEL</button>}
             {job.error_message && <small className="ivl-job-error">{job.error_message}</small>}
@@ -435,12 +547,23 @@ function InternalVideoLibraryPage() {
             <div className="ivl-card-media"><video src={"/api/internal-video-assets/" + encodeURIComponent(asset.id)} preload="metadata" muted playsInline onClick={() => setPreview(asset)} /><span>{asset.asset_type === "source" ? "SOURCE" : asset.asset_type.toUpperCase()}</span></div>
             <div className="ivl-card-body"><div className="ivl-card-title"><h3>{asset.title}</h3><small>{asset.status.toUpperCase()}</small></div><p>{asset.description || asset.category || "No description added."}</p><div className="ivl-card-meta"><span>{formatBytes(asset.file_size_bytes)}</span><span>{asset.language?.toUpperCase() || "—"}</span><span>{asset.rights_status?.replace("_", " ").toUpperCase()}</span></div>{asset.source_url && <a href={asset.source_url} target="_blank" rel="noreferrer">SOURCE REFERENCE ↗</a>}
               {asset.public_video_status === "published" && <span className="ivl-published-label">PUBLISHED IN CLIENT LIBRARY</span>}
-              <div className="ivl-card-actions"><button type="button" className="text-btn" onClick={() => setPreview(asset)}>PREVIEW ▶</button>{asset.rights_status === "authorised" && asset.rights_evidence_url && asset.status !== "archived" && asset.public_video_status !== "published" && <button type="button" className="text-btn" onClick={() => openPublish(asset)}>PUBLISH TO CLIENT LIBRARY ↗</button>}{["authorised", "not_applicable"].includes(asset.rights_status) && asset.status !== "archived" && <><button type="button" className="text-btn" onClick={() => queueJob(asset, "analyse")}>ANALYSE</button><button type="button" className="text-btn" onClick={() => queueJob(asset, "transcribe")}>TRANSCRIBE</button></>}{asset.status !== "archived" && <button type="button" className="text-btn" onClick={() => archive(asset)}>ARCHIVE</button>}</div>
+              <div className="ivl-card-actions"><button type="button" className="text-btn" onClick={() => setPreview(asset)}>PREVIEW ▶</button>{asset.rights_status === "authorised" && asset.rights_evidence_url && asset.status !== "archived" && asset.public_video_status !== "published" && <button type="button" className="text-btn" onClick={() => openPublish(asset)}>PUBLISH TO CLIENT LIBRARY ↗</button>}{["authorised", "not_applicable"].includes(asset.rights_status) && asset.status !== "archived" && <><button type="button" className="text-btn" onClick={() => queueJob(asset, "analyse")}>ANALYSE</button><button type="button" className="text-btn" onClick={() => queueJob(asset, "transcribe")}>TRANSCRIBE</button>{Number(asset.duration_seconds) > 0 && <button type="button" className="text-btn" onClick={() => openCut(asset)}>CUT CLIP ✂</button>}</>}{asset.status !== "archived" && <button type="button" className="text-btn" onClick={() => archive(asset)}>ARCHIVE</button>}</div>
             </div>
           </article>)}</div> : <div className="ivl-empty">{loading ? "Loading internal assets…" : "No internal video assets yet. Upload a source video or a clip to start building the library."}</div>}
           {hasMore && <div className="ivl-load-more"><button className="outline-btn" type="button" onClick={() => refresh(false)} disabled={loading}>{loading ? "LOADING…" : "LOAD MORE ASSETS"}</button></div>}
         </section>
       </section>
+      {cutAsset && <div className="ivl-preview-backdrop" role="presentation" onClick={e => { if (e.target === e.currentTarget && !cutBusy) setCutAsset(null); }}><form className="ivl-preview-modal ivl-publish-modal" onSubmit={submitCut}>
+        <header><div><small>FFMPEG / CLIP EXPORT</small><h2>Cut: {cutAsset.title}</h2></div><button type="button" className="text-btn" disabled={cutBusy} onClick={() => setCutAsset(null)}>CLOSE ×</button></header>
+        <p>The original remains in its current storage location. VICEHUB will render the selected range and save the MP4 to the connected Google Drive account, preferably alongside the source video.</p>
+        <label>Clip title<input value={cutTitle} maxLength={180} onChange={e => setCutTitle(e.target.value)} required /></label>
+        <div className="ivl-form-grid">
+          <label>Start time (seconds)<input type="number" min="0" max={Math.max(0, Number(cutAsset.duration_seconds) - 0.01)} step="0.01" value={cutStartSeconds} onChange={e => setCutStartSeconds(e.target.value)} required /></label>
+          <label>End time (seconds)<input type="number" min="0.01" max={Number(cutAsset.duration_seconds)} step="0.01" value={cutEndSeconds} onChange={e => setCutEndSeconds(e.target.value)} required /></label>
+        </div>
+        <p>Source duration: {Number(cutAsset.duration_seconds || 0)} seconds. Maximum clip duration in this first worker version: 900 seconds. Rendering uses H.264/AAC re-encoding for accurate cut points.</p>
+        <div className="ivl-form-footer"><p>The job starts when the VPS worker is online. Completed clips appear as separate assets in the private library.</p><button className="primary-btn" type="submit" disabled={cutBusy}>{cutBusy ? "ADDING JOB…" : "ADD CLIP TO PROCESSING QUEUE ↗"}</button></div>
+      </form></div>}
       {publishAsset && <div className="ivl-preview-backdrop" role="presentation" onClick={e => { if (e.target === e.currentTarget && !publishBusy) setPublishAsset(null); }}><form className="ivl-preview-modal ivl-publish-modal" onSubmit={submitPublish}>
         <header><div><small>PUBLIC CATALOGUE / RIGHTS CLEARED</small><h2>Publish: {publishAsset.title}</h2></div><button type="button" className="text-btn" disabled={publishBusy} onClick={() => setPublishAsset(null)}>CLOSE ×</button></header>
         <p>This keeps the original master in private storage, creates a permanent VICEHUB-watermarked MP4, and publishes the video to the client library. The rights evidence already recorded for this asset will be attached to the public video record.</p>

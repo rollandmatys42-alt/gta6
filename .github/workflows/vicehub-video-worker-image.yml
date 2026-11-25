@@ -18,9 +18,33 @@ permissions:
 
 jobs:
   container-build:
-    name: Build worker container (no publish)
+    name: Build and smoke-test worker container
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker image
         run: docker build --pull -t vicehub-video-worker:ci -f workers/video-engine/Dockerfile workers/video-engine
+      - name: Check Python worker syntax
+        run: docker run --rm --entrypoint python vicehub-video-worker:ci -m py_compile /app/worker.py
+      - name: Check FFmpeg and FFprobe
+        run: |
+          docker run --rm --entrypoint ffmpeg vicehub-video-worker:ci -version
+          docker run --rm --entrypoint ffprobe vicehub-video-worker:ci -version
+      - name: Start worker and render a sample clip
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name vicehub-worker-smoke -p 127.0.0.1:8080:8080 -e VICEHUB_WORKER_ENABLED=false vicehub-video-worker:ci
+          cleanup() { docker rm -f vicehub-worker-smoke >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:8080/healthz
+          docker exec vicehub-worker-smoke ffmpeg -nostdin -y -hide_banner -loglevel error -f lavfi -i testsrc=size=160x90:rate=25 -f lavfi -i sine=frequency=1000:sample_rate=44100 -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac /tmp/vicehub-source.mp4
+          docker exec vicehub-worker-smoke python -c "import subprocess; from worker import build_clip_command; subprocess.run(build_clip_command('/tmp/vicehub-source.mp4', '/tmp/vicehub-clip.mp4', 0.5, 2.5), check=True)"
+          docker exec vicehub-worker-smoke ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 /tmp/vicehub-clip.mp4
+          docker exec vicehub-worker-smoke sh -c 'test -s /tmp/vicehub-clip.mp4'

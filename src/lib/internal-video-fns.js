@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth-middleware";
+import {
+  createGoogleDriveResumableUpload,
+  getGoogleDriveAccessToken,
+  getGoogleDriveFileMetadata,
+  listGoogleDriveVideoFiles as fetchGoogleDriveVideoFiles,
+} from "@/lib/google-drive-api";
 import { issueStorageUploadUrl, listStorageConnections, recordStorageUsage } from "@/lib/storage-fns";
 
 function requireAdmin(context) {
@@ -37,11 +43,73 @@ export const listInternalVideoJobs = createServerFn({ method: "GET" })
     return context.getBase44().asServiceRole.entities.InternalVideoJob.list("-created_date", data.limit, 0);
   });
 
+export const listGoogleDriveVideoFiles = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({
+    query: z.string().trim().max(100).default(""),
+    pageToken: z.string().max(2000).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    const result = await fetchGoogleDriveVideoFiles(context.getBase44(), data);
+    return { ...result, connected: true };
+  });
+
+export const importGoogleDriveVideo = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({
+    fileId: z.string().trim().min(5).max(512),
+    rightsStatus: z.enum(rightsStatuses).default("pending"),
+    rightsEvidenceUrl: z.string().url().max(1000).optional(),
+    category: z.string().trim().max(80).optional(),
+    language: z.string().trim().max(12).default("en"),
+  }))
+  .handler(async ({ data, context }) => {
+    requireAdmin(context);
+    if (data.rightsStatus === "authorised" && !data.rightsEvidenceUrl) {
+      throw Object.assign(new Error("Written rights evidence is required before marking this Drive video authorised."), { status: 400, code: "RIGHTS_EVIDENCE_REQUIRED" });
+    }
+    const db = context.getBase44().asServiceRole.entities;
+    const existing = await db.InternalVideoAsset.filter({ google_drive_file_id: data.fileId }, "-created_date", 1, 0);
+    if (existing.length) return { asset: existing[0], alreadyImported: true };
+    const file = await getGoogleDriveFileMetadata(context.getBase44(), data.fileId);
+    if (!String(file.mimeType || "").startsWith("video/")) {
+      throw Object.assign(new Error("Only video files stored in Google Drive can be imported."), { status: 415, code: "DRIVE_FILE_NOT_VIDEO" });
+    }
+    if (file.capabilities?.canDownload === false) {
+      throw Object.assign(new Error("Google Drive reports that this video cannot be downloaded by the connected account."), { status: 403, code: "DRIVE_DOWNLOAD_NOT_ALLOWED" });
+    }
+    const fileSize = Number(file.size || 0);
+    const asset = await db.InternalVideoAsset.create({
+      title: String(file.name || "Untitled Drive video").slice(0, 180),
+      description: String(file.description || "").slice(0, 5000),
+      asset_type: "source",
+      status: "stored",
+      category: data.category || "",
+      language: data.language || "en",
+      tags: [],
+      rights_status: data.rightsStatus,
+      ...(data.rightsEvidenceUrl ? { rights_evidence_url: data.rightsEvidenceUrl } : {}),
+      storage_provider: "google_drive",
+      google_drive_file_id: file.id,
+      ...(Array.isArray(file.parents) && file.parents[0] ? { google_drive_parent_id: file.parents[0] } : {}),
+      ...(file.webViewLink ? { google_drive_web_view_link: file.webViewLink } : {}),
+      original_filename: String(file.name || "video").slice(0, 180),
+      mime_type: file.mimeType,
+      file_size_bytes: Number.isFinite(fileSize) ? fileSize : 0,
+      created_by: context.user.id,
+    });
+    return { asset, alreadyImported: false };
+  });
+
 export const enqueueInternalVideoJob = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .validator(z.object({
     assetId: z.string().min(1).max(128),
-    jobType: z.enum(["analyse", "transcribe"]),
+    jobType: z.enum(["analyse", "transcribe", "cut_clip"]),
+    startSeconds: z.number().min(0).max(86400).optional(),
+    endSeconds: z.number().min(0).max(86400).optional(),
+    outputTitle: z.string().trim().min(2).max(180).optional(),
   }))
   .handler(async ({ data, context }) => {
     requireAdmin(context);
@@ -50,8 +118,26 @@ export const enqueueInternalVideoJob = createServerFn({ method: "POST" })
     if (!asset || asset.status === "archived") {
       throw Object.assign(new Error("The source asset is unavailable."), { status: 404, code: "SOURCE_ASSET_NOT_FOUND" });
     }
-    if (!["authorised", "not_applicable"].includes(asset.rights_status)) {
+    if (![ "authorised", "not_applicable" ].includes(asset.rights_status)) {
       throw Object.assign(new Error("Processing is blocked until usage rights are verified and recorded for this asset."), { status: 409, code: "VIDEO_RIGHTS_NOT_CLEARED" });
+    }
+    let cutDetails = {};
+    if (data.jobType === "cut_clip") {
+      const start = data.startSeconds;
+      const end = data.endSeconds;
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > 900) {
+        throw Object.assign(new Error("A clip must have a valid start and end time and cannot exceed 15 minutes."), { status: 400, code: "INVALID_CLIP_RANGE" });
+      }
+      if (!Number(asset.duration_seconds) || end > Number(asset.duration_seconds) + 0.05) {
+        throw Object.assign(new Error("Analyse this source video first so VICEHUB knows its duration, then choose a clip range within the source."), { status: 409, code: "SOURCE_DURATION_REQUIRED" });
+      }
+      await getGoogleDriveAccessToken(context.getBase44());
+      cutDetails = {
+        start_seconds: start,
+        end_seconds: end,
+        output_title: data.outputTitle || (asset.title + " - clip"),
+        ...(asset.google_drive_parent_id ? { output_drive_parent_id: asset.google_drive_parent_id } : {}),
+      };
     }
     const active = await db.InternalVideoJob.filter({ asset_id: asset.id, job_type: data.jobType }, "-created_date", 10, 0);
     if (active.some(job => ["queued", "processing"].includes(job.status))) {
@@ -62,12 +148,15 @@ export const enqueueInternalVideoJob = createServerFn({ method: "POST" })
       job_type: data.jobType,
       status: "queued",
       progress_percent: 0,
-      stage: "Waiting for an available VICEHUB worker",
+      stage: data.jobType === "cut_clip" ? "Waiting for the FFmpeg worker" : "Waiting for an available VICEHUB worker",
       attempts: 0,
       idempotency_key: crypto.randomUUID(),
       created_by: context.user.id,
+      ...cutDetails,
     });
-    return { job, workerConfigured: false, message: "Job saved to the queue. It will start when the authenticated VICEHUB worker is connected." };
+    return { job, workerConfigured: false, message: data.jobType === "cut_clip"
+      ? "Clip export added to the queue. It will run when the authenticated video worker is deployed."
+      : "Job saved to the queue. It will start when the authenticated VICEHUB worker is connected." };
   });
 
 export const cancelInternalVideoJob = createServerFn({ method: "POST" })
@@ -158,6 +247,7 @@ export const createInternalVideoAsset = createServerFn({ method: "POST" })
       ...(data.sourceUrl ? { source_url: data.sourceUrl } : {}),
       rights_status: data.rightsStatus,
       ...(data.rightsEvidenceUrl ? { rights_evidence_url: data.rightsEvidenceUrl } : {}),
+      storage_provider: "s3",
       storage_key: data.storageKey,
       storage_connection_id: data.storageConnectionId,
       original_filename: data.originalFilename,
