@@ -15,7 +15,9 @@ export const Route=createFileRoute("/library")({
  component:ClientClipLibrary
 });
 
-const EDITORIAL_IMAGES=["https://www.rockstargames.com/VI/_next/static/media/Vice_City_01.135x56yoeu.6t.jpg?akim=1&imdensity=1&imwidth=3840","https://www.rockstargames.com/VI/_next/static/media/Leonida_Keys_01.0zgz7tveur6y8.jpg?akim=1&imdensity=1&imwidth=3840","https://www.rockstargames.com/VI/_next/static/media/Port_Gellhorn_01.0fmisvza-5-cq.jpg?akim=1&imdensity=1&imwidth=3840"];\n\nfunction ClientClipLibrary(){
+const EDITORIAL_IMAGES=["https://www.rockstargames.com/VI/_next/static/media/Vice_City_01.135x56yoeu.6t.jpg?akim=1&imdensity=1&imwidth=3840","https://www.rockstargames.com/VI/_next/static/media/Leonida_Keys_01.0zgz7tveur6y8.jpg?akim=1&imdensity=1&imwidth=3840","https://www.rockstargames.com/VI/_next/static/media/Port_Gellhorn_01.0fmisvza-5-cq.jpg?akim=1&imdensity=1&imwidth=3840"];
+
+function ClientClipLibrary(){
  const{isAuthenticated}=useAuth();
  const[clips,setClips]=useState([]);
  const[collections,setCollections]=useState({featured:[],favourites:[],mostDownloaded:[],videoOfWeek:null});
