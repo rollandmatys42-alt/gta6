@@ -913,8 +913,41 @@ export const updateShopOrder = createServerFn({method:"POST"}).middleware([requi
   if(["cancelled","refunded","payment_failed"].includes(order.status)&&data.status!==order.status)throw Object.assign(new Error("This order is closed and cannot be reopened."),{status:409,code:"ORDER_CLOSED"});
   const patch={status:data.status,tracking_number:data.trackingNumber||"",admin_note:data.adminNote||"",updated_by:context.user.id};if(data.trackingUrl)patch.tracking_url=data.trackingUrl;return db.update(order.id,patch);
  });
+async function calculateShopCoupon(db, code, currency, subtotal, shipping) {
+ const normalized=String(code||"").trim().toUpperCase();
+ if(!normalized)return {coupon:null,discountCents:0};
+ const matches=await db.ShopCoupon.filter({code:normalized},"-created_date",2,0);
+ const coupon=matches[0],now=Date.now();
+ if(!coupon||!coupon.active)throw Object.assign(new Error("This discount code is invalid or inactive."),{status:400,code:"SHOP_COUPON_INVALID"});
+ if(coupon.starts_at&&new Date(coupon.starts_at).getTime()>now)throw Object.assign(new Error("This discount code is not active yet."),{status:400,code:"SHOP_COUPON_NOT_STARTED"});
+ if(coupon.expires_at&&new Date(coupon.expires_at).getTime()<now)throw Object.assign(new Error("This discount code has expired."),{status:400,code:"SHOP_COUPON_EXPIRED"});
+ if(Number(coupon.max_redemptions||0)>0&&Number(coupon.redemption_count||0)>=Number(coupon.max_redemptions))throw Object.assign(new Error("This discount code has reached its redemption limit."),{status:409,code:"SHOP_COUPON_LIMIT_REACHED"});
+ if(Number(subtotal)<Number(coupon.minimum_spend_cents||0))throw Object.assign(new Error("The basket does not meet this discount code's minimum spend."),{status:400,code:"SHOP_COUPON_MINIMUM_SPEND"});
+ if(coupon.discount_type==="fixed"&&coupon.currency!==currency)throw Object.assign(new Error("This discount code is valid only in "+coupon.currency+"."),{status:400,code:"SHOP_COUPON_CURRENCY"});
+ const basis=Number(subtotal)+Number(shipping);
+ const discountCents=coupon.discount_type==="percent"
+  ? Math.floor(basis*Number(coupon.discount_value)/100)
+  : Math.min(basis,Number(coupon.discount_value));
+ if(!Number.isInteger(discountCents)||discountCents<1)throw Object.assign(new Error("This discount code does not apply to this basket."),{status:400,code:"SHOP_COUPON_NO_DISCOUNT"});
+ return {coupon,discountCents};
+}
+export const previewShopCoupon = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({code:z.string().min(3).max(32),items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10)})).min(1).max(20)}))
+ .handler(async({data,context})=>{
+  const db=context.getBase44().asServiceRole.entities;
+  const products=await Promise.all(data.items.map(x=>db.ShopProduct.get(x.productId).catch(()=>null)));
+  const cart=data.items.map((line,i)=>({line,product:products[i]}));
+  if(cart.some(x=>!x.product||x.product.status!=="published"||!["original","licensed"].includes(x.product.rights_status)))throw Object.assign(new Error("One or more products are no longer available for sale."),{status:409,code:"SHOP_PRODUCT_UNAVAILABLE"});
+  const currencies=[...new Set(cart.map(x=>x.product.currency))];
+  if(currencies.length!==1)throw Object.assign(new Error("Your bag contains different currencies. Checkout one currency at a time."),{status:400,code:"SHOP_MIXED_CURRENCIES"});
+  const subtotal=cart.reduce((sum,x)=>sum+Number(x.product.price_cents)*x.line.quantity,0);
+  const shipping=cart.reduce((sum,x)=>sum+(x.product.product_type==="physical"&&x.product.shipping_required?Number(x.product.shipping_price_cents||0)*x.line.quantity:0),0);
+  const {coupon,discountCents}=await calculateShopCoupon(db,data.code,currencies[0],subtotal,shipping);
+  return {code:coupon.code,discountCents,currency:currencies[0],subtotalCents:subtotal,shippingCents:shipping,totalBeforeTaxCents:Math.max(0,subtotal+shipping-discountCents),discountType:coupon.discount_type,discountValue:coupon.discount_value};
+ });
 export const createShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
  .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10),size:z.string().max(40).optional(),color:z.string().max(40).optional()})).min(1).max(20)}))
+ .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10),size:z.string().max(40).optional(),color:z.string().max(40).optional()})).min(1).max(20),couponCode:z.string().max(32).optional()}))
  .handler(async({data,context})=>{
   const user=context.user,db=context.getBase44().asServiceRole.entities;
   if(!secrets.get("STRIPE_SECRET_KEY"))throw Object.assign(new Error("Online checkout is not active yet. The administrator must connect Stripe before orders can be paid."),{status:503,code:"SHOP_PAYMENTS_NOT_CONFIGURED"});
@@ -937,9 +970,10 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
   const currency=currencies[0],items=cart.map(({line,product})=>({product_id:product.id,title:product.title,sku:product.sku||"",product_type:product.product_type,quantity:line.quantity,size:line.size||"",color:line.color||"",unit_price_cents:Number(product.price_cents),currency,image_url:product.image_url||"",shipping_required:!!product.shipping_required}));
   const subtotal=cart.reduce((sum,x)=>sum+Number(x.product.price_cents)*x.line.quantity,0);
   const shipping=cart.reduce((sum,x)=>sum+(x.product.product_type==="physical"&&x.product.shipping_required?Number(x.product.shipping_price_cents||0)*x.line.quantity:0),0);
-  const total=subtotal+shipping;
+  const {coupon,discountCents}=await calculateShopCoupon(db,data.couponCode,currency,subtotal,shipping);
+  const total=subtotal+shipping-discountCents;
   if(total<1)throw Object.assign(new Error("The order total must be greater than zero."),{status:400});
-  const order=await db.ShopOrder.create({user_id:user.id,customer_email:user.email||"",customer_name:user.full_name||user.name||"",currency,items,subtotal_cents:subtotal,shipping_cents:shipping,tax_cents:0,total_cents:total,status:"pending_payment"});
+  const order=await db.ShopOrder.create({user_id:user.id,customer_email:user.email||"",customer_name:user.full_name||user.name||"",currency,items,subtotal_cents:subtotal,shipping_cents:shipping,coupon_id:coupon?.id||"",coupon_code:coupon?.code||"",coupon_discount_cents:discountCents,tax_cents:0,total_cents:total,status:"pending_payment"});
   try{
    const form=new URLSearchParams();form.set("mode","payment");
    form.set("success_url",STRIPE_SITE_URL+"/shop?session_id={CHECKOUT_SESSION_ID}");
@@ -947,6 +981,14 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
    form.set("client_reference_id",user.id);if(user.email)form.set("customer_email",user.email);
    form.set("metadata[order_id]",order.id);form.set("metadata[user_id]",user.id);
    form.set("payment_intent_data[metadata][order_id]",order.id);form.set("payment_intent_data[metadata][user_id]",user.id);
+   if(coupon){
+    const couponForm=new URLSearchParams();couponForm.set("duration","once");
+    if(coupon.discount_type==="percent")couponForm.set("percent_off",String(coupon.discount_value));
+    else{couponForm.set("amount_off",String(discountCents));couponForm.set("currency",currency.toLowerCase());}
+    const stripeCoupon=await stripeApi("coupons","POST",couponForm);
+    if(!stripeCoupon.id)throw new Error("Stripe did not create the checkout discount.");
+    form.set("discounts[0][coupon]",stripeCoupon.id);
+   }
    form.set("billing_address_collection","required");form.set("phone_number_collection[enabled]","true");form.set("automatic_tax[enabled]","true");
    if(cart.some(x=>x.product.product_type==="physical")){
     ["GB","US","CA","FR","DE","ES","IT","PT","BE","LU","NL","IE"].forEach((country,i)=>form.set("shipping_address_collection[allowed_countries]["+i+"]",country));
@@ -1005,6 +1047,7 @@ export const confirmShopCheckoutSession = createServerFn({method:"POST"}).middle
    customer_name:session.shipping_details?.name||session.customer_details?.name||order.customer_name,
    shipping_address:shipping||{}
   });
+  if(order.coupon_id)await db.ShopCoupon.updateMany({id:order.coupon_id},{$inc:{redemption_count:1}}).catch(()=>null);
   return {success:true,orderId:updated.id,status:updated.status};
  });
 
