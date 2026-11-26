@@ -40,6 +40,8 @@
       "type": "integer",
       "minimum": 0
     },
+    "coupon_code": { "type": "string", "maxLength": 32 },
+    "coupon_discount_cents": { "type": "integer", "minimum": 0, "default": 0 },
     "tax_cents": {
       "type": "integer",
       "minimum": 0
