@@ -137,7 +137,7 @@ class Uploader(tk.Tk):
                         "mime_type": content_type,
                         "sha256": digest,
                         "migration_status": "uploaded",
-                        "rights_status": "authorised",
+                        "rights_status": "pending",
                     })
                     self.ui(self.write_log, f"OK  {path.name}")
                 except Exception as exc:
