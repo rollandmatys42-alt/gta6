@@ -946,7 +946,6 @@ export const previewShopCoupon = createServerFn({method:"POST"}).middleware([req
   return {code:coupon.code,discountCents,currency:currencies[0],subtotalCents:subtotal,shippingCents:shipping,totalBeforeTaxCents:Math.max(0,subtotal+shipping-discountCents),discountType:coupon.discount_type,discountValue:coupon.discount_value};
  });
 export const createShopCheckoutSession = createServerFn({method:"POST"}).middleware([requireUser])
- .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10),size:z.string().max(40).optional(),color:z.string().max(40).optional()})).min(1).max(20)}))
  .validator(z.object({items:z.array(z.object({productId:z.string().min(1),quantity:z.number().int().min(1).max(10),size:z.string().max(40).optional(),color:z.string().max(40).optional()})).min(1).max(20),couponCode:z.string().max(32).optional()}))
  .handler(async({data,context})=>{
   const user=context.user,db=context.getBase44().asServiceRole.entities;
