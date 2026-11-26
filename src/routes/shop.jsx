@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { useAuth } from "@/lib/AuthContext";
 import { getShopProducts, getMyShopOrders, createShopCheckoutSession, confirmShopCheckoutSession } from "@/lib/server-fns";
+import { getShopDigitalDownloadUrl } from "@/lib/digital-shop-fns";
 import "@/styles/shop-commerce.css";
 
 export const Route = createFileRoute("/shop")({
@@ -32,6 +33,7 @@ function ShopPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [downloadingItem, setDownloadingItem] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -109,6 +111,20 @@ function ShopPage() {
   const updateQuantity = (index, delta) => setCart(current => current.map((item, i) => i === index ? { ...item, quantity: Math.max(1, Math.min(10, item.quantity + delta)) } : item));
   const removeItem = index => setCart(current => current.filter((_, i) => i !== index));
 
+  const downloadDigitalItem = async (order, item) => {
+    const key = order.id + ":" + item.product_id;
+    if (downloadingItem) return;
+    setDownloadingItem(key);
+    setMessage("Preparing your secure download…");
+    try {
+      const result = await getShopDigitalDownloadUrl({ data: { orderId: order.id, productId: item.product_id } });
+      const link = document.createElement("a"); link.href = result.url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.download = result.fileName || item.title;
+      document.body.appendChild(link); link.click(); link.remove();
+      setMessage("Your private download link is valid for 2 minutes.");
+    } catch (error) { setMessage(error?.message || "The digital download could not be prepared."); }
+    finally { setDownloadingItem(""); }
+  };
+
   const checkout = async () => {
     if (!cart.length || busy) return;
     if (!isAuthenticated) { navigateToLogin(); return; }
@@ -182,7 +198,7 @@ function ShopPage() {
           <div className="vh-shop-empty-copy"><span>LEONIDA / DROP 001</span><h3>{products.length?"NOTHING AT THIS COORDINATE.":"THE FIRST DROP IS BEING PREPARED."}</h3><p>{products.length?"Try another category or search term.":"Our team is preparing the first VICEHUB collection. Only real products with verified ownership or licensing will appear here."}</p><b>CHECK BACK SOON <i>✳</i></b></div>
         </div>}
 
-      {isAuthenticated&&myOrders.length>0&&<section className="vh-shop-orders"><div className="vh-shop-orders-head"><div><span className="vh-shop-section-label">ACCOUNT / PURCHASE HISTORY</span><h2>MY ORDERS</h2></div><small>{myOrders.length} RECENT ORDERS</small></div>{myOrders.map(order=><article className="vh-shop-order-row" key={order.id}><div><b>ORDER / {order.id.slice(-8).toUpperCase()}</b><small>{(order.items||[]).map(item=>item.quantity+" × "+item.title).join(" · ")}</small></div><span className={"vh-shop-order-status "+order.status}>{order.status.replaceAll("_"," ")}</span><strong>{money(order.total_cents,order.currency)}</strong>{order.tracking_url&&<a href={order.tracking_url} target="_blank" rel="noreferrer">TRACK ↗</a>}</article>)}</section>}
+      {isAuthenticated&&myOrders.length>0&&<section className="vh-shop-orders"><div className="vh-shop-orders-head"><div><span className="vh-shop-section-label">ACCOUNT / PURCHASE HISTORY</span><h2>MY ORDERS</h2></div><small>{myOrders.length} RECENT ORDERS</small></div>{myOrders.map(order=><article className="vh-shop-order-row" key={order.id}><div><b>ORDER / {order.id.slice(-8).toUpperCase()}</b><small>{(order.items||[]).map(item=>item.quantity+" × "+item.title).join(" · ")}</small>{(order.items||[]).filter(item=>item.product_type==="digital").map(item=><button className="vh-shop-download" key={item.product_id} disabled={!!downloadingItem} onClick={()=>downloadDigitalItem(order,item)}>{downloadingItem===order.id+":"+item.product_id?"PREPARING…":"DOWNLOAD "+item.title.toUpperCase()+" ↓"}</button>)}</div><span className={"vh-shop-order-status "+order.status}>{order.status.replaceAll("_"," ")}</span><strong>{money(order.total_cents,order.currency)}</strong>{order.tracking_url&&<a href={order.tracking_url} target="_blank" rel="noreferrer">TRACK ↗</a>}</article>)}</section>}
 
       <section className="vh-shop-trust">
         <div><b>01 / CREATOR-MADE</b><p>Independent goods and original designs from the VICEHUB community.</p></div>

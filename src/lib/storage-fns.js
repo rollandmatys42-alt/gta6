@@ -191,3 +191,16 @@ export async function proxyStorageAsset({entities,connectionId,objectKey,request
   responseHeaders.set("x-content-type-options","nosniff");
   return new Response(upstream.body,{status:upstream.status,headers:responseHeaders});
 }
+
+export async function issueDigitalProductUploadUrl({entities,fileName,contentType,fileSize}) {
+ const extensions={"application/pdf":"pdf","application/zip":"zip","application/x-zip-compressed":"zip","image/png":"png","image/jpeg":"jpg","image/webp":"webp","video/mp4":"mp4","audio/mpeg":"mp3","audio/wav":"wav","text/plain":"txt","text/csv":"csv"};
+ if(!extensions[contentType])throw Object.assign(new Error("Unsupported digital file type."),{status:400,code:"DIGITAL_FILE_TYPE_NOT_ALLOWED"});
+ if(!Number.isInteger(fileSize)||fileSize<1||fileSize>1000000000)throw Object.assign(new Error("Digital files must be between 1 byte and 1 GB."),{status:400,code:"DIGITAL_FILE_SIZE_INVALID"});
+ if(!fileName||fileName.length>180||/[\\/]/.test(fileName))throw Object.assign(new Error("Invalid digital file name."),{status:400,code:"DIGITAL_FILE_NAME_INVALID"});
+ const rows=await allConnectionRows(entities),connections=await Promise.all(rows.map(readConnection));
+ const candidates=connections.filter(x=>x.enabled!==false&&x.verifiedAt).sort((a,b)=>(a.usedBytes||0)-(b.usedBytes||0));
+ const connection=candidates.find(x=>!x.capacityGb||(Number(x.usedBytes||0)+fileSize)<=x.capacityGb*1000000000);
+ if(!connection)throw Object.assign(new Error("No verified private storage connection has enough capacity. Configure and test private storage in VICEHUB administration first."),{status:503,code:"DIGITAL_STORAGE_NOT_READY"});
+ const objectKey="digital-products/"+crypto.randomUUID()+"."+extensions[contentType];
+ return {uploadUrl:await signUrl(connection,"PUT",objectKey,contentType,300),objectKey,storageConnectionId:connection.id,expiresInSeconds:300};
+}
