@@ -829,7 +829,7 @@ export const createMarketplaceInquiry = createServerFn({method:"POST"}).middlewa
 
 export const getShopProducts = createServerFn({method:"GET"}).handler(async({context})=>{
  const rows=await context.getBase44().asServiceRole.entities.ShopProduct.filter({status:"published"},"-created_date",100,0);
- return rows.filter(p=>["original","licensed","official_external"].includes(p.rights_status||"")).sort((a,b)=>Number(!!b.is_featured)-Number(!!a.is_featured)).map(({digital_storage_key,digital_storage_connection_id,digital_file_name,digital_content_type,digital_file_size_bytes,...product})=>product);
+ return rows.filter(p=>["original","licensed","official_external"].includes(p.rights_status||"")).sort((a,b)=>Number(!!b.is_featured)-Number(!!a.is_featured)).map(({digital_storage_key,digital_storage_connection_id,digital_storage_provider,digital_google_drive_file_id,digital_file_name,digital_content_type,digital_file_size_bytes,...product})=>product);
 });
 export const getAdminShopProducts = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
  requireAdmin(context);return context.getBase44().asServiceRole.entities.ShopProduct.list("-created_date",200,0);
@@ -924,7 +924,7 @@ export const createShopCheckoutSession = createServerFn({method:"POST"}).middlew
   const cart=data.items.map((line,i)=>({line,product:products[i]}));
   if(cart.some(x=>!x.product||x.product.status!=="published"||!["original","licensed"].includes(x.product.rights_status)))throw Object.assign(new Error("One or more products are no longer available for sale."),{status:409,code:"SHOP_PRODUCT_UNAVAILABLE"});
   if(cart.some(x=>x.product.product_type==="external"||x.product.vendor_type==="official_external"))throw Object.assign(new Error("Official external products must be purchased from their linked official retailer."),{status:400});
-  if(cart.some(x=>x.product.product_type==="digital"&&(!x.product.digital_storage_key||!x.product.digital_storage_connection_id||!String(x.product.digital_storage_key).startsWith("digital-products/"))))throw Object.assign(new Error("A digital product is not ready for secure delivery. Contact the store administrator before purchasing."),{status:409,code:"SHOP_DIGITAL_DELIVERY_NOT_CONFIGURED"});
+  if(cart.some(x=>x.product.product_type==="digital"&&(!x.product.digital_storage_key||!String(x.product.digital_storage_key).startsWith("digital-products/")||(x.product.digital_storage_provider==="google_drive"?!x.product.digital_google_drive_file_id:(!x.product.digital_storage_connection_id||x.product.digital_storage_connection_id==="google-drive")))))throw Object.assign(new Error("A digital product is not ready for secure delivery. Contact the store administrator before purchasing."),{status:409,code:"SHOP_DIGITAL_DELIVERY_NOT_CONFIGURED"});
   const currencies=[...new Set(cart.map(x=>x.product.currency))];
   if(currencies.length!==1)throw Object.assign(new Error("Your bag contains different currencies. Checkout one currency at a time."),{status:400,code:"SHOP_MIXED_CURRENCIES"});
   for(const {line,product} of cart){
