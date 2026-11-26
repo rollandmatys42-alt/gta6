@@ -1,0 +1,90 @@
+{
+  "name": "ShopInvoice",
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "invoice_number": {
+      "type": "string"
+    },
+    "customer_email": {
+      "type": "string",
+      "format": "email"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "GBP",
+        "EUR",
+        "USD"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "subtotal_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "shipping_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tax_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "order_id",
+    "user_id",
+    "customer_email",
+    "currency",
+    "items",
+    "subtotal_cents",
+    "shipping_cents",
+    "tax_cents",
+    "total_cents",
+    "issued_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
