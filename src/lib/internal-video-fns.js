@@ -93,7 +93,7 @@ export const importGoogleDriveVideo = createServerFn({ method: "POST" })
       title: String(file.name || "Untitled Drive video").slice(0, 180),
       description: String(file.description || "").slice(0, 5000),
       asset_type: "source",
-      status: "stored",
+      status: "ready",
       category: data.category || "",
       language: data.language || "en",
       tags: [],
@@ -248,7 +248,7 @@ export const reviewInternalVideoAsset = createServerFn({ method: "POST" })
     const db = context.getBase44().asServiceRole.entities;
     const asset = await db.InternalVideoAsset.get(data.assetId).catch(() => null);
     if (!asset || asset.status !== "ready") {
-      throw Object.assign(new Error("Only ready-made videos can be reviewed or published."), { status: 409, code: "CLIP_NOT_READY" });
+      throw Object.assign(new Error("Only ready-made videos can be reviewed or published."), { status: 409, code: "VIDEO_NOT_READY" });
     }
     const reviewStatus = data.reviewStatus || asset.review_status || "needs_review";
     const publicVideoStatus = data.publicVideoStatus || asset.public_video_status || "draft";
@@ -278,7 +278,7 @@ export const setInternalClipEditorial = createServerFn({ method: "POST" })
     if (!asset || asset.status !== "ready" ||
         asset.review_status !== "approved" || asset.public_video_status !== "published" ||
         !["authorised", "not_applicable"].includes(asset.rights_status)) {
-      throw Object.assign(new Error("Only approved, rights-cleared and published clips can be placed in editorial collections."), { status: 409, code: "VIDEO_NOT_PUBLISHABLE" });
+      throw Object.assign(new Error("Only approved, rights-cleared and published videos can be placed in editorial collections."), { status: 409, code: "VIDEO_NOT_PUBLISHABLE" });
     }
     const patch = {};
     if (data.isFeatured !== undefined) patch.is_featured = data.isFeatured;
@@ -328,7 +328,7 @@ export const listPublicInternalClips = createServerFn({ method: "GET" })
         const tags = [];
         if (Number.isFinite(published) && published > 0 && now - published <= 7 * 86400000) tags.push("New");
         if (score !== null && score >= 80) tags.push("High viral potential");
-        if (score !== null && score >= 90) tags.push("Best clip · AI score ≥90");
+        if (score !== null && score >= 90) tags.push("Top video · editorial score ≥90");
         return tags;
       })(),
       duration_seconds: Number(asset.duration_seconds || 0),
