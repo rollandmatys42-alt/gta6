@@ -12,6 +12,7 @@ import { Route as AuthedAdminOperationsRouteImport } from "./routes/_authed/admi
 import { Route as AuthedAdminAffiliatesRouteImport } from "./routes/_authed/admin/affiliates";
 import { Route as AboutRouteImport } from "./routes/about";
 import { Route as AdminRouteImport } from "./routes/admin";
+import { Route as AdminShopRouteImport } from "./routes/admin/shop";
 import { Route as AdminDigitalProductsRouteImport } from "./routes/admin-digital-products";
 import { Route as AdminImportRouteImport } from "./routes/admin.import";
 import { Route as LegacyAdminRouteImport } from "./routes/admin.legacy";
@@ -50,6 +51,7 @@ const AuthedAdminOperationsRoute = AuthedAdminOperationsRouteImport.update({ id:
 const AuthedAdminAffiliatesRoute = AuthedAdminAffiliatesRouteImport.update({ id: "/admin/affiliates", path: "/admin/affiliates", getParentRoute: () => AuthedRoute });
 const AboutRoute = AboutRouteImport.update({ id: "/about", path: "/about", getParentRoute: () => rootRouteImport });
 const AdminRoute = AdminRouteImport.update({ id: "/admin", path: "/admin", getParentRoute: () => rootRouteImport });
+const AdminShopRoute = AdminShopRouteImport.update({ id: "/admin/shop", path: "/admin/shop", getParentRoute: () => rootRouteImport });
 const AdminDigitalProductsRoute = AdminDigitalProductsRouteImport.update({ id: "/admin-digital-products", path: "/admin-digital-products", getParentRoute: () => rootRouteImport });
 const AdminImportRoute = AdminImportRouteImport.update({ id: "/admin/import", path: "/admin/import", getParentRoute: () => rootRouteImport });
 const LegacyAdminRoute = LegacyAdminRouteImport.update({ id: "/admin/legacy", path: "/admin/legacy", getParentRoute: () => rootRouteImport });
@@ -92,6 +94,7 @@ const rootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   AboutRoute,
   AdminRoute,
+  AdminShopRoute,
   AdminDigitalProductsRoute,
   AdminImportRoute,
   AdminVideoLibraryRoute,
