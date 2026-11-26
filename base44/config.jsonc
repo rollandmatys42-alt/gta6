@@ -1,5 +1,5 @@
 {
-  "name": "GTA6 Creator Hub",
+  "name": "VICEHUB",
   "site": {
     "installCommand": "npm install",
     "buildCommand": "npm run build",

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import SiteFrame from "@/components/SiteFrame";
 import { useAuth } from "@/lib/AuthContext";
-import { getShopProducts, getMyShopOrders, createShopCheckoutSession, confirmShopCheckoutSession } from "@/lib/server-fns";
+import { getShopProducts, getMyShopOrders, createShopCheckoutSession, confirmShopCheckoutSession, previewShopCoupon } from "@/lib/server-fns";
 import { getShopDigitalDownloadUrl } from "@/lib/digital-shop-fns";
 import "@/styles/shop-commerce.css";
 
@@ -34,6 +34,9 @@ function ShopPage() {
   const [busy, setBusy] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [downloadingItem, setDownloadingItem] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponBusy, setCouponBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -86,7 +89,8 @@ function ShopPage() {
   const cartCurrency = cart[0]?.product.currency || "GBP";
   const subtotal = cart.reduce((sum, item) => sum + Number(item.product.price_cents || 0) * item.quantity, 0);
   const shipping = cart.reduce((sum, item) => sum + (item.product.product_type === "physical" && item.product.shipping_required ? Number(item.product.shipping_price_cents || 0) * item.quantity : 0), 0);
-  const total = subtotal + shipping;
+  const couponDiscount = Number(appliedCoupon?.discountCents || 0);
+  const total = Math.max(0, subtotal + shipping - couponDiscount);
 
   const addToCart = (product, size = "", color = "") => {
     if (product.product_type === "external") {
@@ -97,6 +101,7 @@ function ShopPage() {
       setMessage("Your bag already contains " + cart[0].product.currency + " products. Complete or clear that bag before adding a different currency.");
       return;
     }
+    setAppliedCoupon(null);
     setCart(current => {
       const key = item => item.product.id === product.id && item.size === size && item.color === color;
       const existing = current.find(key);
@@ -108,8 +113,20 @@ function ShopPage() {
     setMessage("");
   };
 
-  const updateQuantity = (index, delta) => setCart(current => current.map((item, i) => i === index ? { ...item, quantity: Math.max(1, Math.min(10, item.quantity + delta)) } : item));
-  const removeItem = index => setCart(current => current.filter((_, i) => i !== index));
+  const updateQuantity = (index, delta) => { setAppliedCoupon(null); setCart(current => current.map((item, i) => i === index ? { ...item, quantity: Math.max(1, Math.min(10, item.quantity + delta)) } : item)); };
+  const removeItem = index => { setAppliedCoupon(null); setCart(current => current.filter((_, i) => i !== index)); };
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim() || couponBusy) return;
+    if (!isAuthenticated) { navigateToLogin(); return; }
+    setCouponBusy(true); setMessage("");
+    try {
+      const result = await previewShopCoupon({ data: { code: couponCode.trim(), items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity })) } });
+      setAppliedCoupon(result); setCouponCode(result.code);
+      setMessage("Discount code applied. The final amount and tax are confirmed by the payment provider.");
+    } catch (error) { setAppliedCoupon(null); setMessage(error?.message || "This discount code could not be applied."); }
+    finally { setCouponBusy(false); }
+  };
 
   const downloadDigitalItem = async (order, item) => {
     const key = order.id + ":" + item.product_id;
@@ -131,7 +148,7 @@ function ShopPage() {
     setBusy(true);
     setMessage("Preparing your secure checkout…");
     try {
-      const result = await createShopCheckoutSession({ data: { items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity, size: item.size, color: item.color })) } });
+      const result = await createShopCheckoutSession({ data: { items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity, size: item.size, color: item.color })), couponCode: appliedCoupon?.code || undefined } });
       window.location.assign(result.url);
     } catch (error) {
       setMessage(error?.message || "Checkout could not be started.");
@@ -229,7 +246,7 @@ function ShopPage() {
             <div className="vh-shop-cart-thumb">{item.product.image_url?<img src={item.product.image_url} alt=""/>:<b>LH</b>}</div>
             <div className="vh-shop-cart-item-copy"><b>{item.product.title}</b><small>{[item.size,item.color].filter(Boolean).join(" · ")||item.product.sku}</small><strong>{money(item.product.price_cents,item.product.currency)}</strong><div className="vh-shop-quantity"><button onClick={()=>updateQuantity(index,-1)} aria-label="Decrease quantity">−</button><span>{item.quantity}</span><button onClick={()=>updateQuantity(index,1)} aria-label="Increase quantity">+</button><button className="remove" onClick={()=>removeItem(index)}>REMOVE</button></div></div>
           </div>)}</div>
-          {!!cart.length&&<div className="vh-shop-cart-footer"><div><span>SUBTOTAL</span><b>{money(subtotal,cartCurrency)}</b></div>{shipping>0&&<div><span>ESTIMATED SHIPPING</span><b>{money(shipping,cartCurrency)}</b></div>}<div className="total"><span>TOTAL BEFORE ANY APPLICABLE TAX</span><b>{money(total,cartCurrency)}</b></div><p>Final delivery details and any applicable taxes are shown in the secure payment flow.</p><button className="vh-shop-checkout" disabled={busy} onClick={checkout}>{busy?"PLEASE WAIT…":"SECURE CHECKOUT ↗"}</button><button className="vh-shop-clear" onClick={()=>setCart([])}>CLEAR BAG</button></div>}
+          {!!cart.length&&<div className="vh-shop-cart-footer"><div className="vh-shop-coupon"><label htmlFor="vh-shop-coupon-code">DISCOUNT CODE</label><div><input id="vh-shop-coupon-code" value={couponCode} onChange={e=>{setCouponCode(e.target.value.toUpperCase());setAppliedCoupon(null);}} placeholder="Enter code" maxLength={32}/><button type="button" disabled={couponBusy||!couponCode.trim()||!cart.length} onClick={applyCoupon}>{couponBusy?"CHECKING…":"APPLY"}</button></div>{appliedCoupon&&<p>Applied: <b>{appliedCoupon.code}</b> · <button type="button" onClick={()=>{setAppliedCoupon(null);setCouponCode("");}}>REMOVE</button></p>}</div><div><span>SUBTOTAL</span><b>{money(subtotal,cartCurrency)}</b></div>{shipping>0&&<div><span>ESTIMATED SHIPPING</span><b>{money(shipping,cartCurrency)}</b></div>}{appliedCoupon&&<div><span>DISCOUNT · {appliedCoupon.code}</span><b>−{money(couponDiscount,cartCurrency)}</b></div>}<div className="total"><span>TOTAL BEFORE ANY APPLICABLE TAX</span><b>{money(total,cartCurrency)}</b></div><p>Final delivery details and any applicable taxes are shown in the secure payment flow.</p><button className="vh-shop-checkout" disabled={busy} onClick={checkout}>{busy?"PLEASE WAIT…":"SECURE CHECKOUT ↗"}</button><button className="vh-shop-clear" onClick={()=>{setCart([]);setAppliedCoupon(null);setCouponCode("");}}>CLEAR BAG</button></div>}
         </aside>
       </div>}
     </main>

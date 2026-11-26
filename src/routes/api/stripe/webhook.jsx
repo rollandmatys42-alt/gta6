@@ -272,6 +272,7 @@ export const Route = createFileRoute("/api/stripe/webhook")({
                 customer_name: object.shipping_details?.name || object.customer_details?.name || order.customer_name,
                 shipping_address: address,
               });
+              if(order.coupon_id)await db.ShopCoupon.updateMany({id:order.coupon_id},{$inc:{redemption_count:1}}).catch(()=>null);
               }
             }
           } else if (event.type === "checkout.session.expired" && object.mode === "payment") {
