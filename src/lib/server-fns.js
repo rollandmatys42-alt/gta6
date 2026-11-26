@@ -2232,3 +2232,74 @@ export const setCommunityReviewStatus = createServerFn({method:"POST"}).middlewa
   requireAdmin(context);
   return context.getBase44().asServiceRole.entities.CommunityReview.update(data.reviewId,{status:data.status,moderated_by:context.user.id,moderated_at:new Date().toISOString()});
  });
+
+
+// VICEHUB shop operations: coupons, returns, invoices and reporting.
+const SHOP_PAID_STATES = ["paid","paid_stock_issue","processing","shipped","delivered"];
+export const getAdminShopOperations = createServerFn({method:"GET"}).middleware([requireUser]).handler(async({context})=>{
+ requireAdmin(context);
+ const db=context.getBase44().asServiceRole.entities;
+ const [coupons,returns,invoices,orders,products]=await Promise.all([
+  db.ShopCoupon.list("-created_date",200,0),
+  db.ShopReturnRequest.list("-created_date",200,0),
+  db.ShopInvoice.list("-created_date",200,0),
+  db.ShopOrder.list("-created_date",500,0),
+  db.ShopProduct.list("-created_date",300,0)
+ ]);
+ return {coupons,returns,invoices,orders,products};
+});
+export const saveAdminShopCoupon = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({
+  id:z.string().optional(),code:z.string().min(3).max(32).regex(/^[A-Za-z0-9_-]+$/),
+  discountType:z.enum(["percent","fixed"]),discountValue:z.number().int().min(1).max(1000000),
+  currency:z.enum(["GBP","EUR","USD"]).optional(),minimumSpendCents:z.number().int().min(0).default(0),
+  maxRedemptions:z.number().int().min(1).max(1000000).optional(),
+  startsAt:z.string().optional(),expiresAt:z.string().optional(),active:z.boolean()
+ }))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  if(data.discountType==="percent"&&data.discountValue>100)throw Object.assign(new Error("Percentage discounts cannot exceed 100%."),{status:400});
+  if(data.startsAt&&data.expiresAt&&new Date(data.expiresAt)<=new Date(data.startsAt))throw Object.assign(new Error("Expiry must be after the start date."),{status:400});
+  const db=context.getBase44().asServiceRole.entities.ShopCoupon;
+  const code=data.code.trim().toUpperCase();
+  const matches=await db.filter({code},"-created_date",5,0);
+  if(matches.some(x=>x.id!==data.id))throw Object.assign(new Error("This coupon code already exists."),{status:409,code:"COUPON_CODE_EXISTS"});
+  const payload={code,discount_type:data.discountType,discount_value:data.discountValue,currency:data.currency||"",minimum_spend_cents:data.minimumSpendCents||0,max_redemptions:data.maxRedemptions||0,starts_at:data.startsAt||"",expires_at:data.expiresAt||"",active:data.active};
+  return data.id?db.update(data.id,payload):db.create({...payload,redemption_count:0});
+ });
+export const updateAdminShopReturn = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({id:z.string().min(1),status:z.enum(["requested","approved","rejected","received","refunded","closed"]),adminNote:z.string().max(1000).optional()}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const db=context.getBase44().asServiceRole.entities.ShopReturnRequest;
+  const row=await db.get(data.id).catch(()=>null);
+  if(!row)throw Object.assign(new Error("Return request not found."),{status:404});
+  const allowed={requested:["approved","rejected","closed"],approved:["received","rejected","closed"],received:["refunded","closed"],rejected:["closed"],refunded:["closed"],closed:[]};
+  if(row.status!==data.status&&!(allowed[row.status]||[]).includes(data.status))throw Object.assign(new Error("This return status transition is not allowed."),{status:409});
+  return db.update(row.id,{status:data.status,admin_note:data.adminNote||"",reviewed_by:context.user.id,reviewed_at:new Date().toISOString()});
+ });
+export const createAdminShopReturn = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({orderId:z.string().min(1),customerEmail:z.string().email(),reason:z.string().min(3).max(1000),items:z.array(z.object({productId:z.string(),title:z.string(),quantity:z.number().int().min(1)})).min(1).max(30)}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const db=context.getBase44().asServiceRole.entities;
+  const order=await db.ShopOrder.get(data.orderId).catch(()=>null);
+  if(!order||!SHOP_PAID_STATES.includes(order.status))throw Object.assign(new Error("A return can only be opened against a verified paid order."),{status:409});
+  if(order.customer_email.toLowerCase()!==data.customerEmail.toLowerCase())throw Object.assign(new Error("Customer email does not match the order."),{status:400});
+  for(const item of data.items){const line=(order.items||[]).find(x=>x.product_id===item.productId);if(!line||item.quantity>line.quantity)throw Object.assign(new Error("Return quantity exceeds the purchased quantity."),{status:400});}
+  return db.ShopReturnRequest.create({order_id:order.id,user_id:order.user_id,customer_email:order.customer_email,customer_name:order.customer_name||"",reason:data.reason,items:data.items,status:"requested",currency:order.currency,requested_at:new Date().toISOString()});
+ });
+export const createAdminShopInvoice = createServerFn({method:"POST"}).middleware([requireUser])
+ .validator(z.object({orderId:z.string().min(1)}))
+ .handler(async({data,context})=>{
+  requireAdmin(context);
+  const db=context.getBase44().asServiceRole.entities;
+  const order=await db.ShopOrder.get(data.orderId).catch(()=>null);
+  if(!order||!SHOP_PAID_STATES.includes(order.status))throw Object.assign(new Error("An invoice can only be issued for a verified paid order."),{status:409});
+  const existing=await db.ShopInvoice.filter({order_id:order.id},"-created_date",1,0);
+  if(existing[0])return existing[0];
+  const issuedAt=new Date().toISOString();
+  const invoice=await db.ShopInvoice.create({order_id:order.id,user_id:order.user_id,customer_email:order.customer_email,customer_name:order.customer_name||"",currency:order.currency,items:order.items||[],subtotal_cents:Number(order.subtotal_cents||0),shipping_cents:Number(order.shipping_cents||0),tax_cents:Number(order.tax_cents||0),total_cents:Number(order.total_cents||0),issued_at:issuedAt,invoice_number:""});
+  const number="VH-"+new Date(issuedAt).toISOString().slice(0,10).replaceAll("-","")+"-"+String(invoice.id).slice(-6).toUpperCase();
+  return db.ShopInvoice.update(invoice.id,{invoice_number:number});
+ });
