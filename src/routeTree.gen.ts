@@ -12,6 +12,7 @@ import { Route as AuthedAdminOperationsRouteImport } from "./routes/_authed/admi
 import { Route as AuthedAdminAffiliatesRouteImport } from "./routes/_authed/admin/affiliates";
 import { Route as AboutRouteImport } from "./routes/about";
 import { Route as AdminRouteImport } from "./routes/admin";
+import { Route as AdminDigitalProductsRouteImport } from "./routes/admin-digital-products";
 import { Route as AdminImportRouteImport } from "./routes/admin.import";
 import { Route as LegacyAdminRouteImport } from "./routes/admin.legacy";
 import { Route as CommunityRouteImport } from "./routes/community";
@@ -27,6 +28,7 @@ import { Route as NewsSitemapRouteImport } from "./routes/news-sitemap[.]xml";
 import { Route as GrowthCronRouteImport } from "./routes/api/agents/growth/cron";
 import { Route as InternalVideoPreviewRouteImport } from "./routes/api/internal-video-preview/$assetId";
 import { Route as InternalVideoDownloadRouteImport } from "./routes/api/internal-video-download/$assetId";
+import { Route as ShopDigitalDownloadRouteImport } from "./routes/api/shop/digital-download/$productId";
 import { Route as NotificationsRouteImport } from "./routes/notifications";
 import { Route as PrivacyRouteImport } from "./routes/privacy";
 import { Route as RefundsRouteImport } from "./routes/refunds";
@@ -48,6 +50,7 @@ const AuthedAdminOperationsRoute = AuthedAdminOperationsRouteImport.update({ id:
 const AuthedAdminAffiliatesRoute = AuthedAdminAffiliatesRouteImport.update({ id: "/admin/affiliates", path: "/admin/affiliates", getParentRoute: () => AuthedRoute });
 const AboutRoute = AboutRouteImport.update({ id: "/about", path: "/about", getParentRoute: () => rootRouteImport });
 const AdminRoute = AdminRouteImport.update({ id: "/admin", path: "/admin", getParentRoute: () => rootRouteImport });
+const AdminDigitalProductsRoute = AdminDigitalProductsRouteImport.update({ id: "/admin-digital-products", path: "/admin-digital-products", getParentRoute: () => rootRouteImport });
 const AdminImportRoute = AdminImportRouteImport.update({ id: "/admin/import", path: "/admin/import", getParentRoute: () => rootRouteImport });
 const LegacyAdminRoute = LegacyAdminRouteImport.update({ id: "/admin/legacy", path: "/admin/legacy", getParentRoute: () => rootRouteImport });
 const CommunityRoute = CommunityRouteImport.update({ id: "/community", path: "/community", getParentRoute: () => rootRouteImport });
@@ -63,6 +66,7 @@ const NewsSitemapRoute = NewsSitemapRouteImport.update({ id: "/news-sitemap.xml"
 const GrowthCronRoute = GrowthCronRouteImport.update({ id: "/api/agents/growth/cron", path: "/api/agents/growth/cron", getParentRoute: () => rootRouteImport });
 const InternalVideoPreviewRoute = InternalVideoPreviewRouteImport.update({ id: "/api/internal-video-preview/$assetId", path: "/api/internal-video-preview/$assetId", getParentRoute: () => rootRouteImport });
 const InternalVideoDownloadRoute = InternalVideoDownloadRouteImport.update({ id: "/api/internal-video-download/$assetId", path: "/api/internal-video-download/$assetId", getParentRoute: () => rootRouteImport });
+const ShopDigitalDownloadRoute = ShopDigitalDownloadRouteImport.update({ id: "/api/shop/digital-download/$productId", path: "/api/shop/digital-download/$productId", getParentRoute: () => rootRouteImport });
 const NotificationsRoute = NotificationsRouteImport.update({ id: "/notifications", path: "/notifications", getParentRoute: () => rootRouteImport });
 const PrivacyRoute = PrivacyRouteImport.update({ id: "/privacy", path: "/privacy", getParentRoute: () => rootRouteImport });
 const RefundsRoute = RefundsRouteImport.update({ id: "/refunds", path: "/refunds", getParentRoute: () => rootRouteImport });
@@ -88,6 +92,7 @@ const rootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   AboutRoute,
   AdminRoute,
+  AdminDigitalProductsRoute,
   AdminImportRoute,
   AdminVideoLibraryRoute,
   LegacyAdminRoute,
@@ -103,6 +108,7 @@ const rootRouteChildren = {
   GrowthCronRoute,
   InternalVideoPreviewRoute,
   InternalVideoDownloadRoute,
+  ShopDigitalDownloadRoute,
   NotificationsRoute,
   PrivacyRoute,
   RefundsRoute,
