@@ -17,7 +17,7 @@ export const Route=createFileRoute("/api/shop/digital-download/$productId")({
   try{
    const response=await streamGoogleDriveMedia(context.getBase44(),product.digital_google_drive_file_id,request);
    const headers=new Headers(response.headers);
-   const name=String(product.digital_file_name||product.title||"digital-download").replace(/[\\/\r\n\"\\]/g,"_").slice(0,160)||"digital-download";
+   const name=String(product.digital_file_name||product.title||"digital-download").replaceAll("/","_").replaceAll("\\","_").replaceAll("\r","_").replaceAll("\n","_").replaceAll("\"","_").slice(0,160)||"digital-download";
    headers.set("content-disposition","attachment; filename*=UTF-8''"+encodeURIComponent(name));
    headers.set("cache-control","private, no-store");
    headers.set("x-content-type-options","nosniff");
