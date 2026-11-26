@@ -25,3 +25,6 @@ Secrets and provider credentials must be configured in Base44 or the worker's pr
 ## Development
 
 The application uses React, TanStack Start/Router and Base44 backend services. The worker is a Python/FastAPI Docker service. Run the repository's GitHub Actions checks before merging changes. Production app changes are synchronised and deployed through the Base44 REST API; do not use Builder or integration-credit workflows.
+## VICEHUB Store
+
+The native Base44 storefront at `/shop` supports physical and digital catalogue items, a shopping bag, customer order history, private digital delivery, inventory and fulfilment management. Store administrators manage coupons, returns, invoices and sales reports under `/admin/shop/operations`. Coupon rules are validated server-side and applied to Stripe Checkout when payment prerequisites are configured. Stripe checkout remains deliberately disabled until the merchant completes Stripe, signed webhooks and tax configuration; do not represent the store as accepting live payments before those checks pass.
