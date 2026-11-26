@@ -95,13 +95,11 @@ async function findOrCreateDriveFolder(accessToken, name, parentId) {
 export async function ensureGoogleDriveLibraryFolders(base44) {
   const token = await getGoogleDriveAccessToken(base44);
   const root = await findOrCreateDriveFolder(token, "VICEHUB", "root");
-  const [originals, clips, approved, published] = await Promise.all([
+  const [originals, published] = await Promise.all([
     findOrCreateDriveFolder(token, "01 - ORIGINALS", root.id),
-    findOrCreateDriveFolder(token, "02 - CLIPS", root.id),
-    findOrCreateDriveFolder(token, "03 - APPROVED", root.id),
-    findOrCreateDriveFolder(token, "04 - PUBLISHED", root.id),
+    findOrCreateDriveFolder(token, "02 - PUBLISHED", root.id),
   ]);
-  return { root, originals, clips, approved, published };
+  return { root, originals, published };
 }
 
 export async function streamGoogleDriveMedia(base44, fileId, request) {
