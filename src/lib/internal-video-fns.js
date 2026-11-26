@@ -22,8 +22,8 @@ export const listInternalVideoAssets = createServerFn({ method: "GET" })
   .validator(z.object({
     limit: z.number().int().min(1).max(100).default(50),
     offset: z.number().int().min(0).default(0),
-    status: z.enum(["stored", "processing", "ready", "archived"]).optional(),
-    assetType: z.enum(["source", "clip", "derivative"]).optional(),
+    status: z.enum(["ready", "archived"]).optional(),
+    assetType: z.literal("source").optional(),
   }))
   .handler(async ({ data, context }) => {
     requireAdmin(context);
@@ -163,7 +163,7 @@ export const createInternalVideoAsset = createServerFn({ method: "POST" })
   .validator(z.object({
     title: z.string().trim().min(2).max(180),
     description: z.string().max(5000).optional(),
-    assetType: z.enum(["source", "clip", "derivative"]).default("source"),
+    assetType: z.literal("source").default("source"),
     category: z.string().trim().max(80).optional(),
     language: z.string().trim().max(12).default("en"),
     tags: z.array(z.string().trim().min(1).max(50)).max(30).default([]),
@@ -197,7 +197,7 @@ export const createInternalVideoAsset = createServerFn({ method: "POST" })
       title: data.title,
       description: data.description || "",
       asset_type: data.assetType,
-      status: "stored",
+      status: "ready",
       category: data.category || "",
       language: data.language || "en",
       tags: data.tags,
