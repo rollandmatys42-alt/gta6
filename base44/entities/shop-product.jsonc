@@ -122,6 +122,26 @@
     "rights_note": {
       "type": "string",
       "maxLength": 1000
+    },
+    "digital_storage_key": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "digital_storage_connection_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "digital_file_name": {
+      "type": "string",
+      "maxLength": 180
+    },
+    "digital_content_type": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "digital_file_size_bytes": {
+      "type": "integer",
+      "minimum": 0
     }
   },
   "required": [
