@@ -65,6 +65,31 @@ export async function listGoogleDriveVideoFiles(base44, { query = "", pageToken 
   return { files: Array.isArray(payload.files) ? payload.files : [], nextPageToken: payload.nextPageToken || null };
 }
 
+export async function listGoogleDriveDigitalFiles(base44, { query = "", pageToken = "", parentId = "" } = {}) {
+  const token = await getGoogleDriveAccessToken(base44);
+  const q = ["trashed = false", "mimeType != 'application/vnd.google-apps.folder'"];
+  if (parentId) {
+    if (!/^[A-Za-z0-9_-]{1,512}$/.test(parentId)) throw Object.assign(new Error("Invalid Google Drive folder ID."), { status: 400 });
+    q.push("'" + parentId + "' in parents");
+  }
+  const term = String(query || "").trim().slice(0, 100);
+  if (term) {
+    const escaped = term.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    q.push("name contains '" + escaped + "'");
+  }
+  const params = new URLSearchParams({
+    q: q.join(" and "), pageSize: "100", orderBy: "modifiedTime desc",
+    fields: "nextPageToken,files(id,name,mimeType,size,modifiedTime,parents,webViewLink,capabilities(canDownload))",
+    supportsAllDrives: "true", includeItemsFromAllDrives: "true",
+  });
+  if (pageToken) params.set("pageToken", pageToken);
+  const response = await driveRequest(token, DRIVE_API + "/files?" + params.toString());
+  const payload = await response.json();
+  const allowed = new Set(["application/pdf", "application/zip", "application/x-zip-compressed", "image/png", "image/jpeg", "image/webp", "video/mp4", "audio/mpeg", "audio/wav", "text/plain", "text/csv"]);
+  const files = (Array.isArray(payload.files) ? payload.files : []).filter(file => allowed.has(file.mimeType) && file.capabilities?.canDownload !== false && Number(file.size || 0) > 0 && Number(file.size || 0) <= 1000000000);
+  return { files, nextPageToken: payload.nextPageToken || null };
+}
+
 export async function listGoogleDriveFolders(base44, { parentId = "root" } = {}) {
   const token = await getGoogleDriveAccessToken(base44);
   if (!/^[A-Za-z0-9_-]{1,512}$/.test(parentId)) throw Object.assign(new Error("Invalid Google Drive folder ID."), { status: 400 });

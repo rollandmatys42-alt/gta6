@@ -131,6 +131,15 @@
       "type": "string",
       "maxLength": 128
     },
+    "digital_storage_provider": {
+      "type": "string",
+      "enum": ["private_storage", "google_drive"],
+      "default": "private_storage"
+    },
+    "digital_google_drive_file_id": {
+      "type": "string",
+      "maxLength": 512
+    },
     "digital_file_name": {
       "type": "string",
       "maxLength": 180
