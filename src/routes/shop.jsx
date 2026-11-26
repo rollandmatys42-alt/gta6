@@ -120,7 +120,7 @@ function ShopPage() {
       const result = await getShopDigitalDownloadUrl({ data: { orderId: order.id, productId: item.product_id } });
       const link = document.createElement("a"); link.href = result.url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.download = result.fileName || item.title;
       document.body.appendChild(link); link.click(); link.remove();
-      setMessage("Your private download link is valid for 2 minutes.");
+      setMessage(result.expiresInSeconds?"Your private download link is valid for 2 minutes.":"Your private download is ready.");
     } catch (error) { setMessage(error?.message || "The digital download could not be prepared."); }
     finally { setDownloadingItem(""); }
   };
