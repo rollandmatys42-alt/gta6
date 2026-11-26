@@ -1,0 +1,31 @@
+.admin-workbench .admin-topbar { align-items: center; }
+.admin-workbench .admin-sidebar { overflow-y: auto; }
+.admin-workbench .admin-nav-heading { color: #a6a5bb; }
+.admin-workbench .admin-nav-item:focus-visible,
+.admin-home :is(a, button):focus-visible { outline: 2px solid #a7edf1; outline-offset: 3px; }
+.admin-home { display: grid; gap: 1.3rem; max-width: 78rem; }
+.admin-home h2, .admin-home p { margin: 0; }
+.admin-home p, .admin-home small { color: #b9b9cd; }
+.admin-home-intro {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.2rem;
+  padding: clamp(1.2rem, 4vw, 2.5rem); border: 1px solid #534666; border-radius: 1.25rem;
+  background: radial-gradient(ellipse at 85% 0%, #413568, transparent 68%), #1a172a;
+}
+.admin-home-intro h2 { font-size: clamp(1.6rem, 4vw, 2.75rem); font-weight: 750; }
+.admin-home-primary { background: #f9a4ca; color: #261229; padding: .8rem 1rem; border-radius: .7rem; font-weight: 750; text-decoration: none; }
+.admin-home-metrics, .admin-home-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .85rem; }
+.admin-home :is(.admin-home-metrics, .admin-home-actions) > * {
+  text-align: left; color: #f4f2fb; background: #201d32; border: 1px solid #46405d;
+  padding: 1rem; border-radius: .85rem; text-decoration: none; cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.admin-home :is(.admin-home-metrics, .admin-home-actions) > *:hover { background-color: #2e2944; border-color: #f9a4ca; }
+.admin-home-metrics button { display: grid; grid-template-columns: 1fr auto; gap: .6rem; }
+.admin-home-metrics span:first-child { grid-column: 1 / -1; color: #c2c0d5; }
+.admin-home-metrics strong { font-size: 1.8rem; }
+.admin-home-actions > * { display: flex; align-items: center; gap: .7rem; }
+.admin-home-actions > * > span { color: #a7edf1; }
+.admin-home-actions small { display: block; margin-top: .25rem; }
+@media (prefers-reduced-motion: reduce) { .admin-home :is(a, button) { transition: none; } }
+.admin-workbench .admin-feedback { margin: 0 0 1rem; padding: .75rem 1rem; border-radius: .65rem; background: #12383d; color: #c7f9fa; }
+.admin-workbench .admin-feedback-error { background: #471d34; color: #ffdcec; }
