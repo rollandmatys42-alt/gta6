@@ -63,6 +63,7 @@ function ShopAdminPage(){
    <div className="sa-nav-caption sa-tools-caption">CHANNELS</div>
    <a className="sa-nav-item" href="/shop"><span>↗</span>View online store</a>
    <a className="sa-nav-item" href="/admin-digital-products"><span>⇩</span>Digital products</a>
+   <a className="sa-nav-item" href="/admin/shop/operations"><span>⚙</span>Commerce operations</a>
    <a className="sa-nav-item" href="/admin"><span>⌘</span>Main admin</a>
    <div className="sa-sidebar-bottom"><span className="sa-live-dot"></span><div><b>ADMIN SESSION</b><small>{user.email||"Administrator"}</small></div></div>
   </aside>

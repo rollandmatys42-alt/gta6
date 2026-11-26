@@ -1,0 +1,85 @@
+{
+  "name": "ShopCoupon",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 32
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": [
+        "percent",
+        "fixed"
+      ]
+    },
+    "discount_value": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "GBP",
+        "EUR",
+        "USD"
+      ]
+    },
+    "minimum_spend_cents": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_redemptions": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "redemption_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "starts_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "code",
+    "discount_type",
+    "discount_value",
+    "active"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
