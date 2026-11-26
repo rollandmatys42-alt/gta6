@@ -2341,7 +2341,7 @@ export const createAdminShopInvoice = createServerFn({method:"POST"}).middleware
   const existing=await db.ShopInvoice.filter({order_id:order.id},"-created_date",1,0);
   if(existing[0])return existing[0];
   const issuedAt=new Date().toISOString();
-  const invoice=await db.ShopInvoice.create({order_id:order.id,user_id:order.user_id,customer_email:order.customer_email,customer_name:order.customer_name||"",currency:order.currency,items:order.items||[],subtotal_cents:Number(order.subtotal_cents||0),shipping_cents:Number(order.shipping_cents||0),tax_cents:Number(order.tax_cents||0),total_cents:Number(order.total_cents||0),issued_at:issuedAt,invoice_number:""});
+  const invoice=await db.ShopInvoice.create({order_id:order.id,user_id:order.user_id,customer_email:order.customer_email,customer_name:order.customer_name||"",currency:order.currency,items:order.items||[],subtotal_cents:Number(order.subtotal_cents||0),shipping_cents:Number(order.shipping_cents||0),coupon_code:order.coupon_code||"",coupon_discount_cents:Number(order.coupon_discount_cents||0),tax_cents:Number(order.tax_cents||0),total_cents:Number(order.total_cents||0),issued_at:issuedAt,invoice_number:""});
   const number="VH-"+new Date(issuedAt).toISOString().slice(0,10).replaceAll("-","")+"-"+String(invoice.id).slice(-6).toUpperCase();
   return db.ShopInvoice.update(invoice.id,{invoice_number:number});
  });
