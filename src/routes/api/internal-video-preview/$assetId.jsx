@@ -7,8 +7,8 @@ export const Route=createFileRoute("/api/internal-video-preview/$assetId")({
  server:{middleware:[requireUserRoute],handlers:{GET:async({params,request,context})=>{
   const db=context.getBase44().asServiceRole.entities;
   const asset=await db.InternalVideoAsset.get(params.assetId).catch(()=>null);
-  if(!asset||asset.asset_type!=="clip"||asset.status!=="ready"||asset.review_status!=="approved"||asset.public_video_status!=="published"||!["authorised","not_applicable"].includes(asset.rights_status)){
-   return Response.json({error:"Clip preview unavailable."},{status:404,headers:{"cache-control":"no-store"}});
+  if(!asset||asset.asset_type!=="source"||asset.status!=="ready"||asset.review_status!=="approved"||asset.public_video_status!=="published"||!["authorised","not_applicable"].includes(asset.rights_status)){
+   return Response.json({error:"Video preview unavailable."},{status:404,headers:{"cache-control":"no-store"}});
   }
   // Administrators can preview published, rights-cleared clips for quality control.
   // Members still need an active paid subscription.
@@ -17,7 +17,7 @@ export const Route=createFileRoute("/api/internal-video-preview/$assetId")({
    const subscription=subscriptions[0];
    const active=subscription?.status==="active"||(subscription?.status==="past_due"&&subscription?.grace_period_ends_at&&new Date(subscription.grace_period_ends_at)>new Date());
    if(!active||!subscription?.tier_code||subscription.tier_code==="free"){
-    return Response.json({error:"An active paid VICEHUB membership is required to preview clips."},{status:403,headers:{"cache-control":"no-store"}});
+    return Response.json({error:"An active paid VICEHUB membership is required to preview videos."},{status:403,headers:{"cache-control":"no-store"}});
    }
   }
   try{
@@ -31,7 +31,7 @@ export const Route=createFileRoute("/api/internal-video-preview/$assetId")({
    }
    return Response.json({error:"This storage provider does not yet support private VICEHUB streaming."},{status:503,headers:{"cache-control":"no-store"}});
   }catch(error){
-   return Response.json({error:error?.message||"Clip preview failed."},{status:error?.status||502,headers:{"cache-control":"no-store"}});
+   return Response.json({error:error?.message||"Video preview failed."},{status:error?.status||502,headers:{"cache-control":"no-store"}});
   }
  }}}
 });
